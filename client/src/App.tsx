@@ -36,6 +36,10 @@ export function App() {
           setActiveTool('draw')
           setSelectedId(null)
           break
+        case 'l':
+          setActiveTool('line')
+          setSelectedId(null)
+          break
         case 'escape':
           setActiveTool('select')
           setSelectedId(null)

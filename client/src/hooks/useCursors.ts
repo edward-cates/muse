@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { awareness } from '../collab/provider'
+import { useCollab } from '../collab/CollabContext'
 
 export interface RemoteCursor {
   clientId: number
@@ -10,6 +10,7 @@ export interface RemoteCursor {
 }
 
 export function useCursors() {
+  const { awareness } = useCollab()
   const [cursors, setCursors] = useState<RemoteCursor[]>([])
 
   useEffect(() => {
@@ -31,7 +32,7 @@ export function useCursors() {
 
     awareness.on('change', onChange)
     return () => awareness.off('change', onChange)
-  }, [])
+  }, [awareness])
 
   return cursors
 }

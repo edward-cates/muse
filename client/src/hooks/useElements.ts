@@ -1,10 +1,9 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import * as Y from 'yjs'
-import { doc } from '../collab/provider'
-import type { CanvasElement, ShapeType, ShapeElement, PathElement } from '../types'
+import { useCollab } from '../collab/CollabContext'
+import type { CanvasElement, ShapeType, ShapeElement, PathElement, LineElement, Anchor } from '../types'
 
 type YMapVal = string | number | number[]
-const yElements = doc.getArray<Y.Map<YMapVal>>('elements')
 
 function readElement(m: Y.Map<YMapVal>): CanvasElement {
   const type = m.get('type') as string
@@ -15,6 +14,18 @@ function readElement(m: Y.Map<YMapVal>): CanvasElement {
       x: m.get('x') as number,
       y: m.get('y') as number,
       points: m.get('points') as number[],
+      stroke: m.get('stroke') as string,
+      strokeWidth: m.get('strokeWidth') as number,
+    }
+  }
+  if (type === 'line') {
+    return {
+      id: m.get('id') as string,
+      type: 'line',
+      startShapeId: m.get('startShapeId') as string,
+      endShapeId: m.get('endShapeId') as string,
+      startAnchor: m.get('startAnchor') as Anchor,
+      endAnchor: m.get('endAnchor') as Anchor,
       stroke: m.get('stroke') as string,
       strokeWidth: m.get('strokeWidth') as number,
     }
@@ -33,6 +44,8 @@ function readElement(m: Y.Map<YMapVal>): CanvasElement {
 }
 
 export function useElements() {
+  const { doc } = useCollab()
+  const yElements = useMemo(() => doc.getArray<Y.Map<YMapVal>>('elements'), [doc])
   const [elements, setElements] = useState<CanvasElement[]>([])
 
   useEffect(() => {
@@ -42,7 +55,7 @@ export function useElements() {
     yElements.observeDeep(sync)
     sync()
     return () => yElements.unobserveDeep(sync)
-  }, [])
+  }, [yElements])
 
   const addShape = useCallback(
     (type: ShapeType, x: number, y: number, w: number, h: number): string => {
@@ -56,11 +69,11 @@ export function useElements() {
       yEl.set('height', h)
       yEl.set('text', '')
       yEl.set('fill', '#ffffff')
-      yEl.set('stroke', '#1e1e1e')
+      yEl.set('stroke', '#4f46e5')
       yElements.push([yEl])
       return id
     },
-    [],
+    [yElements],
   )
 
   const addPath = useCallback(
@@ -77,11 +90,29 @@ export function useElements() {
       yElements.push([yEl])
       return id
     },
-    [],
+    [yElements],
+  )
+
+  const addLine = useCallback(
+    (startShapeId: string, endShapeId: string, startAnchor: Anchor, endAnchor: Anchor): string => {
+      const id = crypto.randomUUID()
+      const yEl = new Y.Map<YMapVal>()
+      yEl.set('id', id)
+      yEl.set('type', 'line')
+      yEl.set('startShapeId', startShapeId)
+      yEl.set('endShapeId', endShapeId)
+      yEl.set('startAnchor', startAnchor)
+      yEl.set('endAnchor', endAnchor)
+      yEl.set('stroke', '#4f46e5')
+      yEl.set('strokeWidth', 1.5)
+      yElements.push([yEl])
+      return id
+    },
+    [yElements],
   )
 
   const updateElement = useCallback(
-    (id: string, updates: Partial<Omit<ShapeElement, 'id' | 'type'>> | Partial<Omit<PathElement, 'id' | 'type'>>) => {
+    (id: string, updates: Partial<Omit<ShapeElement, 'id' | 'type'>> | Partial<Omit<PathElement, 'id' | 'type'>> | Partial<Omit<LineElement, 'id' | 'type'>>) => {
       yElements.forEach((yEl) => {
         if (yEl.get('id') === id) {
           for (const [key, value] of Object.entries(updates)) {
@@ -90,13 +121,13 @@ export function useElements() {
         }
       })
     },
-    [],
+    [yElements],
   )
 
   const deleteElement = useCallback((id: string) => {
     const idx = yElements.toArray().findIndex((el) => el.get('id') === id)
     if (idx !== -1) yElements.delete(idx, 1)
-  }, [])
+  }, [yElements])
 
-  return { elements, addShape, addPath, updateElement, deleteElement }
+  return { elements, addShape, addPath, addLine, updateElement, deleteElement }
 }

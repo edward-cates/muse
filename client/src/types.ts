@@ -1,6 +1,8 @@
-export type Tool = 'select' | 'rectangle' | 'ellipse' | 'diamond' | 'draw'
+export type Tool = 'select' | 'rectangle' | 'ellipse' | 'diamond' | 'draw' | 'line'
 
 export type ShapeType = 'rectangle' | 'ellipse' | 'diamond'
+
+export type Anchor = 'top' | 'right' | 'bottom' | 'left'
 
 export interface ShapeElement {
   id: string
@@ -24,12 +26,27 @@ export interface PathElement {
   strokeWidth: number
 }
 
-export type CanvasElement = ShapeElement | PathElement
+export interface LineElement {
+  id: string
+  type: 'line'
+  startShapeId: string
+  endShapeId: string
+  startAnchor: Anchor
+  endAnchor: Anchor
+  stroke: string
+  strokeWidth: number
+}
+
+export type CanvasElement = ShapeElement | PathElement | LineElement
 
 export function isShape(el: CanvasElement): el is ShapeElement {
-  return el.type !== 'path'
+  return el.type !== 'path' && el.type !== 'line'
 }
 
 export function isPath(el: CanvasElement): el is PathElement {
   return el.type === 'path'
+}
+
+export function isLine(el: CanvasElement): el is LineElement {
+  return el.type === 'line'
 }

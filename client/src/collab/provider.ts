@@ -1,19 +1,27 @@
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
 
-export const doc = new Y.Doc()
+const USER_COLORS = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#22d3ee', '#818cf8', '#e879f9']
 
-export const wsProvider = new WebsocketProvider(
-  'ws://localhost:4444',
-  'muse-room',
-  doc,
-)
+export interface CollabInstance {
+  doc: Y.Doc
+  wsProvider: WebsocketProvider
+  awareness: WebsocketProvider['awareness']
+}
 
-export const awareness = wsProvider.awareness
+export function createCollabProvider(roomName: string): CollabInstance {
+  const doc = new Y.Doc()
+  const wsProvider = new WebsocketProvider('ws://localhost:4444', roomName, doc)
+  const awareness = wsProvider.awareness
 
-// Set a random user identity
-const COLORS = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#22d3ee', '#818cf8', '#e879f9']
-const color = COLORS[doc.clientID % COLORS.length]
-const name = `User ${doc.clientID % 1000}`
+  const color = USER_COLORS[doc.clientID % USER_COLORS.length]
+  const name = `User ${doc.clientID % 1000}`
+  awareness.setLocalStateField('user', { name, color })
 
-awareness.setLocalStateField('user', { name, color })
+  return { doc, wsProvider, awareness }
+}
+
+export function destroyCollabProvider(instance: CollabInstance) {
+  instance.wsProvider.destroy()
+  instance.doc.destroy()
+}

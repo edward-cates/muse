@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { wsProvider } from '../collab/provider'
+import { useCollab } from '../collab/CollabContext'
 
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected'
 
 export function useConnection(): ConnectionStatus {
+  const { wsProvider } = useCollab()
   const [status, setStatus] = useState<ConnectionStatus>(
     wsProvider.wsconnected ? 'connected' : 'connecting',
   )
@@ -26,7 +27,7 @@ export function useConnection(): ConnectionStatus {
       wsProvider.off('connection-error', onDisconnect)
       wsProvider.off('sync', onConnect)
     }
-  }, [])
+  }, [wsProvider])
 
   return status
 }
