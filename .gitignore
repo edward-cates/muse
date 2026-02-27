@@ -6,4 +6,4 @@ dist
 .env.*
 !*.example
 .DS_Store
-muse-data
+**/muse-data
