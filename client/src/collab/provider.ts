@@ -9,14 +9,24 @@ export interface CollabInstance {
   awareness: WebsocketProvider['awareness']
 }
 
-export function createCollabProvider(roomName: string): CollabInstance {
+interface CollabUser {
+  name: string
+  email: string
+}
+
+export function createCollabProvider(
+  roomName: string,
+  user: CollabUser,
+  token: string,
+): CollabInstance {
   const doc = new Y.Doc()
-  const wsProvider = new WebsocketProvider('ws://localhost:4444', roomName, doc)
+  const wsProvider = new WebsocketProvider('ws://localhost:4444', roomName, doc, {
+    params: { token },
+  })
   const awareness = wsProvider.awareness
 
   const color = USER_COLORS[doc.clientID % USER_COLORS.length]
-  const name = `User ${doc.clientID % 1000}`
-  awareness.setLocalStateField('user', { name, color })
+  awareness.setLocalStateField('user', { name: user.name, color })
 
   return { doc, wsProvider, awareness }
 }

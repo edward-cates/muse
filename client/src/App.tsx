@@ -2,11 +2,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { Canvas } from './components/Canvas'
 import { Toolbar } from './components/Toolbar'
 import { StatusBar } from './components/StatusBar'
+import { SettingsPanel } from './components/SettingsPanel'
+import { AiPanel } from './components/AiPanel'
 import type { Tool } from './types'
 
 export function App() {
   const [activeTool, setActiveTool] = useState<Tool>('select')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [aiOpen, setAiOpen] = useState(false)
 
   const switchToSelect = useCallback(() => setActiveTool('select'), [])
 
@@ -60,7 +64,12 @@ export function App() {
         onShapeCreated={switchToSelect}
       />
       <Toolbar activeTool={activeTool} onToolChange={setActiveTool} />
-      <StatusBar />
+      <StatusBar
+        onSettingsClick={() => setSettingsOpen(true)}
+        onAiClick={() => setAiOpen(true)}
+      />
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <AiPanel open={aiOpen} onClose={() => setAiOpen(false)} />
     </div>
   )
 }
