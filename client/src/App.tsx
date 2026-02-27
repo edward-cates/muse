@@ -1,26 +1,61 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Canvas } from './components/Canvas'
 import { Toolbar } from './components/Toolbar'
 import { StatusBar } from './components/StatusBar'
-
-export type Tool = 'select' | 'note'
-
-const NOTE_COLORS = ['#fef08a', '#fda4af', '#93c5fd', '#86efac', '#c4b5fd', '#fdba74']
+import type { Tool } from './types'
 
 export function App() {
   const [activeTool, setActiveTool] = useState<Tool>('select')
-  const [noteColor, setNoteColor] = useState(NOTE_COLORS[0])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  const switchToSelect = useCallback(() => setActiveTool('select'), [])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't intercept when typing in a textarea/input
+      if ((e.target as HTMLElement).tagName === 'TEXTAREA' || (e.target as HTMLElement).tagName === 'INPUT') return
+
+      switch (e.key.toLowerCase()) {
+        case 'v':
+          setActiveTool('select')
+          break
+        case 'r':
+          setActiveTool('rectangle')
+          setSelectedId(null)
+          break
+        case 'o':
+          setActiveTool('ellipse')
+          setSelectedId(null)
+          break
+        case 'd':
+          setActiveTool('diamond')
+          setSelectedId(null)
+          break
+        case 'p':
+          setActiveTool('draw')
+          setSelectedId(null)
+          break
+        case 'escape':
+          setActiveTool('select')
+          setSelectedId(null)
+          break
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   return (
     <div className="app">
-      <Canvas activeTool={activeTool} noteColor={noteColor} onNotePlaced={() => setActiveTool('select')} />
-      <Toolbar
+      <Canvas
         activeTool={activeTool}
+        selectedId={selectedId}
+        onSelectedIdChange={setSelectedId}
         onToolChange={setActiveTool}
-        noteColor={noteColor}
-        onColorChange={setNoteColor}
-        colors={NOTE_COLORS}
+        onShapeCreated={switchToSelect}
       />
+      <Toolbar activeTool={activeTool} onToolChange={setActiveTool} />
       <StatusBar />
     </div>
   )
