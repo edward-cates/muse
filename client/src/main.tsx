@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext'
 import { LoginPage } from './auth/LoginPage'
 import { CollabProvider } from './collab/CollabContext'
 import { useDrawingId } from './hooks/useDrawingId'
+import { useDrawingRegistration } from './hooks/useDrawingRegistration'
 import './index.css'
 
 function Root() {
@@ -19,9 +20,10 @@ function Root() {
 
 function AuthenticatedApp() {
   const drawingId = useDrawingId()
+  useDrawingRegistration(drawingId)
   return (
     <CollabProvider roomName={`muse-${drawingId}`}>
-      <App />
+      <App drawingId={drawingId} />
     </CollabProvider>
   )
 }

@@ -33,8 +33,8 @@ function shapeSvg(type: ShapeElement['type'], w: number, h: number, stroke: stri
         <ellipse
           cx={w / 2}
           cy={h / 2}
-          rx={(w - sw) / 2}
-          ry={(h - sw) / 2}
+          rx={Math.max(0, (w - sw) / 2)}
+          ry={Math.max(0, (h - sw) / 2)}
           fill="none"
           stroke={accentStroke}
           strokeWidth={sw}

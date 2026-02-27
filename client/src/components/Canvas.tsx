@@ -1,5 +1,4 @@
 import { useRef, useState, useCallback, useEffect, type MouseEvent, type WheelEvent } from 'react'
-import { useElements } from '../hooks/useElements'
 import { useCursors } from '../hooks/useCursors'
 import { useCollab } from '../collab/CollabContext'
 import { ShapeRenderer } from './ShapeRenderer'
@@ -7,7 +6,7 @@ import { PathLayer } from './PathLayer'
 import { LineLayer, getAnchorPoint, findClosestAnchors } from './LineLayer'
 import { Cursors } from './Cursors'
 import { isShape, isPath, isLine } from '../types'
-import type { Tool, ShapeType, Anchor, ShapeElement } from '../types'
+import type { Tool, ShapeType, CanvasElement, Anchor, ShapeElement, PathElement, LineElement } from '../types'
 
 interface Props {
   activeTool: Tool
@@ -15,14 +14,19 @@ interface Props {
   onSelectedIdChange: (id: string | null) => void
   onToolChange: (tool: Tool) => void
   onShapeCreated: () => void
+  elements: CanvasElement[]
+  addShape: (type: ShapeType, x: number, y: number, w: number, h: number) => string
+  addPath: (x: number, y: number, points: number[], stroke: string, strokeWidth: number) => string
+  addLine: (startShapeId: string, endShapeId: string, startAnchor: Anchor, endAnchor: Anchor) => string
+  updateElement: (id: string, updates: Partial<Omit<ShapeElement, 'id' | 'type'>> | Partial<Omit<PathElement, 'id' | 'type'>> | Partial<Omit<LineElement, 'id' | 'type'>>) => void
+  deleteElement: (id: string) => void
 }
 
 const SHAPE_TOOLS: Tool[] = ['rectangle', 'ellipse', 'diamond']
 const MIN_SHAPE_SIZE = 10
 
-export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChange, onShapeCreated }: Props) {
+export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChange, onShapeCreated, elements, addShape, addPath, addLine, updateElement, deleteElement }: Props) {
   const { awareness } = useCollab()
-  const { elements, addShape, addPath, addLine, updateElement, deleteElement } = useElements()
   const cursors = useCursors()
 
   const [offset, setOffset] = useState({ x: 0, y: 0 })

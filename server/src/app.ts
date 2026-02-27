@@ -8,6 +8,7 @@ import cors from 'cors'
 import * as jose from 'jose'
 import keysRouter from './routes/keys.js'
 import aiRouter from './routes/ai.js'
+import drawingsRouter from './routes/drawings.js'
 
 // ── Express types augmentation ──
 declare global {
@@ -132,6 +133,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.use('/api/keys', authMiddleware, keysRouter)
   app.use('/api/ai', authMiddleware, aiRouter)
+  app.use('/api/drawings', authMiddleware, drawingsRouter)
 
   // ── HTTP + WS ──
   const server = createHttpServer(app)

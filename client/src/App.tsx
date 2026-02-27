@@ -4,13 +4,17 @@ import { Toolbar } from './components/Toolbar'
 import { StatusBar } from './components/StatusBar'
 import { SettingsPanel } from './components/SettingsPanel'
 import { AiPanel } from './components/AiPanel'
+import { DrawingsList } from './components/DrawingsList'
+import { useElements } from './hooks/useElements'
 import type { Tool } from './types'
 
-export function App() {
+export function App({ drawingId }: { drawingId: string }) {
   const [activeTool, setActiveTool] = useState<Tool>('select')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
+
+  const { elements, addShape, addPath, addLine, updateElement, deleteElement } = useElements()
 
   const switchToSelect = useCallback(() => setActiveTool('select'), [])
 
@@ -62,6 +66,12 @@ export function App() {
         onSelectedIdChange={setSelectedId}
         onToolChange={setActiveTool}
         onShapeCreated={switchToSelect}
+        elements={elements}
+        addShape={addShape}
+        addPath={addPath}
+        addLine={addLine}
+        updateElement={updateElement}
+        deleteElement={deleteElement}
       />
       <Toolbar activeTool={activeTool} onToolChange={setActiveTool} />
       <StatusBar
@@ -69,7 +79,13 @@ export function App() {
         onAiClick={() => setAiOpen(true)}
       />
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <AiPanel open={aiOpen} onClose={() => setAiOpen(false)} />
+      <AiPanel
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        elements={elements}
+        elementActions={{ addShape, addLine, updateElement, deleteElement }}
+      />
+      <DrawingsList currentDrawingId={drawingId} />
     </div>
   )
 }

@@ -11,7 +11,7 @@ function getSupabase() {
 
 router.post('/message', async (req, res) => {
   const userId = req.userId!
-  const { messages, system, model = 'claude-sonnet-4-20250514' } = req.body
+  const { messages, system, tools, model = 'claude-opus-4-6' } = req.body
 
   if (!messages || !Array.isArray(messages)) {
     res.status(400).json({ error: 'messages array is required' })
@@ -47,16 +47,48 @@ router.post('/message', async (req, res) => {
 
   try {
     const client = new Anthropic({ apiKey })
-    const stream = await client.messages.stream({
+    const stream = client.messages.stream({
       model,
-      max_tokens: 4096,
+      max_tokens: 16384,
       messages,
       ...(system ? { system } : {}),
+      ...(tools && tools.length > 0 ? { tools } : {}),
     })
 
     for await (const event of stream) {
+      // Text content deltas
       if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-        res.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`)
+        res.write(`data: ${JSON.stringify({ type: 'text_delta', text: event.delta.text })}\n\n`)
+      }
+
+      // Tool use block starts
+      if (event.type === 'content_block_start' && event.content_block.type === 'tool_use') {
+        res.write(`data: ${JSON.stringify({
+          type: 'tool_use_start',
+          id: event.content_block.id,
+          name: event.content_block.name,
+        })}\n\n`)
+      }
+
+      // Tool use input JSON deltas
+      if (event.type === 'content_block_delta' && event.delta.type === 'input_json_delta') {
+        res.write(`data: ${JSON.stringify({
+          type: 'input_json_delta',
+          partial_json: event.delta.partial_json,
+        })}\n\n`)
+      }
+
+      // Content block finished
+      if (event.type === 'content_block_stop') {
+        res.write(`data: ${JSON.stringify({ type: 'content_block_stop' })}\n\n`)
+      }
+
+      // Message delta (contains stop_reason)
+      if (event.type === 'message_delta') {
+        res.write(`data: ${JSON.stringify({
+          type: 'message_delta',
+          stop_reason: event.delta.stop_reason,
+        })}\n\n`)
       }
     }
 
@@ -64,7 +96,6 @@ router.post('/message', async (req, res) => {
     res.end()
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'AI request failed'
-    // If headers already sent, send error as SSE event
     if (res.headersSent) {
       res.write(`data: ${JSON.stringify({ error: message })}\n\n`)
       res.end()
