@@ -1,8 +1,10 @@
-export type Tool = 'select' | 'rectangle' | 'ellipse' | 'diamond' | 'draw' | 'line'
+export type Tool = 'select' | 'rectangle' | 'ellipse' | 'diamond' | 'draw' | 'line' | 'arrow'
 
 export type ShapeType = 'rectangle' | 'ellipse' | 'diamond'
 
 export type Anchor = 'top' | 'right' | 'bottom' | 'left'
+
+export type LineType = 'straight' | 'elbow' | 'curve'
 
 export interface ShapeElement {
   id: string
@@ -14,6 +16,7 @@ export interface ShapeElement {
   text: string
   fill: string
   stroke: string
+  strokeWidth: number
 }
 
 export interface PathElement {
@@ -29,12 +32,19 @@ export interface PathElement {
 export interface LineElement {
   id: string
   type: 'line'
-  startShapeId: string
-  endShapeId: string
+  startShapeId: string   // '' = free endpoint
+  endShapeId: string     // '' = free endpoint
   startAnchor: Anchor
   endAnchor: Anchor
+  startX: number         // world coords for free endpoints
+  startY: number
+  endX: number
+  endY: number
   stroke: string
   strokeWidth: number
+  arrowStart: boolean
+  arrowEnd: boolean
+  lineType: LineType
 }
 
 export type CanvasElement = ShapeElement | PathElement | LineElement

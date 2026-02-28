@@ -5,19 +5,22 @@ import { ShapeRenderer } from './ShapeRenderer'
 import { PathLayer } from './PathLayer'
 import { LineLayer, getAnchorPoint, findClosestAnchors } from './LineLayer'
 import { Cursors } from './Cursors'
+import { PropertyPanel } from './PropertyPanel'
 import { isShape, isPath, isLine } from '../types'
-import type { Tool, ShapeType, CanvasElement, Anchor, ShapeElement, PathElement, LineElement } from '../types'
+import type { Tool, ShapeType, CanvasElement, Anchor, LineType, ShapeElement, PathElement, LineElement } from '../types'
 
 interface Props {
   activeTool: Tool
-  selectedId: string | null
-  onSelectedIdChange: (id: string | null) => void
+  activeLineType: LineType
+  selectedIds: string[]
+  onSelectedIdsChange: (ids: string[]) => void
   onToolChange: (tool: Tool) => void
   onShapeCreated: () => void
   elements: CanvasElement[]
   addShape: (type: ShapeType, x: number, y: number, w: number, h: number) => string
   addPath: (x: number, y: number, points: number[], stroke: string, strokeWidth: number) => string
-  addLine: (startShapeId: string, endShapeId: string, startAnchor: Anchor, endAnchor: Anchor) => string
+  addLine: (startShapeId: string, endShapeId: string, startAnchor: Anchor, endAnchor: Anchor, lineType?: LineType) => string
+  addArrow: (startShapeId: string, endShapeId: string, startAnchor: Anchor, endAnchor: Anchor, startX: number, startY: number, endX: number, endY: number, lineType?: LineType) => string
   updateElement: (id: string, updates: Partial<Omit<ShapeElement, 'id' | 'type'>> | Partial<Omit<PathElement, 'id' | 'type'>> | Partial<Omit<LineElement, 'id' | 'type'>>) => void
   deleteElement: (id: string) => void
 }
@@ -25,7 +28,9 @@ interface Props {
 const SHAPE_TOOLS: Tool[] = ['rectangle', 'ellipse', 'diamond']
 const MIN_SHAPE_SIZE = 10
 
-export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChange, onShapeCreated, elements, addShape, addPath, addLine, updateElement, deleteElement }: Props) {
+export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsChange, onToolChange, onShapeCreated, elements, addShape, addPath, addLine, addArrow, updateElement, deleteElement }: Props) {
+  // Compat: derive selectedId from selectedIds for single-select scenarios
+  const selectedId = selectedIds.length === 1 ? selectedIds[0] : null
   const { awareness } = useCollab()
   const cursors = useCursors()
 
@@ -51,8 +56,13 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
     strokeWidth: number
   } | null>(null)
 
-  // Line tool state
-  const [lineStart, setLineStart] = useState<{ shapeId: string; anchor: Anchor } | null>(null)
+  // Marquee selection state
+  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const marqueeStart = useRef({ x: 0, y: 0 })
+  const isMarquee = useRef(false)
+
+  // Line/Arrow tool state
+  const [lineStart, setLineStart] = useState<{ shapeId: string; anchor: Anchor; freeX: number; freeY: number } | null>(null)
   const [linePreviewEnd, setLinePreviewEnd] = useState<{ x: number; y: number } | null>(null)
   const [hoveredShapeId, setHoveredShapeId] = useState<string | null>(null)
 
@@ -105,14 +115,16 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).matches('textarea, input')) return
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
-        deleteElement(selectedId)
-        onSelectedIdChange(null)
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0) {
+        for (const id of selectedIds) {
+          deleteElement(id)
+        }
+        onSelectedIdsChange([])
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selectedId, deleteElement, onSelectedIdChange])
+  }, [selectedIds, deleteElement, onSelectedIdsChange])
 
   const startPan = useCallback(
     (clientX: number, clientY: number) => {
@@ -161,11 +173,14 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
       if (e.button !== 0) return
 
       if (activeTool === 'select') {
-        // Click on empty canvas = deselect + pan
+        // Click on empty canvas = deselect + start marquee
         if (e.target === e.currentTarget) {
-          onSelectedIdChange(null)
+          onSelectedIdsChange([])
           setEditingId(null)
-          startPan(e.clientX, e.clientY)
+          const world = screenToWorld(e.clientX, e.clientY)
+          marqueeStart.current = { x: world.x, y: world.y }
+          isMarquee.current = true
+          setMarquee({ x: world.x, y: world.y, w: 0, h: 0 })
         }
         return
       }
@@ -200,19 +215,43 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
         const hitShape = hitTestShape(world)
         if (hitShape) {
           const anchor = closestAnchor(hitShape, world)
-          setLineStart({ shapeId: hitShape.id, anchor })
+          setLineStart({ shapeId: hitShape.id, anchor, freeX: world.x, freeY: world.y })
           setLinePreviewEnd({ x: world.x, y: world.y })
         }
         return
       }
+
+      if (activeTool === 'arrow') {
+        const hitShape = hitTestShape(world)
+        if (hitShape) {
+          const anchor = closestAnchor(hitShape, world)
+          setLineStart({ shapeId: hitShape.id, anchor, freeX: world.x, freeY: world.y })
+        } else {
+          setLineStart({ shapeId: '', anchor: 'right', freeX: world.x, freeY: world.y })
+        }
+        setLinePreviewEnd({ x: world.x, y: world.y })
+        return
+      }
     },
-    [activeTool, screenToWorld, spaceHeld, startPan, onSelectedIdChange],
+    [activeTool, screenToWorld, spaceHeld, startPan, onSelectedIdsChange],
   )
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       const world = screenToWorld(e.clientX, e.clientY)
       awareness.setLocalStateField('cursor', world)
+
+      if (isMarquee.current) {
+        const sx = marqueeStart.current.x
+        const sy = marqueeStart.current.y
+        setMarquee({
+          x: Math.min(sx, world.x),
+          y: Math.min(sy, world.y),
+          w: Math.abs(world.x - sx),
+          h: Math.abs(world.y - sy),
+        })
+        return
+      }
 
       if (isPanningRef.current) {
         const dx = e.clientX - panStart.current.x
@@ -249,8 +288,8 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
         return
       }
 
-      // Line tool hover detection
-      if (activeTool === 'line') {
+      // Line/Arrow tool hover detection
+      if (activeTool === 'line' || activeTool === 'arrow') {
         const hitShape = hitTestShape(world)
         setHoveredShapeId(hitShape ? hitShape.id : null)
         if (lineStart) {
@@ -264,6 +303,31 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
 
   const handleMouseUp = useCallback(
     (e: MouseEvent) => {
+      if (isMarquee.current) {
+        isMarquee.current = false
+        const world = screenToWorld(e.clientX, e.clientY)
+        const sx = marqueeStart.current.x
+        const sy = marqueeStart.current.y
+        const rect = {
+          x: Math.min(sx, world.x),
+          y: Math.min(sy, world.y),
+          w: Math.abs(world.x - sx),
+          h: Math.abs(world.y - sy),
+        }
+        if (rect.w > 5 && rect.h > 5) {
+          const ids: string[] = []
+          for (const el of shapesRef.current) {
+            if (el.x + el.width > rect.x && el.x < rect.x + rect.w &&
+                el.y + el.height > rect.y && el.y < rect.y + rect.h) {
+              ids.push(el.id)
+            }
+          }
+          onSelectedIdsChange(ids)
+        }
+        setMarquee(null)
+        return
+      }
+
       if (isPanningRef.current) {
         setIsPanning(false)
         isPanningRef.current = false
@@ -274,7 +338,7 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
         isCreatingShape.current = false
         if (shapePreview && shapePreview.w >= MIN_SHAPE_SIZE && shapePreview.h >= MIN_SHAPE_SIZE) {
           const id = addShape(shapePreview.type, shapePreview.x, shapePreview.y, shapePreview.w, shapePreview.h)
-          onSelectedIdChange(id)
+          onSelectedIdsChange([id])
           onShapeCreated()
         }
         setShapePreview(null)
@@ -300,19 +364,57 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
       if (lineStart) {
         const world = screenToWorld(e.clientX, e.clientY)
         const hitShape = hitTestShape(world)
-        if (hitShape && hitShape.id !== lineStart.shapeId) {
-          const startShape = shapesRef.current.find((s) => s.id === lineStart.shapeId)
-          if (startShape) {
-            const { startAnchor, endAnchor } = findClosestAnchors(startShape, hitShape)
-            addLine(startShape.id, hitShape.id, startAnchor, endAnchor)
+
+        if (activeTool === 'line') {
+          // Line tool: requires both endpoints on shapes
+          if (hitShape && hitShape.id !== lineStart.shapeId) {
+            const startShape = shapesRef.current.find((s) => s.id === lineStart.shapeId)
+            if (startShape) {
+              const { startAnchor, endAnchor } = findClosestAnchors(startShape, hitShape)
+              addLine(startShape.id, hitShape.id, startAnchor, endAnchor, activeLineType)
+            }
+          }
+        } else if (activeTool === 'arrow') {
+          // Arrow tool: allows free endpoints
+          const startShapeId = lineStart.shapeId
+          const endShapeId = hitShape ? hitShape.id : ''
+
+          // Determine anchors
+          let startAnchor: Anchor = lineStart.anchor
+          let endAnchor: Anchor = 'left'
+
+          if (startShapeId && endShapeId) {
+            const startShape = shapesRef.current.find((s) => s.id === startShapeId)
+            const endShape = hitShape!
+            if (startShape) {
+              const anchors = findClosestAnchors(startShape, endShape)
+              startAnchor = anchors.startAnchor
+              endAnchor = anchors.endAnchor
+            }
+          } else if (endShapeId && hitShape) {
+            endAnchor = closestAnchor(hitShape, world)
+          }
+
+          // Only create if there's meaningful distance
+          const dx = world.x - lineStart.freeX
+          const dy = world.y - lineStart.freeY
+          if (dx * dx + dy * dy > 100) {
+            addArrow(
+              startShapeId, endShapeId,
+              startAnchor, endAnchor,
+              lineStart.freeX, lineStart.freeY,
+              world.x, world.y,
+              activeLineType,
+            )
           }
         }
+
         setLineStart(null)
         setLinePreviewEnd(null)
         return
       }
     },
-    [shapePreview, addShape, addPath, addLine, onSelectedIdChange, onShapeCreated, lineStart, screenToWorld],
+    [shapePreview, addShape, addPath, addLine, addArrow, onSelectedIdsChange, onShapeCreated, lineStart, screenToWorld, activeTool, activeLineType],
   )
 
   const handleWheel = useCallback(
@@ -332,22 +434,72 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
   )
 
   const handleSelect = useCallback(
-    (id: string) => {
+    (id: string, shiftKey?: boolean) => {
       if (activeTool === 'select') {
-        onSelectedIdChange(id)
+        if (shiftKey) {
+          onSelectedIdsChange(
+            selectedIds.includes(id)
+              ? selectedIds.filter((sid) => sid !== id)
+              : [...selectedIds, id],
+          )
+        } else {
+          onSelectedIdsChange([id])
+        }
       }
     },
-    [activeTool, onSelectedIdChange],
+    [activeTool, onSelectedIdsChange, selectedIds],
+  )
+
+  const handleEndpointDrag = useCallback(
+    (lineId: string, endpoint: 'start' | 'end', e: MouseEvent) => {
+      const startMouse = { x: e.clientX, y: e.clientY }
+
+      const handleMove = (ev: globalThis.MouseEvent) => {
+        const world = screenToWorld(ev.clientX, ev.clientY)
+        if (endpoint === 'start') {
+          updateElement(lineId, { startX: world.x, startY: world.y, startShapeId: '' })
+        } else {
+          updateElement(lineId, { endX: world.x, endY: world.y, endShapeId: '' })
+        }
+      }
+
+      const handleUp = (ev: globalThis.MouseEvent) => {
+        window.removeEventListener('mousemove', handleMove)
+        window.removeEventListener('mouseup', handleUp)
+
+        const world = screenToWorld(ev.clientX, ev.clientY)
+        const hitShape = hitTestShape(world)
+
+        if (hitShape) {
+          const anchor = closestAnchor(hitShape, world)
+          if (endpoint === 'start') {
+            updateElement(lineId, { startShapeId: hitShape.id, startAnchor: anchor })
+          } else {
+            updateElement(lineId, { endShapeId: hitShape.id, endAnchor: anchor })
+          }
+        } else {
+          if (endpoint === 'start') {
+            updateElement(lineId, { startX: world.x, startY: world.y, startShapeId: '' })
+          } else {
+            updateElement(lineId, { endX: world.x, endY: world.y, endShapeId: '' })
+          }
+        }
+      }
+
+      window.addEventListener('mousemove', handleMove)
+      window.addEventListener('mouseup', handleUp)
+    },
+    [screenToWorld, updateElement],
   )
 
   const handleStartEdit = useCallback(
     (id: string) => {
       if (activeTool === 'select') {
         setEditingId(id)
-        onSelectedIdChange(id)
+        onSelectedIdsChange([id])
       }
     },
-    [activeTool, onSelectedIdChange],
+    [activeTool, onSelectedIdsChange],
   )
 
   // Clear editing when selection changes away
@@ -362,7 +514,7 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
   if (isPanning) cursorClass = 'canvas--panning'
   else if (spaceHeld) cursorClass = 'canvas--space-held'
   else if (activeTool === 'draw') cursorClass = 'canvas--tool-draw'
-  else if (activeTool === 'line') cursorClass = 'canvas--tool-line'
+  else if (activeTool === 'line' || activeTool === 'arrow') cursorClass = 'canvas--tool-line'
   else if (SHAPE_TOOLS.includes(activeTool)) cursorClass = 'canvas--tool-shape'
 
   // Shape preview SVG
@@ -392,7 +544,7 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
   ) : null
 
   // Connection dots on hovered shape (line tool)
-  const connectionDots = activeTool === 'line' && hoveredShapeId ? (() => {
+  const connectionDots = (activeTool === 'line' || activeTool === 'arrow') && hoveredShapeId ? (() => {
     const s = shapes.find((sh) => sh.id === hoveredShapeId)
     if (!s) return null
     const anchors: Anchor[] = ['top', 'right', 'bottom', 'left']
@@ -410,7 +562,14 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
 
   // Line preview data for LineLayer
   const linePreviewData = lineStart && linePreviewEnd
-    ? { startShapeId: lineStart.shapeId, startAnchor: lineStart.anchor, endX: linePreviewEnd.x, endY: linePreviewEnd.y }
+    ? {
+        startShapeId: lineStart.shapeId,
+        startAnchor: lineStart.anchor,
+        freeStartX: lineStart.freeX,
+        freeStartY: lineStart.freeY,
+        endX: linePreviewEnd.x,
+        endY: linePreviewEnd.y,
+      }
     : null
 
   return (
@@ -446,7 +605,7 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
           <ShapeRenderer
             key={shape.id}
             shape={shape}
-            isSelected={selectedId === shape.id}
+            isSelected={selectedIds.includes(shape.id)}
             onSelect={handleSelect}
             onUpdate={updateElement}
             onStartEdit={handleStartEdit}
@@ -457,8 +616,63 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
         ))}
         {previewSvg}
         {connectionDots}
+        {/* Endpoint handles for selected connector */}
+        {activeTool === 'select' && selectedId && (() => {
+          const selectedLine = lines.find((l) => l.id === selectedId)
+          if (!selectedLine) return null
+
+          const startPt = selectedLine.startShapeId
+            ? (() => { const s = shapes.find(sh => sh.id === selectedLine.startShapeId); return s ? getAnchorPoint(s, selectedLine.startAnchor) : null })()
+            : { x: selectedLine.startX, y: selectedLine.startY }
+          const endPt = selectedLine.endShapeId
+            ? (() => { const s = shapes.find(sh => sh.id === selectedLine.endShapeId); return s ? getAnchorPoint(s, selectedLine.endAnchor) : null })()
+            : { x: selectedLine.endX, y: selectedLine.endY }
+
+          return (
+            <>
+              {startPt && (
+                <div
+                  className="endpoint-handle"
+                  data-endpoint="start"
+                  style={{ left: startPt.x - 5, top: startPt.y - 5 }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    handleEndpointDrag(selectedLine.id, 'start', e)
+                  }}
+                />
+              )}
+              {endPt && (
+                <div
+                  className="endpoint-handle"
+                  data-endpoint="end"
+                  style={{ left: endPt.x - 5, top: endPt.y - 5 }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    handleEndpointDrag(selectedLine.id, 'end', e)
+                  }}
+                />
+              )}
+            </>
+          )
+        })()}
+        {marquee && (
+          <div
+            className="marquee-selection"
+            style={{
+              left: marquee.x,
+              top: marquee.y,
+              width: marquee.w,
+              height: marquee.h,
+            }}
+          />
+        )}
         <Cursors cursors={cursors} />
       </div>
+      {selectedId && (() => {
+        const el = elements.find((e) => e.id === selectedId)
+        if (!el) return null
+        return <PropertyPanel element={el} onUpdate={updateElement} />
+      })()}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { type Page, type Locator } from '@playwright/test'
 
-export type ToolName = 'select' | 'rectangle' | 'ellipse' | 'diamond' | 'line' | 'draw'
+export type ToolName = 'select' | 'rectangle' | 'ellipse' | 'diamond' | 'line' | 'arrow' | 'draw' | 'text' | 'hand' | 'eraser' | 'frame' | 'triangle' | 'hexagon' | 'star' | 'cloud'
 
 export class CanvasPage {
   readonly page: Page
@@ -59,8 +59,13 @@ export class CanvasPage {
     return this.page.locator('.canvas__paths path[stroke]:not([stroke="transparent"])')
   }
 
+  get connectors(): Locator {
+    return this.page.locator('.canvas__lines path.connector')
+  }
+
+  /** @deprecated Use connectors instead */
   get lines(): Locator {
-    return this.page.locator('.canvas__lines line[stroke]:not([stroke="transparent"])')
+    return this.connectors
   }
 
   // --- Canvas state ---

@@ -4,7 +4,7 @@ import type { ShapeElement, Tool } from '../types'
 interface Props {
   shape: ShapeElement
   isSelected: boolean
-  onSelect: (id: string) => void
+  onSelect: (id: string, shiftKey?: boolean) => void
   onUpdate: (id: string, updates: Partial<Omit<ShapeElement, 'id' | 'type'>>) => void
   onStartEdit: (id: string) => void
   editingId: string | null
@@ -12,9 +12,24 @@ interface Props {
   activeTool: Tool
 }
 
-function shapeSvg(type: ShapeElement['type'], w: number, h: number, stroke: string, isSelected: boolean) {
+const MIN_SIZE = 10
+
+type HandleDir = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
+
+const HANDLES: { dir: HandleDir; x: number; y: number; cursor: string }[] = [
+  { dir: 'nw', x: 0, y: 0, cursor: 'nwse-resize' },
+  { dir: 'n', x: 0.5, y: 0, cursor: 'ns-resize' },
+  { dir: 'ne', x: 1, y: 0, cursor: 'nesw-resize' },
+  { dir: 'e', x: 1, y: 0.5, cursor: 'ew-resize' },
+  { dir: 'se', x: 1, y: 1, cursor: 'nwse-resize' },
+  { dir: 's', x: 0.5, y: 1, cursor: 'ns-resize' },
+  { dir: 'sw', x: 0, y: 1, cursor: 'nesw-resize' },
+  { dir: 'w', x: 0, y: 0.5, cursor: 'ew-resize' },
+]
+
+function shapeSvg(type: ShapeElement['type'], w: number, h: number, fill: string, stroke: string, strokeWidth: number, isSelected: boolean) {
   const accentStroke = isSelected ? '#4f46e5' : stroke
-  const sw = isSelected ? 2 : 1.5
+  const sw = isSelected ? strokeWidth + 0.5 : strokeWidth
   switch (type) {
     case 'rectangle':
       return (
@@ -24,7 +39,7 @@ function shapeSvg(type: ShapeElement['type'], w: number, h: number, stroke: stri
           width={w - sw}
           height={h - sw}
           rx={3}
-          fill="none"
+          fill={fill}
           stroke={accentStroke}
           strokeWidth={sw}
         />
@@ -36,14 +51,14 @@ function shapeSvg(type: ShapeElement['type'], w: number, h: number, stroke: stri
           cy={h / 2}
           rx={Math.max(0, (w - sw) / 2)}
           ry={Math.max(0, (h - sw) / 2)}
-          fill="none"
+          fill={fill}
           stroke={accentStroke}
           strokeWidth={sw}
         />
       )
     case 'diamond': {
       const pts = `${w / 2},${sw / 2} ${w - sw / 2},${h / 2} ${w / 2},${h - sw / 2} ${sw / 2},${h / 2}`
-      return <polygon points={pts} fill="none" stroke={accentStroke} strokeWidth={sw} />
+      return <polygon points={pts} fill={fill} stroke={accentStroke} strokeWidth={sw} />
     }
   }
 }
@@ -54,6 +69,7 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
   const shapeStart = useRef({ x: 0, y: 0 })
   const textRef = useRef<HTMLTextAreaElement>(null)
   const isEditing = editingId === shape.id
+  const showHandles = isSelected && activeTool === 'select'
 
   const handleMouseDown = useCallback(
     (e: MouseEvent) => {
@@ -63,7 +79,8 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
       if (activeTool !== 'select') return
 
       e.stopPropagation()
-      onSelect(shape.id)
+      onSelect(shape.id, e.shiftKey)
+      if (e.shiftKey) return // Don't start drag on shift-click
       setIsDragging(true)
       dragStart.current = { x: e.clientX, y: e.clientY }
       shapeStart.current = { x: shape.x, y: shape.y }
@@ -95,6 +112,46 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
       onStartEdit(shape.id)
     },
     [shape.id, onStartEdit],
+  )
+
+  const handleResizeStart = useCallback(
+    (e: MouseEvent, dir: HandleDir) => {
+      e.stopPropagation()
+      e.preventDefault()
+      const startMouse = { x: e.clientX, y: e.clientY }
+      const startShape = { x: shape.x, y: shape.y, w: shape.width, h: shape.height }
+
+      const handleMove = (ev: globalThis.MouseEvent) => {
+        const dx = (ev.clientX - startMouse.x) / scale
+        const dy = (ev.clientY - startMouse.y) / scale
+
+        let { x, y, w, h } = startShape
+
+        if (dir.includes('e')) w = Math.max(MIN_SIZE, startShape.w + dx)
+        if (dir.includes('w')) {
+          const newW = Math.max(MIN_SIZE, startShape.w - dx)
+          x = startShape.x + startShape.w - newW
+          w = newW
+        }
+        if (dir.includes('s')) h = Math.max(MIN_SIZE, startShape.h + dy)
+        if (dir.includes('n')) {
+          const newH = Math.max(MIN_SIZE, startShape.h - dy)
+          y = startShape.y + startShape.h - newH
+          h = newH
+        }
+
+        onUpdate(shape.id, { x, y, width: w, height: h })
+      }
+
+      const handleUp = () => {
+        window.removeEventListener('mousemove', handleMove)
+        window.removeEventListener('mouseup', handleUp)
+      }
+
+      window.addEventListener('mousemove', handleMove)
+      window.addEventListener('mouseup', handleUp)
+    },
+    [shape.id, shape.x, shape.y, shape.width, shape.height, scale, onUpdate],
   )
 
   // Focus textarea when editing starts
@@ -131,7 +188,7 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
         height={shape.height}
         viewBox={`0 0 ${shape.width} ${shape.height}`}
       >
-        {shapeSvg(shape.type, shape.width, shape.height, shape.stroke, isSelected)}
+        {shapeSvg(shape.type, shape.width, shape.height, shape.fill, shape.stroke, shape.strokeWidth, isSelected)}
       </svg>
       <textarea
         ref={textRef}
@@ -143,6 +200,19 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
           if (isEditing) e.stopPropagation()
         }}
       />
+      {showHandles && HANDLES.map(({ dir, x, y, cursor }) => (
+        <div
+          key={dir}
+          data-handle={dir}
+          className="resize-handle"
+          style={{
+            left: x * shape.width - 4,
+            top: y * shape.height - 4,
+            cursor,
+          }}
+          onMouseDown={(e) => handleResizeStart(e, dir)}
+        />
+      ))}
     </div>
   )
 }

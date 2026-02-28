@@ -1,11 +1,12 @@
 import type { ShapeElement, LineElement, Anchor } from '../types'
+import { buildPath } from '../lib/pathBuilders'
 
 interface Props {
   shapes: ShapeElement[]
   lines: LineElement[]
   selectedId: string | null
   onSelect: (id: string) => void
-  linePreview: { startShapeId: string; startAnchor: Anchor; endX: number; endY: number } | null
+  linePreview: { startShapeId: string; startAnchor: Anchor; freeStartX: number; freeStartY: number; endX: number; endY: number } | null
 }
 
 export function getAnchorPoint(shape: ShapeElement, anchor: Anchor): { x: number; y: number } {
@@ -48,12 +49,31 @@ export function findClosestAnchors(
   return { startAnchor: bestStart, endAnchor: bestEnd }
 }
 
+function resolveEndpoint(
+  shapeId: string,
+  anchor: Anchor,
+  freeX: number,
+  freeY: number,
+  shapeMap: Map<string, ShapeElement>,
+): { x: number; y: number } {
+  if (shapeId) {
+    const shape = shapeMap.get(shapeId)
+    if (shape) return getAnchorPoint(shape, anchor)
+  }
+  return { x: freeX, y: freeY }
+}
+
 export function LineLayer({ shapes, lines, selectedId, onSelect, linePreview }: Props) {
   const shapeMap = new Map(shapes.map((s) => [s.id, s]))
 
-  const previewStartShape = linePreview ? shapeMap.get(linePreview.startShapeId) : null
-  const previewStart = previewStartShape && linePreview
-    ? getAnchorPoint(previewStartShape, linePreview.startAnchor)
+  const previewStart = linePreview
+    ? (() => {
+        if (linePreview.startShapeId) {
+          const shape = shapeMap.get(linePreview.startShapeId)
+          if (shape) return getAnchorPoint(shape, linePreview.startAnchor)
+        }
+        return { x: linePreview.freeStartX, y: linePreview.freeStartY }
+      })()
     : null
 
   return (
@@ -62,33 +82,83 @@ export function LineLayer({ shapes, lines, selectedId, onSelect, linePreview }: 
       style={{ overflow: 'visible', position: 'absolute', top: 0, left: 0 }}
     >
       <defs>
-        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        {lines.map((line) => {
+          const stroke = line.id === selectedId ? '#4f46e5' : line.stroke
+          if (line.arrowEnd) {
+            return (
+              <marker
+                key={`arrow-end-${line.id}`}
+                id={`arrowhead-end-${line.id}`}
+                markerWidth="10"
+                markerHeight="7"
+                refX="9"
+                refY="3.5"
+                orient="auto"
+              >
+                <polygon points="0 0, 10 3.5, 0 7" fill={stroke} />
+              </marker>
+            )
+          }
+          return null
+        })}
+        {lines.map((line) => {
+          const stroke = line.id === selectedId ? '#4f46e5' : line.stroke
+          if (line.arrowStart) {
+            return (
+              <marker
+                key={`arrow-start-${line.id}`}
+                id={`arrowhead-start-${line.id}`}
+                markerWidth="10"
+                markerHeight="7"
+                refX="1"
+                refY="3.5"
+                orient="auto"
+              >
+                <polygon points="10 0, 0 3.5, 10 7" fill={stroke} />
+              </marker>
+            )
+          }
+          return null
+        })}
+        {/* Preview arrowhead */}
+        <marker id="arrowhead-preview" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
           <polygon points="0 0, 10 3.5, 0 7" fill="#4f46e5" />
         </marker>
       </defs>
 
       {lines.map((line) => {
-        const startShape = shapeMap.get(line.startShapeId)
-        const endShape = shapeMap.get(line.endShapeId)
-        if (!startShape || !endShape) return null
+        const start = resolveEndpoint(line.startShapeId, line.startAnchor, line.startX, line.startY, shapeMap)
+        const end = resolveEndpoint(line.endShapeId, line.endAnchor, line.endX, line.endY, shapeMap)
 
-        const start = getAnchorPoint(startShape, line.startAnchor)
-        const end = getAnchorPoint(endShape, line.endAnchor)
+        // Skip rendering if both endpoints resolve to an unconnected shape that was deleted
+        if (line.startShapeId && !shapeMap.has(line.startShapeId)) return null
+        if (line.endShapeId && !shapeMap.has(line.endShapeId)) return null
+
         const isSelected = line.id === selectedId
+        const stroke = isSelected ? '#4f46e5' : line.stroke
+        const sw = isSelected ? line.strokeWidth + 1 : line.strokeWidth
+        const d = buildPath(line.lineType, start, end)
 
         return (
           <g key={line.id}>
-            <line
-              x1={start.x} y1={start.y} x2={end.x} y2={end.y}
-              stroke="transparent" strokeWidth={12}
+            {/* Wide invisible hit area */}
+            <path
+              d={d}
+              stroke="transparent"
+              strokeWidth={12}
+              fill="none"
               style={{ cursor: 'pointer', pointerEvents: 'stroke' }}
               onMouseDown={(e) => { e.stopPropagation(); onSelect(line.id) }}
             />
-            <line
-              x1={start.x} y1={start.y} x2={end.x} y2={end.y}
-              stroke={isSelected ? '#4f46e5' : line.stroke}
-              strokeWidth={isSelected ? line.strokeWidth + 1 : line.strokeWidth}
-              markerEnd="url(#arrowhead)"
+            {/* Visible connector */}
+            <path
+              className="connector"
+              d={d}
+              stroke={stroke}
+              strokeWidth={sw}
+              fill="none"
+              markerEnd={line.arrowEnd ? `url(#arrowhead-end-${line.id})` : undefined}
+              markerStart={line.arrowStart ? `url(#arrowhead-start-${line.id})` : undefined}
               style={{ pointerEvents: 'none' }}
             />
           </g>
@@ -97,11 +167,14 @@ export function LineLayer({ shapes, lines, selectedId, onSelect, linePreview }: 
 
       {/* Line preview while dragging */}
       {previewStart && linePreview && (
-        <line
-          x1={previewStart.x} y1={previewStart.y}
-          x2={linePreview.endX} y2={linePreview.endY}
-          stroke="#4f46e5" strokeWidth={1.5}
-          strokeDasharray="6 3" opacity={0.6}
+        <path
+          d={`M ${previewStart.x} ${previewStart.y} L ${linePreview.endX} ${linePreview.endY}`}
+          stroke="#4f46e5"
+          strokeWidth={1.5}
+          fill="none"
+          strokeDasharray="6 3"
+          opacity={0.6}
+          markerEnd="url(#arrowhead-preview)"
           style={{ pointerEvents: 'none' }}
         />
       )}

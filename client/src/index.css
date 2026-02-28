@@ -63,10 +63,10 @@ body {
    so clicks pass through to the canvas for tool operations */
 .canvas--tool-draw .shape,
 .canvas--tool-draw .path-hitarea,
-.canvas--tool-draw .canvas__lines line,
+.canvas--tool-draw .canvas__lines path,
 .canvas--tool-shape .shape,
 .canvas--tool-shape .path-hitarea,
-.canvas--tool-shape .canvas__lines line {
+.canvas--tool-shape .canvas__lines path {
   pointer-events: none;
   cursor: inherit;
 }
@@ -78,7 +78,7 @@ body {
 }
 
 .canvas--tool-line .path-hitarea,
-.canvas--tool-line .canvas__lines line {
+.canvas--tool-line .canvas__lines path {
   pointer-events: none;
 }
 
@@ -157,6 +157,18 @@ body {
   color: rgba(0, 0, 0, 0.2);
 }
 
+/* ── Resize handles ── */
+.resize-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: white;
+  border: 1.5px solid var(--accent);
+  border-radius: 2px;
+  z-index: 200;
+  pointer-events: auto;
+}
+
 /* ── Paths (SVG layer) ── */
 .canvas__paths {
   pointer-events: none;
@@ -180,7 +192,7 @@ body {
   pointer-events: none;
 }
 
-.canvas__lines line {
+.canvas__lines path {
   pointer-events: stroke;
 }
 
@@ -195,6 +207,32 @@ body {
   box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.3);
   pointer-events: none;
   z-index: 300;
+}
+
+/* ── Endpoint handles (connector drag) ── */
+.endpoint-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid var(--accent);
+  cursor: crosshair;
+  z-index: 300;
+  pointer-events: auto;
+}
+
+.endpoint-handle:hover {
+  background: var(--accent);
+}
+
+/* ── Marquee selection ── */
+.marquee-selection {
+  position: absolute;
+  border: 1.5px dashed var(--accent);
+  background: rgba(79, 70, 229, 0.06);
+  pointer-events: none;
+  z-index: 200;
 }
 
 /* ── Drawing Title (top-left) ── */
@@ -326,6 +364,38 @@ body {
   color: white;
 }
 
+.toolbar__line-types {
+  display: flex;
+  gap: 1px;
+  border-left: 1px solid var(--border);
+  margin-left: 2px;
+  padding-left: 4px;
+}
+
+.toolbar__line-type-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: background 0.12s, color 0.12s;
+}
+
+.toolbar__line-type-btn:hover {
+  background: var(--accent-light);
+  color: var(--text);
+}
+
+.toolbar__line-type-btn--active {
+  background: rgba(79, 70, 229, 0.15);
+  color: var(--accent);
+}
+
 /* ── Status Bar (bottom-right) ── */
 .statusbar {
   position: fixed;
@@ -395,4 +465,68 @@ body {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+
+/* ── Property Panel (right side) ── */
+.property-panel {
+  position: fixed;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow-lg);
+  z-index: 500;
+  min-width: 160px;
+}
+
+.property-panel__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.property-panel__label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.property-panel__field input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.12s;
+}
+
+.property-panel__field input:focus,
+.property-panel__field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+}
+
+.property-panel__field select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
 }

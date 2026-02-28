@@ -7,15 +7,16 @@ import { AiPanel } from './components/AiPanel'
 import { DrawingsList } from './components/DrawingsList'
 import { DrawingTitle } from './components/DrawingTitle'
 import { useElements } from './hooks/useElements'
-import type { Tool } from './types'
+import type { Tool, LineType } from './types'
 
 export function App({ drawingId }: { drawingId: string }) {
   const [activeTool, setActiveTool] = useState<Tool>('select')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [activeLineType, setActiveLineType] = useState<LineType>('straight')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
 
-  const { elements, addShape, addPath, addLine, updateElement, deleteElement } = useElements()
+  const { elements, addShape, addPath, addLine, addArrow, updateElement, deleteElement } = useElements()
 
   const switchToSelect = useCallback(() => setActiveTool('select'), [])
 
@@ -31,27 +32,31 @@ export function App({ drawingId }: { drawingId: string }) {
           break
         case 'r':
           setActiveTool('rectangle')
-          setSelectedId(null)
+          setSelectedIds([])
           break
         case 'o':
           setActiveTool('ellipse')
-          setSelectedId(null)
+          setSelectedIds([])
           break
         case 'd':
           setActiveTool('diamond')
-          setSelectedId(null)
+          setSelectedIds([])
           break
         case 'p':
           setActiveTool('draw')
-          setSelectedId(null)
+          setSelectedIds([])
           break
         case 'l':
           setActiveTool('line')
-          setSelectedId(null)
+          setSelectedIds([])
+          break
+        case 'a':
+          setActiveTool('arrow')
+          setSelectedIds([])
           break
         case 'escape':
           setActiveTool('select')
-          setSelectedId(null)
+          setSelectedIds([])
           break
       }
     }
@@ -63,18 +68,20 @@ export function App({ drawingId }: { drawingId: string }) {
     <div className="app">
       <Canvas
         activeTool={activeTool}
-        selectedId={selectedId}
-        onSelectedIdChange={setSelectedId}
+        activeLineType={activeLineType}
+        selectedIds={selectedIds}
+        onSelectedIdsChange={setSelectedIds}
         onToolChange={setActiveTool}
         onShapeCreated={switchToSelect}
         elements={elements}
         addShape={addShape}
         addPath={addPath}
         addLine={addLine}
+        addArrow={addArrow}
         updateElement={updateElement}
         deleteElement={deleteElement}
       />
-      <Toolbar activeTool={activeTool} onToolChange={setActiveTool} />
+      <Toolbar activeTool={activeTool} activeLineType={activeLineType} onToolChange={setActiveTool} onLineTypeChange={setActiveLineType} />
       <StatusBar
         onSettingsClick={() => setSettingsOpen(true)}
         onAiClick={() => setAiOpen(true)}
