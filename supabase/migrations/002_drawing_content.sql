@@ -1,1 +1,1 @@
-alter table drawings add column content bytea;
+alter table drawings add column content text;
