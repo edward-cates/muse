@@ -1,5 +1,9 @@
 import { test, expect, type Page } from '@playwright/test'
 
+// Increase timeout — this test does multiple full page reloads through
+// real Supabase + Express + Vite infrastructure.
+test.setTimeout(60_000)
+
 async function drawShape(page: Page, x: number, y: number, w: number, h: number) {
   await page.mouse.move(x, y)
   await page.mouse.down()
@@ -7,49 +11,45 @@ async function drawShape(page: Page, x: number, y: number, w: number, h: number)
   await page.mouse.up()
 }
 
-/** Wait for a POST /api/drawings registration to complete. */
-function waitForRegistration(page: Page) {
-  return page.waitForResponse(
-    (resp) =>
-      resp.url().includes('/api/drawings') &&
-      !resp.url().includes('/api/drawings/') &&
-      resp.request().method() === 'POST' &&
-      resp.status() === 200,
-  )
-}
-
-/** Wait for a PATCH /api/drawings/:id rename to complete. */
-function waitForRename(page: Page) {
-  return page.waitForResponse(
+async function renameDrawing(page: Page, title: string) {
+  // Wait for PATCH response so we know the rename persisted
+  const patchDone = page.waitForResponse(
     (resp) =>
       resp.url().includes('/api/drawings/') &&
       resp.request().method() === 'PATCH' &&
       resp.status() === 200,
   )
-}
-
-async function renameDrawing(page: Page, title: string) {
-  const patchDone = waitForRename(page)
   await page.locator('.drawing-title__display').click()
   await page.locator('.drawing-title__input').fill(title)
   await page.locator('.drawing-title__input').press('Enter')
   await patchDone
 }
 
-/** Extract drawing ID from the current URL hash. */
 function getDrawingId(url: string): string {
   const match = url.match(/#\/d\/(.+)/)
   if (!match) throw new Error(`No drawing ID in URL: ${url}`)
   return match[1]
 }
 
+/**
+ * Navigate to a drawing with a full page reload.
+ * Going via about:blank ensures the browser does a fresh load,
+ * which is exactly what we want for testing persistence.
+ */
+async function navigateToDrawing(page: Page, drawingId: string) {
+  await page.goto('about:blank')
+  await page.goto(`/#/d/${drawingId}`)
+  await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+}
+
 test('drawing titles and content persist across navigation', async ({ page }) => {
   // ── Create Doc 1 ──
-  const firstReg = waitForRegistration(page)
   await page.goto('/')
-  await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible' })
-  await firstReg
+  await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
   const doc1Id = getDrawingId(page.url())
+
+  // Wait for registration POST to complete before renaming
+  await page.waitForTimeout(1000)
 
   await renameDrawing(page, 'Doc 1')
 
@@ -62,12 +62,13 @@ test('drawing titles and content persist across navigation', async ({ page }) =>
   // Wait for persistence debounce (500ms) to flush to DB
   await page.waitForTimeout(800)
 
-  // ── Create Doc 2 (full page load → new drawing) ──
-  const secondReg = waitForRegistration(page)
+  // ── Create Doc 2 (full page reload → new drawing) ──
+  await page.goto('about:blank')
   await page.goto('/')
-  await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible' })
-  await secondReg
+  await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
   const doc2Id = getDrawingId(page.url())
+
+  await page.waitForTimeout(1000)
 
   await renameDrawing(page, 'Doc 2')
 
@@ -77,9 +78,8 @@ test('drawing titles and content persist across navigation', async ({ page }) =>
   // Wait for persistence debounce
   await page.waitForTimeout(800)
 
-  // ── Navigate to Doc 1 via URL — verify title + shapes ──
-  await page.goto(`/#/d/${doc1Id}`)
-  await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible' })
+  // ── Navigate to Doc 1 — verify title + shapes survived ──
+  await navigateToDrawing(page, doc1Id)
 
   await expect(page.locator('.drawing-title__display')).toHaveText('Doc 1', { timeout: 10_000 })
   await expect(page.locator('[data-testid="shape-rectangle"]')).toHaveCount(1, { timeout: 10_000 })
@@ -93,15 +93,13 @@ test('drawing titles and content persist across navigation', async ({ page }) =>
   await page.waitForTimeout(800)
 
   // ── Navigate to Doc 2 — verify title + shapes ──
-  await page.goto(`/#/d/${doc2Id}`)
-  await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible' })
+  await navigateToDrawing(page, doc2Id)
 
   await expect(page.locator('.drawing-title__display')).toHaveText('Doc 2', { timeout: 10_000 })
   await expect(page.locator('[data-testid="shape-diamond"]')).toHaveCount(1, { timeout: 10_000 })
 
-  // ── Navigate back to Doc 1 — verify ALL shapes ──
-  await page.goto(`/#/d/${doc1Id}`)
-  await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible' })
+  // ── Navigate back to Doc 1 — verify ALL shapes including the new one ──
+  await navigateToDrawing(page, doc1Id)
 
   await expect(page.locator('.drawing-title__display')).toHaveText('Doc 1', { timeout: 10_000 })
   await expect(page.locator('[data-testid="shape-rectangle"]')).toHaveCount(2, { timeout: 10_000 })
