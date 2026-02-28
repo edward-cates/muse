@@ -27,10 +27,13 @@ export function setupPersistence() {
       setTimeout(async () => {
         writeTimers.delete(docName)
         const state = Y.encodeStateAsUpdate(ydoc)
-        await getSupabase()
+        const b64 = Buffer.from(state).toString('base64')
+        console.log(`[persist] debounced write ${drawingId(docName)} (${state.length} bytes, ${b64.length} chars)`)
+        const { error } = await getSupabase()
           .from('drawings')
-          .update({ content: Buffer.from(state).toString('base64') })
+          .update({ content: b64 })
           .eq('id', drawingId(docName))
+        if (error) console.error(`[persist] debounced write error:`, error)
       }, 500),
     )
   }
@@ -38,14 +41,17 @@ export function setupPersistence() {
   return {
     provider: null,
     bindState: async (docName: string, ydoc: Doc) => {
-      const { data } = await getSupabase()
+      const { data, error } = await getSupabase()
         .from('drawings')
         .select('content')
         .eq('id', drawingId(docName))
         .single()
 
+      console.log(`[persist] bindState ${drawingId(docName)}: row=${!!data}, content=${data?.content ? data.content.length + ' chars' : 'null'}, error=${error?.message || 'none'}`)
+
       if (data?.content) {
         const bytes = Buffer.from(data.content, 'base64')
+        console.log(`[persist] applying update: ${bytes.length} bytes`)
         Y.applyUpdate(ydoc, new Uint8Array(bytes))
       }
 
@@ -57,10 +63,13 @@ export function setupPersistence() {
       writeTimers.delete(docName)
 
       const state = Y.encodeStateAsUpdate(ydoc)
-      await getSupabase()
+      const b64 = Buffer.from(state).toString('base64')
+      console.log(`[persist] writeState ${drawingId(docName)} (${state.length} bytes, ${b64.length} chars)`)
+      const { error } = await getSupabase()
         .from('drawings')
-        .update({ content: Buffer.from(state).toString('base64') })
+        .update({ content: b64 })
         .eq('id', drawingId(docName))
+      if (error) console.error(`[persist] writeState error:`, error)
     },
   }
 }
