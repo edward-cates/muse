@@ -40,7 +40,7 @@ test.describe('Line connections', () => {
     await expect(canvas.connectors).toHaveCount(1)
   })
 
-  test('line tool shows connection dots on shape hover', async ({ page }) => {
+  test('line tool shows connection highlight on shape hover', async ({ page }) => {
     await canvas.selectTool('line')
 
     // Hover over first shape
@@ -50,9 +50,8 @@ test.describe('Line connections', () => {
 
     await page.mouse.move(box1.x + box1.width / 2, box1.y + box1.height / 2)
 
-    // Connection dots should appear (4 anchors: top, right, bottom, left)
-    const dots = page.locator('.connection-dot')
-    await expect(dots).toHaveCount(4)
+    // Connection highlight should appear around the shape
+    await expect(page.locator('.connection-highlight')).toHaveCount(1)
   })
 
   test('line has arrowhead marker', async ({ page }) => {

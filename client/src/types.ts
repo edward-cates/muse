@@ -2,8 +2,6 @@ export type Tool = 'select' | 'rectangle' | 'ellipse' | 'diamond' | 'draw' | 'li
 
 export type ShapeType = 'rectangle' | 'ellipse' | 'diamond' | 'triangle' | 'hexagon' | 'star' | 'cloud'
 
-export type Anchor = 'top' | 'right' | 'bottom' | 'left'
-
 export type LineType = 'straight' | 'elbow' | 'curve'
 
 export type StrokeStyle = 'solid' | 'dashed' | 'dotted'
@@ -51,8 +49,10 @@ export interface LineElement {
   type: 'line'
   startShapeId: string   // '' = free endpoint
   endShapeId: string     // '' = free endpoint
-  startAnchor: Anchor
-  endAnchor: Anchor
+  startAnchorX: number   // 0-1 ratio relative to shape bounding box
+  startAnchorY: number
+  endAnchorX: number
+  endAnchorY: number
   startX: number         // world coords for free endpoints
   startY: number
   endX: number

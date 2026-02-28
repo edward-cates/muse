@@ -128,7 +128,8 @@ export function App({ drawingId }: { drawingId: string }) {
                 const endId = el.endShapeId ? (idMap.get(el.endShapeId) || el.endShapeId) : ''
                 const id = addArrow(
                   startId, endId,
-                  el.startAnchor, el.endAnchor,
+                  el.startAnchorX, el.startAnchorY,
+                  el.endAnchorX, el.endAnchorY,
                   el.startX + 20, el.startY + 20,
                   el.endX + 20, el.endY + 20,
                   el.lineType,
@@ -173,7 +174,7 @@ export function App({ drawingId }: { drawingId: string }) {
               } else if (isLine(el)) {
                 const startId = el.startShapeId ? (idMap.get(el.startShapeId) || el.startShapeId) : ''
                 const endId = el.endShapeId ? (idMap.get(el.endShapeId) || el.endShapeId) : ''
-                const id = addArrow(startId, endId, el.startAnchor, el.endAnchor, el.startX + 20, el.startY + 20, el.endX + 20, el.endY + 20, el.lineType)
+                const id = addArrow(startId, endId, el.startAnchorX, el.startAnchorY, el.endAnchorX, el.endAnchorY, el.startX + 20, el.startY + 20, el.endX + 20, el.endY + 20, el.lineType)
                 newIds.push(id)
               } else if (isText(el)) {
                 const id = addText(el.x + 20, el.y + 20)

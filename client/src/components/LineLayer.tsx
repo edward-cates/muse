@@ -1,4 +1,4 @@
-import type { ShapeElement, LineElement, Anchor, ArrowheadStyle } from '../types'
+import type { ShapeElement, LineElement, ArrowheadStyle } from '../types'
 import { buildPath } from '../lib/pathBuilders'
 
 interface Props {
@@ -7,62 +7,27 @@ interface Props {
   selectedId: string | null
   onSelect: (id: string) => void
   onDoubleClick?: (id: string) => void
-  linePreview: { startShapeId: string; startAnchor: Anchor; freeStartX: number; freeStartY: number; endX: number; endY: number } | null
+  linePreview: { startShapeId: string; startAnchorX: number; startAnchorY: number; freeStartX: number; freeStartY: number; endX: number; endY: number } | null
   editingLabelId?: string | null
   onLabelChange?: (id: string, label: string) => void
   onLabelEditDone?: () => void
 }
 
-export function getAnchorPoint(shape: ShapeElement, anchor: Anchor): { x: number; y: number } {
-  switch (anchor) {
-    case 'top':
-      return { x: shape.x + shape.width / 2, y: shape.y }
-    case 'right':
-      return { x: shape.x + shape.width, y: shape.y + shape.height / 2 }
-    case 'bottom':
-      return { x: shape.x + shape.width / 2, y: shape.y + shape.height }
-    case 'left':
-      return { x: shape.x, y: shape.y + shape.height / 2 }
-  }
-}
-
-export function findClosestAnchors(
-  shapeA: ShapeElement,
-  shapeB: ShapeElement,
-): { startAnchor: Anchor; endAnchor: Anchor } {
-  const anchors: Anchor[] = ['top', 'right', 'bottom', 'left']
-  let bestDist = Infinity
-  let bestStart: Anchor = 'right'
-  let bestEnd: Anchor = 'left'
-
-  for (const a of anchors) {
-    const pa = getAnchorPoint(shapeA, a)
-    for (const b of anchors) {
-      const pb = getAnchorPoint(shapeB, b)
-      const dx = pa.x - pb.x
-      const dy = pa.y - pb.y
-      const dist = dx * dx + dy * dy
-      if (dist < bestDist) {
-        bestDist = dist
-        bestStart = a
-        bestEnd = b
-      }
-    }
-  }
-
-  return { startAnchor: bestStart, endAnchor: bestEnd }
+export function getAnchorPoint(shape: ShapeElement, ratioX: number, ratioY: number): { x: number; y: number } {
+  return { x: shape.x + ratioX * shape.width, y: shape.y + ratioY * shape.height }
 }
 
 function resolveEndpoint(
   shapeId: string,
-  anchor: Anchor,
+  anchorX: number,
+  anchorY: number,
   freeX: number,
   freeY: number,
   shapeMap: Map<string, ShapeElement>,
 ): { x: number; y: number } {
   if (shapeId) {
     const shape = shapeMap.get(shapeId)
-    if (shape) return getAnchorPoint(shape, anchor)
+    if (shape) return getAnchorPoint(shape, anchorX, anchorY)
   }
   return { x: freeX, y: freeY }
 }
@@ -119,7 +84,7 @@ export function LineLayer({ shapes, lines, selectedId, onSelect, onDoubleClick, 
     ? (() => {
         if (linePreview.startShapeId) {
           const shape = shapeMap.get(linePreview.startShapeId)
-          if (shape) return getAnchorPoint(shape, linePreview.startAnchor)
+          if (shape) return getAnchorPoint(shape, linePreview.startAnchorX, linePreview.startAnchorY)
         }
         return { x: linePreview.freeStartX, y: linePreview.freeStartY }
       })()
@@ -156,8 +121,8 @@ export function LineLayer({ shapes, lines, selectedId, onSelect, onDoubleClick, 
       </defs>
 
       {lines.map((line) => {
-        const start = resolveEndpoint(line.startShapeId, line.startAnchor, line.startX, line.startY, shapeMap)
-        const end = resolveEndpoint(line.endShapeId, line.endAnchor, line.endX, line.endY, shapeMap)
+        const start = resolveEndpoint(line.startShapeId, line.startAnchorX, line.startAnchorY, line.startX, line.startY, shapeMap)
+        const end = resolveEndpoint(line.endShapeId, line.endAnchorX, line.endAnchorY, line.endX, line.endY, shapeMap)
 
         if (line.startShapeId && !shapeMap.has(line.startShapeId)) return null
         if (line.endShapeId && !shapeMap.has(line.endShapeId)) return null

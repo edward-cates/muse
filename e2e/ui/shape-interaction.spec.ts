@@ -190,3 +190,44 @@ test.describe('Shape resize handles', () => {
     await expect(page.locator('.resize-handle')).toHaveCount(0)
   })
 })
+
+test.describe('Click-to-select in non-select tool modes', () => {
+  let canvas: CanvasPage
+
+  test.beforeEach(async ({ page }) => {
+    canvas = new CanvasPage(page)
+    await canvas.goto()
+
+    // Create a shape, then deselect
+    await canvas.selectTool('rectangle')
+    await canvas.drawShape(200, 200, 120, 80)
+    await page.mouse.click(600, 50) // deselect
+  })
+
+  test('clicking shape while in rectangle tool selects it and switches to select mode', async ({ page }) => {
+    await canvas.selectTool('rectangle')
+    // Shapes have pointer-events:none in creation modes, so click at shape center coords
+    await page.mouse.click(260, 240)
+
+    await expect(page.locator('.shape--selected')).toHaveCount(1)
+    await expect(canvas.toolButton('select')).toHaveClass(/toolbar__btn--active/)
+  })
+
+  test('clicking shape while in draw tool selects it and switches to select mode', async ({ page }) => {
+    await canvas.selectTool('draw')
+    // Shapes have pointer-events:none in creation modes, so click at shape center coords
+    await page.mouse.click(260, 240)
+
+    await expect(page.locator('.shape--selected')).toHaveCount(1)
+    await expect(canvas.toolButton('select')).toHaveClass(/toolbar__btn--active/)
+  })
+
+  test('clicking shape in line mode does not auto-select (line tool takes priority)', async ({ page }) => {
+    await canvas.selectTool('line')
+    // Click at shape center — line tool should start a connector, not auto-select
+    await page.mouse.click(260, 240)
+
+    // In line mode, clicking a shape starts a connector, not selection
+    await expect(page.locator('.shape--selected')).toHaveCount(0)
+  })
+})

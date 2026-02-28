@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import * as Y from 'yjs'
 import { useCollab } from '../collab/CollabContext'
-import type { CanvasElement, ShapeType, ShapeElement, PathElement, LineElement, Anchor, LineType } from '../types'
+import type { CanvasElement, ShapeType, ShapeElement, PathElement, LineElement, LineType } from '../types'
 
 type YMapVal = string | number | number[]
 
@@ -43,8 +43,10 @@ export function readElement(m: Y.Map<YMapVal>): CanvasElement {
       type: 'line',
       startShapeId: (m.get('startShapeId') as string) || '',
       endShapeId: (m.get('endShapeId') as string) || '',
-      startAnchor: (m.get('startAnchor') as Anchor) || 'right',
-      endAnchor: (m.get('endAnchor') as Anchor) || 'left',
+      startAnchorX: (m.get('startAnchorX') as number) ?? 1,
+      startAnchorY: (m.get('startAnchorY') as number) ?? 0.5,
+      endAnchorX: (m.get('endAnchorX') as number) ?? 0,
+      endAnchorY: (m.get('endAnchorY') as number) ?? 0.5,
       startX: (m.get('startX') as number) || 0,
       startY: (m.get('startY') as number) || 0,
       endX: (m.get('endX') as number) || 0,
@@ -186,15 +188,17 @@ export function useElements() {
   )
 
   const addLine = useCallback(
-    (startShapeId: string, endShapeId: string, startAnchor: Anchor, endAnchor: Anchor, lineType: LineType = 'straight'): string => {
+    (startShapeId: string, endShapeId: string, startAnchorX: number, startAnchorY: number, endAnchorX: number, endAnchorY: number, lineType: LineType = 'straight'): string => {
       const id = crypto.randomUUID()
       const yEl = new Y.Map<YMapVal>()
       yEl.set('id', id)
       yEl.set('type', 'line')
       yEl.set('startShapeId', startShapeId)
       yEl.set('endShapeId', endShapeId)
-      yEl.set('startAnchor', startAnchor)
-      yEl.set('endAnchor', endAnchor)
+      yEl.set('startAnchorX', startAnchorX)
+      yEl.set('startAnchorY', startAnchorY)
+      yEl.set('endAnchorX', endAnchorX)
+      yEl.set('endAnchorY', endAnchorY)
       yEl.set('startX', 0)
       yEl.set('startY', 0)
       yEl.set('endX', 0)
@@ -211,15 +215,17 @@ export function useElements() {
   )
 
   const addArrow = useCallback(
-    (startShapeId: string, endShapeId: string, startAnchor: Anchor, endAnchor: Anchor, startX: number, startY: number, endX: number, endY: number, lineType: LineType = 'straight'): string => {
+    (startShapeId: string, endShapeId: string, startAnchorX: number, startAnchorY: number, endAnchorX: number, endAnchorY: number, startX: number, startY: number, endX: number, endY: number, lineType: LineType = 'straight'): string => {
       const id = crypto.randomUUID()
       const yEl = new Y.Map<YMapVal>()
       yEl.set('id', id)
       yEl.set('type', 'line')
       yEl.set('startShapeId', startShapeId)
       yEl.set('endShapeId', endShapeId)
-      yEl.set('startAnchor', startAnchor)
-      yEl.set('endAnchor', endAnchor)
+      yEl.set('startAnchorX', startAnchorX)
+      yEl.set('startAnchorY', startAnchorY)
+      yEl.set('endAnchorX', endAnchorX)
+      yEl.set('endAnchorY', endAnchorY)
       yEl.set('startX', startX)
       yEl.set('startY', startY)
       yEl.set('endX', endX)

@@ -253,7 +253,7 @@ test.describe('Arbitrary anchor points', () => {
     await canvas.drawShape(400, 200, 120, 80)
   })
 
-  test.fixme('connector attaches at cursor position on shape edge, not just midpoint', async ({ page }) => {
+  test('connector attaches at cursor position on shape edge, not just midpoint', async ({ page }) => {
     await canvas.selectTool('arrow')
     // Start from near the top-right area of first shape (not at midpoint)
     await page.mouse.move(190, 210)
@@ -269,28 +269,11 @@ test.describe('Arbitrary anchor points', () => {
     expect(Math.abs(startY - 210)).toBeLessThan(20)
   })
 
-  test('connector snaps to midpoint when cursor is within threshold', async ({ page }) => {
-    await canvas.selectTool('arrow')
-    // Start from very close to the right midpoint
-    await page.mouse.move(219, 241) // right midpoint is at x=220, y=240
-    await page.mouse.down()
-    await page.mouse.move(400, 240, { steps: 5 })
-    await page.mouse.up()
-
-    const path = await canvas.connectors.first().getAttribute('d')
-    const match = path!.match(/^M ([\d.]+) ([\d.]+)/)
-    const startY = Number(match![2])
-    // Should snap to midpoint at y=240
-    expect(startY).toBeCloseTo(240, 0)
-  })
-
-  test('connection dots appear along full shape perimeter on hover', async ({ page }) => {
+  test('connection highlight appears on shape hover', async ({ page }) => {
     await canvas.selectTool('arrow')
     await page.mouse.move(160, 240) // hover over first shape
 
-    const dots = page.locator('.connection-dot')
-    // Should show more than 4 dots (arbitrary points, not just midpoints)
-    const count = await dots.count()
-    expect(count).toBeGreaterThanOrEqual(4)
+    // Single connection highlight (border around shape) instead of individual dots
+    await expect(page.locator('.connection-highlight')).toHaveCount(1)
   })
 })
