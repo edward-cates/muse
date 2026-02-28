@@ -59,7 +59,7 @@ export function LineLayer({ shapes, lines, selectedId, onSelect, linePreview }: 
   return (
     <svg
       className="canvas__lines"
-      style={{ overflow: 'visible', position: 'absolute', top: 0, left: 0, width: 0, height: 0 }}
+      style={{ overflow: 'visible', position: 'absolute', top: 0, left: 0 }}
     >
       <defs>
         <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">

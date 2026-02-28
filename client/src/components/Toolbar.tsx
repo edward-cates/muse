@@ -10,6 +10,7 @@ export function Toolbar({ activeTool, onToolChange }: Props) {
     <div className="toolbar">
       {/* Select */}
       <button
+        data-testid="tool-select"
         className={`toolbar__btn ${activeTool === 'select' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('select')}
         title="Select (V)"
@@ -21,6 +22,7 @@ export function Toolbar({ activeTool, onToolChange }: Props) {
 
       {/* Rectangle */}
       <button
+        data-testid="tool-rectangle"
         className={`toolbar__btn ${activeTool === 'rectangle' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('rectangle')}
         title="Rectangle (R)"
@@ -32,6 +34,7 @@ export function Toolbar({ activeTool, onToolChange }: Props) {
 
       {/* Ellipse */}
       <button
+        data-testid="tool-ellipse"
         className={`toolbar__btn ${activeTool === 'ellipse' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('ellipse')}
         title="Ellipse (O)"
@@ -43,6 +46,7 @@ export function Toolbar({ activeTool, onToolChange }: Props) {
 
       {/* Diamond */}
       <button
+        data-testid="tool-diamond"
         className={`toolbar__btn ${activeTool === 'diamond' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('diamond')}
         title="Diamond (D)"
@@ -54,6 +58,7 @@ export function Toolbar({ activeTool, onToolChange }: Props) {
 
       {/* Line */}
       <button
+        data-testid="tool-line"
         className={`toolbar__btn ${activeTool === 'line' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('line')}
         title="Line (L)"
@@ -66,6 +71,7 @@ export function Toolbar({ activeTool, onToolChange }: Props) {
 
       {/* Draw */}
       <button
+        data-testid="tool-draw"
         className={`toolbar__btn ${activeTool === 'draw' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('draw')}
         title="Draw (P)"

@@ -415,6 +415,7 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
 
   return (
     <div
+      data-testid="canvas"
       className={`canvas ${cursorClass}`}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -451,6 +452,7 @@ export function Canvas({ activeTool, selectedId, onSelectedIdChange, onToolChang
             onStartEdit={handleStartEdit}
             editingId={editingId}
             scale={scale}
+            activeTool={activeTool}
           />
         ))}
         {previewSvg}

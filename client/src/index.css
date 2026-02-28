@@ -59,6 +59,29 @@ body {
   cursor: crosshair;
 }
 
+/* In draw/line/shape modes, disable pointer events on shapes and hit areas
+   so clicks pass through to the canvas for tool operations */
+.canvas--tool-draw .shape,
+.canvas--tool-draw .path-hitarea,
+.canvas--tool-draw .canvas__lines line,
+.canvas--tool-shape .shape,
+.canvas--tool-shape .path-hitarea,
+.canvas--tool-shape .canvas__lines line {
+  pointer-events: none;
+  cursor: inherit;
+}
+
+/* In line mode, shapes need pointer events for hit-testing (hover + click),
+   but we override cursor to crosshair instead of grab */
+.canvas--tool-line .shape {
+  cursor: crosshair;
+}
+
+.canvas--tool-line .path-hitarea,
+.canvas--tool-line .canvas__lines line {
+  pointer-events: none;
+}
+
 .canvas--panning {
   cursor: grabbing;
 }
@@ -172,6 +195,55 @@ body {
   box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.3);
   pointer-events: none;
   z-index: 300;
+}
+
+/* ── Drawing Title (top-left) ── */
+.drawing-title {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 500;
+}
+
+.drawing-title__display {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawing-title__display:hover {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.drawing-title__input {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  outline: none;
+  width: 260px;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 /* ── Shape preview (while dragging to create) ── */

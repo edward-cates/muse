@@ -33,7 +33,7 @@ function pointsToSvgPath(pts: number[]): string {
 
 export function PathLayer({ paths, selectedId, onSelect, drawingPath }: Props) {
   return (
-    <svg className="canvas__paths" style={{ overflow: 'visible', position: 'absolute', top: 0, left: 0, width: 0, height: 0 }}>
+    <svg className="canvas__paths" style={{ overflow: 'visible', position: 'absolute', top: 0, left: 0 }}>
       {paths.map((p) => {
         const d = pointsToSvgPath(p.points.map((v, i) => (i % 2 === 0 ? v - p.x : v - p.y)))
         const isSelected = p.id === selectedId

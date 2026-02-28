@@ -32,17 +32,28 @@ router.post('/', async (req, res) => {
   const { id, title } = req.body
   const supabase = getSupabase()
 
+  // If an ID is provided, check if the drawing already exists.
+  // Return it as-is to avoid overwriting title on re-registration.
+  if (id) {
+    const { data: existing } = await supabase
+      .from('drawings')
+      .select('id, title, created_at, updated_at')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (existing) {
+      res.json({ drawing: existing })
+      return
+    }
+  }
+
   const { data, error } = await supabase
     .from('drawings')
-    .upsert(
-      {
-        ...(id ? { id } : {}),
-        owner_id: userId,
-        title: title || 'Untitled',
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'id' },
-    )
+    .insert({
+      ...(id ? { id } : {}),
+      owner_id: userId,
+      title: title || 'Untitled',
+    })
     .select()
     .single()
 

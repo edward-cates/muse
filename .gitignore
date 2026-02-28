@@ -6,4 +6,7 @@ dist
 .env.*
 !*.example
 .DS_Store
-**/muse-data
+test-results
+playwright-report
+integration-report
+.auth-state.json

@@ -175,7 +175,6 @@ describe('AI message route', () => {
     process.env.SUPABASE_JWT_SECRET = TEST_JWT_SECRET
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
     process.env.ENCRYPTION_KEY = 'a'.repeat(64)
-    process.env.DATA_DIR = '/tmp/muse-test-ai'
     process.env.ANTHROPIC_BASE_URL = mockAnthropic.url
 
     // Encrypt a test API key so decrypt() will succeed

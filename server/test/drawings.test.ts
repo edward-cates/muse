@@ -84,7 +84,6 @@ describe('Drawings API', () => {
     process.env.SUPABASE_JWT_SECRET = TEST_JWT_SECRET
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
     process.env.ENCRYPTION_KEY = 'a'.repeat(64)
-    process.env.DATA_DIR = '/tmp/muse-test-drawings'
 
     const { createApp } = await import('../src/app.js')
     const app = await createApp()
@@ -157,21 +156,28 @@ describe('Drawings API', () => {
 
   // ── POST /api/drawings ──
 
-  it('POST /api/drawings creates a drawing with provided ID', async () => {
+  it('POST /api/drawings creates a new drawing when ID does not exist', async () => {
     const drawingId = '11111111-1111-1111-1111-111111111111'
-    let capturedBody = ''
+    let insertBody = ''
 
-    setMockRoutes([{
-      method: 'POST',
-      table: 'drawings',
-      handler: (_req, body) => {
-        capturedBody = body
-        return {
-          status: 200,
-          data: { id: drawingId, owner_id: TEST_USER_ID, title: 'Untitled', created_at: '2025-01-01', updated_at: '2025-01-01' },
-        }
+    setMockRoutes([
+      {
+        method: 'GET',
+        table: 'drawings',
+        handler: () => ({ status: 200, data: null }), // not found
       },
-    }])
+      {
+        method: 'POST',
+        table: 'drawings',
+        handler: (_req, body) => {
+          insertBody = body
+          return {
+            status: 200,
+            data: { id: drawingId, owner_id: TEST_USER_ID, title: 'Untitled', created_at: '2025-01-01', updated_at: '2025-01-01' },
+          }
+        },
+      },
+    ])
 
     const res = await fetch(url('/api/drawings'), {
       method: 'POST',
@@ -183,26 +189,66 @@ describe('Drawings API', () => {
     assert.equal(body.drawing.id, drawingId)
     assert.equal(body.drawing.title, 'Untitled')
 
-    // Verify the Supabase request included the ID and defaulted title
-    const parsed = JSON.parse(capturedBody)
+    const parsed = JSON.parse(insertBody)
     assert.equal(parsed.id, drawingId)
     assert.equal(parsed.title, 'Untitled')
   })
 
-  it('POST /api/drawings uses provided title', async () => {
-    let capturedBody = ''
+  it('POST /api/drawings returns existing drawing without modification', async () => {
+    const drawingId = '22222222-2222-2222-2222-222222222222'
+    let insertCalled = false
 
-    setMockRoutes([{
-      method: 'POST',
-      table: 'drawings',
-      handler: (_req, body) => {
-        capturedBody = body
-        return {
+    setMockRoutes([
+      {
+        method: 'GET',
+        table: 'drawings',
+        handler: () => ({
           status: 200,
-          data: { id: 'new-id', owner_id: TEST_USER_ID, title: 'My Diagram', created_at: '2025-01-01', updated_at: '2025-01-01' },
-        }
+          data: { id: drawingId, title: 'My Renamed Drawing', created_at: '2025-01-01', updated_at: '2025-06-01' },
+        }),
       },
-    }])
+      {
+        method: 'POST',
+        table: 'drawings',
+        handler: () => {
+          insertCalled = true
+          return { status: 200, data: {} }
+        },
+      },
+    ])
+
+    const res = await fetch(url('/api/drawings'), {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ id: drawingId }),
+    })
+    assert.equal(res.status, 200)
+    const body = await res.json() as { drawing: { id: string; title: string } }
+    assert.equal(body.drawing.title, 'My Renamed Drawing', 'should return existing title, not overwrite it')
+    assert.equal(insertCalled, false, 'should not insert when drawing already exists')
+  })
+
+  it('POST /api/drawings uses provided title for new drawing', async () => {
+    let insertBody = ''
+
+    setMockRoutes([
+      {
+        method: 'GET',
+        table: 'drawings',
+        handler: () => ({ status: 200, data: null }),
+      },
+      {
+        method: 'POST',
+        table: 'drawings',
+        handler: (_req, body) => {
+          insertBody = body
+          return {
+            status: 200,
+            data: { id: 'new-id', owner_id: TEST_USER_ID, title: 'My Diagram', created_at: '2025-01-01', updated_at: '2025-01-01' },
+          }
+        },
+      },
+    ])
 
     const res = await fetch(url('/api/drawings'), {
       method: 'POST',
@@ -213,16 +259,23 @@ describe('Drawings API', () => {
     const body = await res.json() as { drawing: { title: string } }
     assert.equal(body.drawing.title, 'My Diagram')
 
-    const parsed = JSON.parse(capturedBody)
+    const parsed = JSON.parse(insertBody)
     assert.equal(parsed.title, 'My Diagram')
   })
 
   it('POST /api/drawings returns 500 on DB error', async () => {
-    setMockRoutes([{
-      method: 'POST',
-      table: 'drawings',
-      handler: () => ({ status: 400, data: { message: 'conflict', code: 'PGRST000' } }),
-    }])
+    setMockRoutes([
+      {
+        method: 'GET',
+        table: 'drawings',
+        handler: () => ({ status: 200, data: null }),
+      },
+      {
+        method: 'POST',
+        table: 'drawings',
+        handler: () => ({ status: 400, data: { message: 'conflict', code: 'PGRST000' } }),
+      },
+    ])
 
     const res = await fetch(url('/api/drawings'), {
       method: 'POST',
