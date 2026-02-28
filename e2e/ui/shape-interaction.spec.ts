@@ -191,6 +191,50 @@ test.describe('Shape resize handles', () => {
   })
 })
 
+test.describe('Shape-geometry-aware selection', () => {
+  let canvas: CanvasPage
+
+  test('clicking outside ellipse but inside bounding box does not select', async ({ page }) => {
+    canvas = new CanvasPage(page)
+    await canvas.goto()
+
+    // Create an ellipse at (200, 200) with size (160, 120)
+    await canvas.selectTool('ellipse')
+    await canvas.drawShape(200, 200, 160, 120)
+    await page.mouse.click(600, 50) // deselect
+
+    // Click top-left corner of bounding box — outside the ellipse
+    await page.mouse.click(205, 205)
+    await expect(page.locator('.shape--selected')).toHaveCount(0)
+  })
+
+  test('clicking inside ellipse selects it', async ({ page }) => {
+    canvas = new CanvasPage(page)
+    await canvas.goto()
+
+    await canvas.selectTool('ellipse')
+    await canvas.drawShape(200, 200, 160, 120)
+    await page.mouse.click(600, 50) // deselect
+
+    // Click center of ellipse — should select
+    await page.mouse.click(280, 260)
+    await expect(page.locator('.shape--selected')).toHaveCount(1)
+  })
+
+  test('clicking outside diamond but inside bounding box does not select', async ({ page }) => {
+    canvas = new CanvasPage(page)
+    await canvas.goto()
+
+    await canvas.selectTool('diamond')
+    await canvas.drawShape(200, 200, 160, 120)
+    await page.mouse.click(600, 50) // deselect
+
+    // Click top-left corner of bounding box — outside the diamond
+    await page.mouse.click(205, 205)
+    await expect(page.locator('.shape--selected')).toHaveCount(0)
+  })
+})
+
 test.describe('Click-to-select in non-select tool modes', () => {
   let canvas: CanvasPage
 
