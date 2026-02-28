@@ -14,6 +14,7 @@ export function DrawingTitle({ drawingId }: Props) {
 
   // Fetch current title when drawingId changes
   useEffect(() => {
+    setTitle('Untitled')
     if (!session?.access_token) return
     let cancelled = false
 

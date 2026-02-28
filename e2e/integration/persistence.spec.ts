@@ -115,3 +115,24 @@ test('drawing titles and content persist across navigation', async ({ page }) =>
   await expect(page.locator('[data-testid="shape-rectangle"]')).toHaveCount(2, { timeout: 10_000 })
   await expect(page.locator('[data-testid="shape-ellipse"]')).toHaveCount(1)
 })
+
+test('new drawing resets title to Untitled', async ({ page }) => {
+  // Create a drawing and rename it
+  await page.goto('/')
+  await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+  await page.waitForTimeout(1000)
+
+  await renameDrawing(page, 'Custom Title')
+
+  // Draw something so the drawing isn't empty
+  await page.locator('[data-testid="tool-rectangle"]').click()
+  await drawShape(page, 200, 200, 150, 100)
+
+  // Create a new drawing via full page reload
+  await page.goto('about:blank')
+  await page.goto('/')
+  await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+
+  // New drawing should show "Untitled", not the previous drawing's title
+  await expect(page.locator('.drawing-title__display')).toHaveText('Untitled', { timeout: 10_000 })
+})
