@@ -258,23 +258,43 @@ export function Canvas({
     [offset],
   )
 
+  function pointInShape(s: ShapeElement, wx: number, wy: number): boolean {
+    // Normalize to 0-1 coordinates within bounding box
+    const nx = (wx - s.x) / s.width
+    const ny = (wy - s.y) / s.height
+    if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return false
+
+    switch (s.type) {
+      case 'ellipse': {
+        const dx = nx - 0.5, dy = ny - 0.5
+        return dx * dx + dy * dy <= 0.25
+      }
+      case 'diamond': {
+        return Math.abs(nx - 0.5) + Math.abs(ny - 0.5) <= 0.5
+      }
+      case 'triangle': {
+        // Point-up triangle: vertices at (0.5,0), (0,1), (1,1)
+        return ny >= 2 * Math.abs(nx - 0.5)
+      }
+      default:
+        return true // rectangle, hexagon, star, cloud — use bounding box
+    }
+  }
+
   function hitTestShape(world: { x: number; y: number }): ShapeElement | undefined {
-    // Iterate in reverse order to hit topmost shape first
     for (let i = shapesRef.current.length - 1; i >= 0; i--) {
       const s = shapesRef.current[i]
-      if (world.x >= s.x && world.x <= s.x + s.width && world.y >= s.y && world.y <= s.y + s.height) {
-        return s
-      }
+      if (pointInShape(s, world.x, world.y)) return s
     }
     return undefined
   }
 
   function hitTestAnyElement(world: { x: number; y: number }): CanvasElement | undefined {
-    // Check shapes, text, images, frames
     for (let i = elements.length - 1; i >= 0; i--) {
       const el = elements[i]
-      if (el.type === 'path') {
-        // Hit-test path by checking proximity to any segment
+      if (isShape(el)) {
+        if (pointInShape(el, world.x, world.y)) return el
+      } else if (el.type === 'path') {
         const pts = (el as PathElement).points
         const HIT_DIST = 8
         for (let j = 0; j < pts.length - 2; j += 2) {
