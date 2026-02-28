@@ -1,5 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
-import * as Y from 'yjs'
+import { createRequire } from 'node:module'
+import type { Doc } from 'yjs'
+
+// y-websocket uses require('yjs') (CJS). We must use the same CJS
+// instance to avoid the dual-package hazard where ESM and CJS load
+// separate copies of Yjs, crashing Y.applyUpdate() across instances.
+const _require = createRequire(import.meta.url)
+const Y = _require('yjs') as { applyUpdate: typeof import('yjs').applyUpdate; encodeStateAsUpdate: typeof import('yjs').encodeStateAsUpdate }
 
 function getSupabase() {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -12,7 +19,7 @@ export function setupPersistence() {
     return docName.replace(/^muse-/, '')
   }
 
-  function persistDoc(docName: string, ydoc: Y.Doc) {
+  function persistDoc(docName: string, ydoc: Doc) {
     const existing = writeTimers.get(docName)
     if (existing) clearTimeout(existing)
     writeTimers.set(
@@ -30,7 +37,7 @@ export function setupPersistence() {
 
   return {
     provider: null,
-    bindState: async (docName: string, ydoc: Y.Doc) => {
+    bindState: async (docName: string, ydoc: Doc) => {
       const { data } = await getSupabase()
         .from('drawings')
         .select('content')
@@ -44,7 +51,7 @@ export function setupPersistence() {
 
       ydoc.on('update', () => persistDoc(docName, ydoc))
     },
-    writeState: async (docName: string, ydoc: Y.Doc) => {
+    writeState: async (docName: string, ydoc: Doc) => {
       const existing = writeTimers.get(docName)
       if (existing) clearTimeout(existing)
       writeTimers.delete(docName)
