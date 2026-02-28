@@ -5,6 +5,7 @@ import { StatusBar } from './components/StatusBar'
 import { SettingsPanel } from './components/SettingsPanel'
 import { AiPanel } from './components/AiPanel'
 import { DrawingsList } from './components/DrawingsList'
+import { DrawingTitle } from './components/DrawingTitle'
 import { useElements } from './hooks/useElements'
 import type { Tool } from './types'
 
@@ -85,6 +86,7 @@ export function App({ drawingId }: { drawingId: string }) {
         elements={elements}
         elementActions={{ addShape, addLine, updateElement, deleteElement }}
       />
+      <DrawingTitle drawingId={drawingId} />
       <DrawingsList currentDrawingId={drawingId} />
     </div>
   )

@@ -1,14 +1,12 @@
 import { createServer as createHttpServer, type IncomingMessage, type Server } from 'node:http'
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
 import { WebSocketServer, type WebSocket } from 'ws'
-import * as Y from 'yjs'
 import express from 'express'
 import cors from 'cors'
 import * as jose from 'jose'
 import keysRouter from './routes/keys.js'
 import aiRouter from './routes/ai.js'
 import drawingsRouter from './routes/drawings.js'
+import { setupPersistence } from './persistence.js'
 
 // ── Express types augmentation ──
 declare global {
@@ -55,42 +53,6 @@ function createVerifier() {
   }
 }
 
-// ── Yjs persistence ──
-function setupPersistence(dataDir: string) {
-  const writeTimers = new Map<string, ReturnType<typeof setTimeout>>()
-
-  function persistDoc(docName: string, ydoc: Y.Doc) {
-    const existing = writeTimers.get(docName)
-    if (existing) clearTimeout(existing)
-    writeTimers.set(
-      docName,
-      setTimeout(() => {
-        mkdirSync(dataDir, { recursive: true })
-        const state = Y.encodeStateAsUpdate(ydoc)
-        writeFileSync(join(dataDir, `${docName}.bin`), state)
-        writeTimers.delete(docName)
-      }, 500),
-    )
-  }
-
-  return {
-    provider: null,
-    bindState: async (docName: string, ydoc: Y.Doc) => {
-      const filepath = join(dataDir, `${docName}.bin`)
-      if (existsSync(filepath)) {
-        const data = readFileSync(filepath)
-        Y.applyUpdate(ydoc, new Uint8Array(data))
-      }
-      ydoc.on('update', () => persistDoc(docName, ydoc))
-    },
-    writeState: async (docName: string, ydoc: Y.Doc) => {
-      mkdirSync(dataDir, { recursive: true })
-      const state = Y.encodeStateAsUpdate(ydoc)
-      writeFileSync(join(dataDir, `${docName}.bin`), state)
-    },
-  }
-}
-
 export interface AppInstance {
   server: Server
   wss: WebSocketServer
@@ -104,7 +66,7 @@ export async function createApp(): Promise<AppInstance> {
   const utils = await import('y-websocket/bin/utils')
   const { setupWSConnection, setPersistence } = utils
 
-  setPersistence(setupPersistence(process.env.DATA_DIR || './muse-data'))
+  setPersistence(setupPersistence())
 
   // ── Express ──
   const app = express()

@@ -13,7 +13,6 @@ process.env.SUPABASE_URL = 'http://localhost:54421'
 process.env.SUPABASE_JWT_SECRET = TEST_JWT_SECRET
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
 process.env.ENCRYPTION_KEY = 'a'.repeat(64)
-process.env.DATA_DIR = '/tmp/muse-test-data'
 
 const { createApp } = await import('../src/app.js')
 

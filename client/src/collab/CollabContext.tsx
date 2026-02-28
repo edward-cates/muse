@@ -3,7 +3,7 @@ import type { CollabInstance } from './provider'
 import { createCollabProvider, destroyCollabProvider } from './provider'
 import { useAuth } from '../auth/AuthContext'
 
-const CollabContext = createContext<CollabInstance | null>(null)
+export const CollabContext = createContext<CollabInstance | null>(null)
 
 export function useCollab(): CollabInstance {
   const ctx = useContext(CollabContext)

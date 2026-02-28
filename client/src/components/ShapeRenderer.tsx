@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect, type MouseEvent } from 'react'
-import type { ShapeElement } from '../types'
+import type { ShapeElement, Tool } from '../types'
 
 interface Props {
   shape: ShapeElement
@@ -9,6 +9,7 @@ interface Props {
   onStartEdit: (id: string) => void
   editingId: string | null
   scale: number
+  activeTool: Tool
 }
 
 function shapeSvg(type: ShapeElement['type'], w: number, h: number, stroke: string, isSelected: boolean) {
@@ -47,7 +48,7 @@ function shapeSvg(type: ShapeElement['type'], w: number, h: number, stroke: stri
   }
 }
 
-export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEdit, editingId, scale }: Props) {
+export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEdit, editingId, scale, activeTool }: Props) {
   const [isDragging, setIsDragging] = useState(false)
   const dragStart = useRef({ x: 0, y: 0 })
   const shapeStart = useRef({ x: 0, y: 0 })
@@ -57,6 +58,9 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
   const handleMouseDown = useCallback(
     (e: MouseEvent) => {
       if (isEditing && (e.target as HTMLElement).tagName === 'TEXTAREA') return
+
+      // In non-select modes, let the event propagate to Canvas for tool handling
+      if (activeTool !== 'select') return
 
       e.stopPropagation()
       onSelect(shape.id)
@@ -82,7 +86,7 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
       window.addEventListener('mousemove', handleMove)
       window.addEventListener('mouseup', handleUp)
     },
-    [shape.id, shape.x, shape.y, scale, onSelect, onUpdate, isEditing],
+    [shape.id, shape.x, shape.y, scale, onSelect, onUpdate, isEditing, activeTool],
   )
 
   const handleDoubleClick = useCallback(
@@ -109,6 +113,8 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
 
   return (
     <div
+      data-testid={`shape-${shape.type}`}
+      data-shape-id={shape.id}
       className={`shape ${isSelected ? 'shape--selected' : ''} ${isDragging ? 'shape--dragging' : ''}`}
       style={{
         left: shape.x,
