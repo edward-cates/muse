@@ -1,10 +1,10 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const PROJECT_ROOT = resolve(__dirname, '../..')
+// Playwright runs global setup from the repo root (process.cwd())
+const PROJECT_ROOT = process.cwd()
+const INTEGRATION_DIR = resolve(PROJECT_ROOT, 'e2e/integration')
 
 function readEnvFile(path: string): Record<string, string> {
   const content = readFileSync(path, 'utf-8')
@@ -69,5 +69,5 @@ export default async function globalSetup() {
     }],
   }
 
-  writeFileSync(resolve(__dirname, '.auth-state.json'), JSON.stringify(storageState, null, 2))
+  writeFileSync(resolve(INTEGRATION_DIR, '.auth-state.json'), JSON.stringify(storageState, null, 2))
 }
