@@ -8,6 +8,7 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI ? 'github' : [['html', { outputFolder: 'integration-report' }]],
   timeout: 30_000,
+  globalTimeout: 120_000,
 
   use: {
     baseURL: 'http://localhost:5175',

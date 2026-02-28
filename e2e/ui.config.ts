@@ -1,13 +1,14 @@
 import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
-  testDir: './tests',
+  testDir: './ui',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? 'github' : 'html',
-  timeout: 30_000,
+  timeout: 5_000,
+  globalTimeout: 60_000,
 
   use: {
     baseURL: 'http://localhost:5174',
@@ -20,7 +21,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run dev:e2e',
+    command: 'npm run dev:ui-test',
     cwd: '..',
     url: 'http://localhost:5174',
     reuseExistingServer: !process.env.CI,

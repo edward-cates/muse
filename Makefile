@@ -1,4 +1,4 @@
-.PHONY: dev setup validate test typecheck install clean db-reset test-e2e test-e2e-ui test-integration
+.PHONY: dev setup validate test typecheck install clean db-reset test-ui test-ui-open test-integration
 
 # Start all dev servers
 dev:
@@ -29,15 +29,15 @@ test:
 db-reset:
 	supabase db reset
 
-# Run E2E tests (Playwright)
-test-e2e:
-	npx playwright test --config e2e/playwright.config.ts
+# Run UI tests (Playwright, no backend needed)
+test-ui:
+	npx playwright test --config e2e/ui.config.ts
 
-# Run E2E tests with Playwright UI mode
-test-e2e-ui:
-	npx playwright test --config e2e/playwright.config.ts --ui
+# Run UI tests with Playwright interactive mode
+test-ui-open:
+	npx playwright test --config e2e/ui.config.ts --ui
 
-# Run integration E2E tests (requires local Supabase running)
+# Run integration tests (requires local Supabase running)
 test-integration:
 	npx playwright test --config e2e/integration.config.ts
 

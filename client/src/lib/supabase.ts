@@ -4,9 +4,12 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Run scripts/setup-env.sh first.',
+  console.warn(
+    'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY — Supabase client will not work.',
   )
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(
+  supabaseUrl || 'http://placeholder',
+  supabaseAnonKey || 'placeholder',
+)
