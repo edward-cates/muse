@@ -28,7 +28,7 @@ export function setupPersistence() {
         writeTimers.delete(docName)
         const state = Y.encodeStateAsUpdate(ydoc)
         const b64 = Buffer.from(state).toString('base64')
-        console.log(`[persist] debounced write ${drawingId(docName)} (${state.length} bytes, ${b64.length} chars)`)
+        console.error(`[persist] debounced write ${drawingId(docName)} (${state.length} bytes, ${b64.length} chars)`)
         const { error } = await getSupabase()
           .from('drawings')
           .update({ content: b64 })
@@ -47,11 +47,11 @@ export function setupPersistence() {
         .eq('id', drawingId(docName))
         .single()
 
-      console.log(`[persist] bindState ${drawingId(docName)}: row=${!!data}, content=${data?.content ? data.content.length + ' chars' : 'null'}, error=${error?.message || 'none'}`)
+      console.error(`[persist] bindState ${drawingId(docName)}: row=${!!data}, content=${data?.content ? data.content.length + ' chars' : 'null'}, error=${error?.message || 'none'}`)
 
       if (data?.content) {
         const bytes = Buffer.from(data.content, 'base64')
-        console.log(`[persist] applying update: ${bytes.length} bytes`)
+        console.error(`[persist] applying update: ${bytes.length} bytes`)
         Y.applyUpdate(ydoc, new Uint8Array(bytes))
       }
 
@@ -64,7 +64,7 @@ export function setupPersistence() {
 
       const state = Y.encodeStateAsUpdate(ydoc)
       const b64 = Buffer.from(state).toString('base64')
-      console.log(`[persist] writeState ${drawingId(docName)} (${state.length} bytes, ${b64.length} chars)`)
+      console.error(`[persist] writeState ${drawingId(docName)} (${state.length} bytes, ${b64.length} chars)`)
       const { error } = await getSupabase()
         .from('drawings')
         .update({ content: b64 })
