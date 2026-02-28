@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import { resolve } from 'node:path'
 
 export default defineConfig({
   testDir: './integration',
@@ -14,7 +15,7 @@ export default defineConfig({
     baseURL: 'http://localhost:5175',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    storageState: './integration/.auth-state.json',
+    storageState: resolve('e2e/integration/.auth-state.json'),
   },
 
   projects: [
