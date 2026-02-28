@@ -12,6 +12,12 @@ function getSupabase() {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
+// An empty Yjs doc encodes to exactly 2 bytes. Writing this to the DB
+// would clobber real content — e.g. React StrictMode's rapid mount/unmount
+// cycle destroys a doc before async bindState loads content, triggering
+// writeState with an empty state. Skip these no-op writes.
+const EMPTY_STATE_SIZE = 2
+
 export function setupPersistence() {
   const writeTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
@@ -27,13 +33,11 @@ export function setupPersistence() {
       setTimeout(async () => {
         writeTimers.delete(docName)
         const state = Y.encodeStateAsUpdate(ydoc)
-        const b64 = Buffer.from(state).toString('base64')
-        console.error(`[persist] debounced write ${drawingId(docName)} (${state.length} bytes, ${b64.length} chars)`)
-        const { error } = await getSupabase()
+        if (state.length <= EMPTY_STATE_SIZE) return
+        await getSupabase()
           .from('drawings')
-          .update({ content: b64 })
+          .update({ content: Buffer.from(state).toString('base64') })
           .eq('id', drawingId(docName))
-        if (error) console.error(`[persist] debounced write error:`, error)
       }, 500),
     )
   }
@@ -41,17 +45,14 @@ export function setupPersistence() {
   return {
     provider: null,
     bindState: async (docName: string, ydoc: Doc) => {
-      const { data, error } = await getSupabase()
+      const { data } = await getSupabase()
         .from('drawings')
         .select('content')
         .eq('id', drawingId(docName))
-        .single()
-
-      console.error(`[persist] bindState ${drawingId(docName)}: row=${!!data}, content=${data?.content ? data.content.length + ' chars' : 'null'}, error=${error?.message || 'none'}`)
+        .maybeSingle()
 
       if (data?.content) {
         const bytes = Buffer.from(data.content, 'base64')
-        console.error(`[persist] applying update: ${bytes.length} bytes`)
         Y.applyUpdate(ydoc, new Uint8Array(bytes))
       }
 
@@ -63,13 +64,11 @@ export function setupPersistence() {
       writeTimers.delete(docName)
 
       const state = Y.encodeStateAsUpdate(ydoc)
-      const b64 = Buffer.from(state).toString('base64')
-      console.error(`[persist] writeState ${drawingId(docName)} (${state.length} bytes, ${b64.length} chars)`)
-      const { error } = await getSupabase()
+      if (state.length <= EMPTY_STATE_SIZE) return
+      await getSupabase()
         .from('drawings')
-        .update({ content: b64 })
+        .update({ content: Buffer.from(state).toString('base64') })
         .eq('id', drawingId(docName))
-      if (error) console.error(`[persist] writeState error:`, error)
     },
   }
 }
