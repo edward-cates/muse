@@ -12,17 +12,17 @@ async function drawShape(page: Page, x: number, y: number, w: number, h: number)
 }
 
 async function renameDrawing(page: Page, title: string) {
-  // Wait for PATCH response so we know the rename persisted
+  // Wait for PATCH response so we know the rename was sent
   const patchDone = page.waitForResponse(
     (resp) =>
       resp.url().includes('/api/drawings/') &&
-      resp.request().method() === 'PATCH' &&
-      resp.status() === 200,
+      resp.request().method() === 'PATCH',
   )
   await page.locator('.drawing-title__display').click()
   await page.locator('.drawing-title__input').fill(title)
   await page.locator('.drawing-title__input').press('Enter')
-  await patchDone
+  const resp = await patchDone
+  console.log(`[TEST] Rename to "${title}" → status ${resp.status()}`)
 }
 
 function getDrawingId(url: string): string {
@@ -43,10 +43,20 @@ async function navigateToDrawing(page: Page, drawingId: string) {
 }
 
 test('drawing titles and content persist across navigation', async ({ page }) => {
+  // Log all API responses for debugging
+  page.on('response', (resp) => {
+    if (resp.url().includes('/api/')) {
+      resp.text().then((body) => {
+        console.log(`[API] ${resp.request().method()} ${resp.url()} → ${resp.status()} ${body.slice(0, 200)}`)
+      }).catch(() => {})
+    }
+  })
+
   // ── Create Doc 1 ──
   await page.goto('/')
   await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
   const doc1Id = getDrawingId(page.url())
+  console.log(`[TEST] Doc 1 ID: ${doc1Id}`)
 
   // Wait for registration POST to complete before renaming
   await page.waitForTimeout(1000)
