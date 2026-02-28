@@ -76,7 +76,13 @@ export class CanvasPage {
     return this.page.locator('.canvas__paths path[stroke]:not([stroke="transparent"])')
   }
 
+  /** Clickable connector hit areas — use for interaction (click, dblclick) */
   get connectors(): Locator {
+    return this.page.locator('.canvas__lines path.path-hitarea')
+  }
+
+  /** Visible connector paths — use for visual assertions (stroke, opacity, markers) */
+  get connectorPaths(): Locator {
     return this.page.locator('.canvas__lines path.connector')
   }
 

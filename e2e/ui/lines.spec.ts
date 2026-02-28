@@ -529,7 +529,7 @@ test.describe('Arrow tool', () => {
     await expect(canvas.connectors).toHaveCount(1)
 
     // Get the connector's stroke color
-    const connector = canvas.connectors.first()
+    const connector = canvas.connectorPaths.first()
     const stroke = await connector.getAttribute('stroke')
 
     // The arrowhead marker polygon should match the connector stroke color

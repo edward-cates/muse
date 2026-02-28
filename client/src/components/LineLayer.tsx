@@ -142,18 +142,21 @@ export function LineLayer({ shapes, lines, selectedId, onSelect, onDoubleClick, 
         const midY = (start.y + end.y) / 2
 
         return (
-          <g key={line.id}>
-            {/* Wide invisible hit area rendered below for easy clicking */}
+          <g
+            key={line.id}
+            style={{ cursor: 'pointer' }}
+            onMouseDown={(e) => { e.stopPropagation(); onSelect(line.id) }}
+            onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick?.(line.id) }}
+          >
+            {/* Wide invisible hit area for easy clicking */}
             <path
+              className="path-hitarea"
               d={d}
               stroke="transparent"
               strokeWidth={Math.max(12, sw + 10)}
               fill="none"
-              style={{ cursor: 'pointer', pointerEvents: 'stroke' }}
-              onMouseDown={(e) => { e.stopPropagation(); onSelect(line.id) }}
-              onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick?.(line.id) }}
             />
-            {/* Visible connector on top — uses bounding-box pointer-events so it's clickable even when arrowhead markers shift the bounding box center away from the stroke */}
+            {/* Visible connector */}
             <path
               className="connector"
               d={d}
@@ -164,9 +167,7 @@ export function LineLayer({ shapes, lines, selectedId, onSelect, onDoubleClick, 
               opacity={lineOpacity}
               markerEnd={endStyle !== 'none' ? `url(#arrowhead-${endStyle}-end-${line.id})` : undefined}
               markerStart={startStyle !== 'none' ? `url(#arrowhead-${startStyle}-start-${line.id})` : undefined}
-              style={{ pointerEvents: 'bounding-box' as unknown as React.CSSProperties['pointerEvents'], cursor: 'pointer' }}
-              onMouseDown={(e) => { e.stopPropagation(); onSelect(line.id) }}
-              onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick?.(line.id) }}
+              style={{ pointerEvents: 'none' }}
             />
             {/* Connector label editor */}
             {editingLabelId === line.id && (

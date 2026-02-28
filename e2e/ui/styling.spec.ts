@@ -136,7 +136,7 @@ test.describe('Stroke styles', () => {
     await page.locator('.property-panel [data-testid="stroke-style"]').selectOption('dashed')
 
     await page.mouse.click(600, 50)
-    const path = canvas.connectors.first()
+    const path = canvas.connectorPaths.first()
     const dashArray = await path.getAttribute('stroke-dasharray')
     expect(dashArray).toBeTruthy()
   })
@@ -199,7 +199,7 @@ test.describe('Opacity', () => {
     const slider = page.locator('.property-panel input[data-testid="opacity"]')
     await slider.fill('30')
 
-    const connector = canvas.connectors.first()
+    const connector = canvas.connectorPaths.first()
     const opacity = await connector.getAttribute('opacity')
     expect(Number(opacity)).toBeCloseTo(0.3, 1)
   })

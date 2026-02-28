@@ -49,7 +49,7 @@ test.describe('Arrowhead styles', () => {
 
     await page.locator('.property-panel [data-testid="arrowhead-end"]').selectOption('diamond')
 
-    const connector = canvas.connectors.first()
+    const connector = canvas.connectorPaths.first()
     const markerEnd = await connector.getAttribute('marker-end')
     expect(markerEnd).toContain('diamond')
   })
@@ -60,7 +60,7 @@ test.describe('Arrowhead styles', () => {
 
     await page.locator('.property-panel [data-testid="arrowhead-start"]').selectOption('triangle')
 
-    const connector = canvas.connectors.first()
+    const connector = canvas.connectorPaths.first()
     const markerStart = await connector.getAttribute('marker-start')
     expect(markerStart).toBeTruthy()
   })
@@ -71,7 +71,7 @@ test.describe('Arrowhead styles', () => {
 
     await page.locator('.property-panel [data-testid="arrowhead-end"]').selectOption('none')
 
-    const connector = canvas.connectors.first()
+    const connector = canvas.connectorPaths.first()
     const markerEnd = await connector.getAttribute('marker-end')
     expect(!markerEnd || markerEnd === '' || markerEnd === 'none').toBeTruthy()
   })

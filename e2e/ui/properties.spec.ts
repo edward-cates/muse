@@ -157,7 +157,7 @@ test.describe('Property panel', () => {
     await page.mouse.click(600, 50)
 
     // Verify connector stroke changed
-    const connector = canvas.connectors.first()
+    const connector = canvas.connectorPaths.first()
     await expect(connector).toHaveAttribute('stroke', '#ff0000')
   })
 
@@ -196,7 +196,7 @@ test.describe('Property panel', () => {
     await page.mouse.click(600, 50)
 
     // Verify connector stroke-width changed
-    const connector = canvas.connectors.first()
+    const connector = canvas.connectorPaths.first()
     await expect(connector).toHaveAttribute('stroke-width', '5')
   })
 
