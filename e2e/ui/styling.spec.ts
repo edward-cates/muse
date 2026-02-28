@@ -13,12 +13,13 @@ test.describe('Color picker', () => {
     await canvas.shapes.first().click()
   })
 
-  test.fixme('fill color shows palette swatches', async ({ page }) => {
+  test('fill color shows palette swatches', async ({ page }) => {
     const swatches = page.locator('.property-panel .color-picker--fill .color-swatch')
-    await expect(swatches).toHaveCount({ minimum: 12 })
+    const count = await swatches.count()
+    expect(count).toBeGreaterThanOrEqual(12)
   })
 
-  test.fixme('clicking a fill swatch changes shape fill', async ({ page }) => {
+  test('clicking a fill swatch changes shape fill', async ({ page }) => {
     const swatch = page.locator('.property-panel .color-picker--fill .color-swatch').nth(2)
     const color = await swatch.getAttribute('data-color')
     await swatch.click()
@@ -28,7 +29,7 @@ test.describe('Color picker', () => {
     await expect(rect).toHaveAttribute('fill', color!)
   })
 
-  test.fixme('transparent fill option exists and works', async ({ page }) => {
+  test('transparent fill option exists and works', async ({ page }) => {
     const transparentBtn = page.locator('.property-panel .color-picker--fill [data-color="transparent"]')
     await transparentBtn.click()
 
@@ -38,7 +39,7 @@ test.describe('Color picker', () => {
     expect(fill === 'transparent' || fill === 'none').toBeTruthy()
   })
 
-  test.fixme('custom hex input works for fill', async ({ page }) => {
+  test('custom hex input works for fill', async ({ page }) => {
     const hexInput = page.locator('.property-panel .color-picker--fill input[type="text"]')
     await hexInput.fill('#e74c3c')
     await hexInput.press('Enter')
@@ -48,12 +49,13 @@ test.describe('Color picker', () => {
     await expect(rect).toHaveAttribute('fill', '#e74c3c')
   })
 
-  test.fixme('stroke color shows palette swatches', async ({ page }) => {
+  test('stroke color shows palette swatches', async ({ page }) => {
     const swatches = page.locator('.property-panel .color-picker--stroke .color-swatch')
-    await expect(swatches).toHaveCount({ minimum: 12 })
+    const count = await swatches.count()
+    expect(count).toBeGreaterThanOrEqual(12)
   })
 
-  test.fixme('clicking a stroke swatch changes shape stroke', async ({ page }) => {
+  test('clicking a stroke swatch changes shape stroke', async ({ page }) => {
     const swatch = page.locator('.property-panel .color-picker--stroke .color-swatch').nth(3)
     const color = await swatch.getAttribute('data-color')
     await swatch.click()
@@ -63,7 +65,7 @@ test.describe('Color picker', () => {
     await expect(rect).toHaveAttribute('stroke', color!)
   })
 
-  test.fixme('recently used colors appear in picker', async ({ page }) => {
+  test('recently used colors appear in picker', async ({ page }) => {
     const hexInput = page.locator('.property-panel .color-picker--fill input[type="text"]')
     await hexInput.fill('#abcdef')
     await hexInput.press('Enter')
@@ -90,7 +92,7 @@ test.describe('Stroke styles', () => {
     await canvas.shapes.first().click()
   })
 
-  test.fixme('stroke style selector shows solid/dashed/dotted options', async ({ page }) => {
+  test('stroke style selector shows solid/dashed/dotted options', async ({ page }) => {
     const options = page.locator('.property-panel [data-testid="stroke-style"] option')
     const values = await options.allTextContents()
     expect(values).toContain('Solid')
@@ -98,7 +100,7 @@ test.describe('Stroke styles', () => {
     expect(values).toContain('Dotted')
   })
 
-  test.fixme('dashed stroke style applies to shape', async ({ page }) => {
+  test('dashed stroke style applies to shape', async ({ page }) => {
     await page.locator('.property-panel [data-testid="stroke-style"]').selectOption('dashed')
 
     await page.mouse.click(600, 50) // deselect
@@ -108,7 +110,7 @@ test.describe('Stroke styles', () => {
     expect(dashArray).not.toBe('none')
   })
 
-  test.fixme('dotted stroke style applies to shape', async ({ page }) => {
+  test('dotted stroke style applies to shape', async ({ page }) => {
     await page.locator('.property-panel [data-testid="stroke-style"]').selectOption('dotted')
 
     await page.mouse.click(600, 50) // deselect
@@ -117,7 +119,7 @@ test.describe('Stroke styles', () => {
     expect(dashArray).toBeTruthy()
   })
 
-  test.fixme('dashed stroke style applies to connector', async ({ page }) => {
+  test('dashed stroke style applies to connector', async ({ page }) => {
     // Create connected shapes
     await page.keyboard.press('Escape')
     await canvas.selectTool('rectangle')
@@ -139,7 +141,7 @@ test.describe('Stroke styles', () => {
     expect(dashArray).toBeTruthy()
   })
 
-  test.fixme('stroke width presets (thin/medium/bold) work', async ({ page }) => {
+  test('stroke width presets (thin/medium/bold) work', async ({ page }) => {
     const presets = page.locator('.property-panel [data-testid="stroke-width-preset"]')
     await expect(presets).toHaveCount(3) // thin, medium, bold
 
@@ -164,17 +166,17 @@ test.describe('Opacity', () => {
     await canvas.shapes.first().click()
   })
 
-  test.fixme('opacity slider is shown in property panel', async ({ page }) => {
+  test('opacity slider is shown in property panel', async ({ page }) => {
     const slider = page.locator('.property-panel input[data-testid="opacity"]')
     await expect(slider).toBeVisible()
   })
 
-  test.fixme('opacity slider defaults to 100%', async ({ page }) => {
+  test('opacity slider defaults to 100%', async ({ page }) => {
     const slider = page.locator('.property-panel input[data-testid="opacity"]')
     await expect(slider).toHaveValue('100')
   })
 
-  test.fixme('changing opacity applies to shape', async ({ page }) => {
+  test('changing opacity applies to shape', async ({ page }) => {
     const slider = page.locator('.property-panel input[data-testid="opacity"]')
     await slider.fill('50')
 
@@ -182,7 +184,7 @@ test.describe('Opacity', () => {
     await expect(shape).toHaveCSS('opacity', '0.5')
   })
 
-  test.fixme('opacity applies to connectors', async ({ page }) => {
+  test('opacity applies to connectors', async ({ page }) => {
     await page.keyboard.press('Escape')
     await canvas.selectTool('rectangle')
     await canvas.drawShape(400, 200, 80, 60)
@@ -211,7 +213,7 @@ test.describe('Style workflow', () => {
     await canvas.goto()
   })
 
-  test.fixme('copy style + paste style transfers fill/stroke between shapes', async ({ page }) => {
+  test('copy style + paste style transfers fill/stroke between shapes', async ({ page }) => {
     // Create source shape with custom style
     await canvas.selectTool('rectangle')
     await canvas.drawShape(100, 200, 100, 80)
@@ -239,7 +241,7 @@ test.describe('Style workflow', () => {
     await expect(rect).toHaveAttribute('fill', '#ff0000')
   })
 
-  test.fixme('new shapes use the last-used fill and stroke colors', async ({ page }) => {
+  test('new shapes use the last-used fill and stroke colors', async ({ page }) => {
     // Create first shape and change its color
     await canvas.selectTool('rectangle')
     await canvas.drawShape(100, 200, 100, 80)
@@ -260,7 +262,7 @@ test.describe('Style workflow', () => {
     await expect(rect).toHaveAttribute('fill', '#3498db')
   })
 
-  test.fixme('corner radius control adjusts shape roundness', async ({ page }) => {
+  test('corner radius control adjusts shape roundness', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 120, 80)
     await canvas.selectTool('select')
@@ -275,7 +277,7 @@ test.describe('Style workflow', () => {
     await expect(rect).toHaveAttribute('rx', '12')
   })
 
-  test.fixme('shadow toggle adds drop shadow to shape', async ({ page }) => {
+  test('shadow toggle adds drop shadow to shape', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 120, 80)
     await canvas.selectTool('select')

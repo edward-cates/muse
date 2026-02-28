@@ -56,13 +56,13 @@ test.describe('Multi-select', () => {
     await expect(canvas.shapes).toHaveCount(1)
   })
 
-  test.fixme('Cmd+A selects all elements', async ({ page }) => {
+  test('Cmd+A selects all elements', async ({ page }) => {
     await canvas.selectTool('select')
     await page.keyboard.press('Meta+a')
     await expect(page.locator('.shape--selected')).toHaveCount(3)
   })
 
-  test.fixme('shift-click on selected shape removes it from selection', async ({ page }) => {
+  test('shift-click on selected shape removes it from selection', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
     await canvas.shapes.nth(1).click({ modifiers: ['Shift'] })
@@ -73,7 +73,7 @@ test.describe('Multi-select', () => {
     await expect(page.locator('.shape--selected')).toHaveCount(1)
   })
 
-  test.fixme('marquee selection shows selection rectangle while dragging', async ({ page }) => {
+  test('marquee selection shows selection rectangle while dragging', async ({ page }) => {
     await canvas.selectTool('select')
 
     await page.mouse.move(50, 150)
@@ -84,7 +84,7 @@ test.describe('Multi-select', () => {
     await page.mouse.up()
   })
 
-  test.fixme('Tab cycles through elements', async ({ page }) => {
+  test('Tab cycles through elements', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
     const id1 = await page.locator('.shape--selected').getAttribute('data-shape-id')
@@ -98,7 +98,7 @@ test.describe('Multi-select', () => {
     expect(id3).not.toEqual(id2)
   })
 
-  test.fixme('property panel handles multi-select (shared properties)', async ({ page }) => {
+  test('property panel handles multi-select (shared properties)', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
     await canvas.shapes.nth(1).click({ modifiers: ['Shift'] })

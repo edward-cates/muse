@@ -238,9 +238,15 @@ body {
 /* ── Drawing Title (top-left) ── */
 .drawing-title {
   position: fixed;
-  top: 20px;
-  left: 20px;
+  top: 4px;
+  left: 130px;
   z-index: 500;
+  pointer-events: none;
+}
+
+.drawing-title__display,
+.drawing-title__input {
+  pointer-events: auto;
 }
 
 .drawing-title__display {
@@ -470,21 +476,23 @@ body {
 /* ── Property Panel (right side) ── */
 .property-panel {
   position: fixed;
-  top: 50%;
-  right: 20px;
-  transform: translateY(-50%);
+  top: 60px;
+  right: 12px;
   background: var(--surface);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   box-shadow: var(--shadow-lg);
   z-index: 500;
-  min-width: 160px;
+  width: 200px;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  font-size: 12px;
 }
 
 .property-panel__field {
@@ -504,13 +512,15 @@ body {
 .property-panel__field input {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px 8px;
+  border-radius: 4px;
+  padding: 3px 6px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 11px;
   color: var(--text);
   outline: none;
   transition: border-color 0.12s;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .property-panel__field input:focus,
@@ -522,11 +532,590 @@ body {
 .property-panel__field select {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px 8px;
+  border-radius: 4px;
+  padding: 3px 6px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 11px;
   color: var(--text);
+  width: 100%;
+  box-sizing: border-box;
   outline: none;
   cursor: pointer;
+}
+
+.property-panel__row {
+  display: flex;
+  gap: 4px;
+}
+
+.property-panel__field--small {
+  flex: 1;
+  min-width: 0;
+}
+
+.property-panel__field--small input {
+  width: 100%;
+}
+
+.property-panel__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.property-panel__btn:hover {
+  background: var(--accent-light);
+  color: var(--text);
+}
+
+.property-panel__btn--active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+/* ── Color Picker ── */
+.color-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.color-picker__swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.color-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  transition: transform 0.1s;
+}
+
+.color-swatch:hover {
+  transform: scale(1.2);
+  z-index: 1;
+}
+
+.color-swatch--transparent {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.color-picker__hex-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.color-picker__hex-input {
+  width: 70px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text);
+  outline: none;
+}
+
+.color-picker__hex-input:focus {
+  border-color: var(--accent);
+}
+
+.color-picker__native {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+}
+
+/* ── Shape Picker Flyout ── */
+.shape-picker-flyout {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  display: flex;
+  gap: 2px;
+  box-shadow: var(--shadow-lg);
+  z-index: 600;
+}
+
+.shape-picker-flyout button {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: background 0.12s, color 0.12s;
+}
+
+.shape-picker-flyout button:hover {
+  background: var(--accent-light);
+  color: var(--text);
+}
+
+/* ── Hand / Eraser / Text Tool Cursors ── */
+.canvas--tool-hand {
+  cursor: grab;
+}
+
+.canvas--tool-hand.canvas--panning {
+  cursor: grabbing;
+}
+
+.canvas--tool-hand .shape {
+  cursor: grab;
+}
+
+.canvas--tool-hand .path-hitarea,
+.canvas--tool-hand .canvas__lines path {
+  pointer-events: none;
+  cursor: inherit;
+}
+
+.canvas--tool-eraser {
+  cursor: crosshair;
+}
+
+.canvas--tool-eraser .shape {
+  cursor: crosshair;
+}
+
+.canvas--tool-text {
+  cursor: text;
+}
+
+.canvas--tool-text .shape,
+.canvas--tool-text .path-hitarea,
+.canvas--tool-text .canvas__lines path {
+  pointer-events: none;
+  cursor: inherit;
+}
+
+.canvas--tool-frame {
+  cursor: crosshair;
+}
+
+.canvas--tool-frame .shape,
+.canvas--tool-frame .path-hitarea,
+.canvas--tool-frame .canvas__lines path {
+  pointer-events: none;
+  cursor: inherit;
+}
+
+/* ── Text Element ── */
+.text-element {
+  position: absolute;
+  cursor: grab;
+  user-select: none;
+  min-width: 20px;
+  min-height: 20px;
+}
+
+.text-element--selected {
+  z-index: 50;
+}
+
+.text-element--dragging {
+  cursor: grabbing;
+  opacity: 0.9;
+  z-index: 100;
+}
+
+.text-element__content {
+  background: none;
+  border: none;
+  resize: none;
+  outline: none;
+  width: 100%;
+  min-height: 24px;
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text);
+  padding: 4px;
+  pointer-events: none;
+  cursor: inherit;
+}
+
+.text-element__content--editing {
+  pointer-events: auto;
+  cursor: text;
+  background: rgba(255, 255, 255, 0.5);
+  outline: 1px solid var(--accent);
+  border-radius: 2px;
+}
+
+/* ── Image Element ── */
+.image-element {
+  position: absolute;
+  cursor: grab;
+  user-select: none;
+}
+
+.image-element--selected {
+  z-index: 50;
+  outline: 2px solid var(--accent);
+}
+
+.image-element--dragging {
+  cursor: grabbing;
+  opacity: 0.9;
+  z-index: 100;
+}
+
+.image-element img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* ── Frame Element ── */
+.frame-element {
+  position: absolute;
+  cursor: grab;
+  user-select: none;
+  border: 2px dashed var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.frame-element--selected {
+  z-index: 50;
+  border-color: var(--accent);
+}
+
+.frame-element--dragging {
+  cursor: grabbing;
+  opacity: 0.9;
+  z-index: 100;
+}
+
+.frame-title {
+  position: absolute;
+  top: -22px;
+  left: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ── Shape Text Container (vertical align) ── */
+.shape__text-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* ── Rotation Handle ── */
+.rotation-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: white;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  cursor: grab;
+  z-index: 201;
+  pointer-events: auto;
+  left: 50%;
+  top: -28px;
+  transform: translateX(-50%);
+}
+
+.rotation-handle:hover {
+  background: var(--accent-light);
+}
+
+.rotation-line {
+  position: absolute;
+  width: 1px;
+  height: 20px;
+  background: var(--accent);
+  left: 50%;
+  top: -20px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 200;
+}
+
+/* ── Lock Indicator ── */
+.lock-indicator {
+  position: absolute;
+  top: -20px;
+  right: -8px;
+  font-size: 14px;
+  pointer-events: none;
+  z-index: 201;
+}
+
+.shape--locked {
+  cursor: not-allowed;
+}
+
+/* ── Alignment Guides ── */
+.alignment-guide {
+  position: absolute;
+  background: #e74c3c;
+  z-index: 300;
+  pointer-events: none;
+}
+
+.alignment-guide--center {
+  background: var(--accent);
+}
+
+/* ── Alignment Toolbar ── */
+.alignment-toolbar {
+  position: fixed;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  display: flex;
+  gap: 2px;
+  box-shadow: var(--shadow-lg);
+  z-index: 500;
+}
+
+.alignment-toolbar button {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: background 0.12s, color 0.12s;
+}
+
+.alignment-toolbar button:hover:not(:disabled) {
+  background: var(--accent-light);
+  color: var(--text);
+}
+
+.alignment-toolbar button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.alignment-toolbar__divider {
+  width: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+/* ── Minimap ── */
+.minimap {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 200px;
+  height: 150px;
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  z-index: 500;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.minimap__shape {
+  border-radius: 1px;
+}
+
+.minimap__viewport {
+  border: 1.5px solid var(--accent);
+  background: rgba(79, 70, 229, 0.08);
+  pointer-events: none;
+}
+
+/* ── Zoom Indicator ── */
+.zoom-indicator {
+  position: fixed;
+  bottom: 80px;
+  left: 20px;
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  box-shadow: var(--shadow);
+  z-index: 500;
+  cursor: pointer;
+}
+
+.zoom-indicator:hover {
+  color: var(--text);
+}
+
+/* ── Canvas Grid (SVG) ── */
+.canvas__grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* ── Connector Label ── */
+.connector-label {
+  text-align: center;
+  font-size: 12px;
+  background: white;
+  padding: 0 4px;
+  border-radius: 3px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.connector-label-editor {
+  position: absolute;
+  background: white;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  outline: none;
+  z-index: 400;
+}
+
+/* ── Waypoint Handle ── */
+.waypoint-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: white;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  cursor: move;
+  z-index: 300;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+}
+
+.waypoint-handle:hover {
+  background: var(--accent-light);
+}
+
+/* ── Remote Cursor (collaboration) ── */
+.remote-cursor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 999;
+  transition: left 0.12s linear, top 0.12s linear;
+}
+
+.cursor-label {
+  display: inline-block;
+  margin-left: 16px;
+  margin-top: 0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: white;
+  white-space: nowrap;
+}
+
+/* ── Group ── */
+[data-testid="group"] {
+  position: absolute;
+}
+
+/* ── Dark mode ── */
+[data-theme="dark"] {
+  --bg: #1a1a2e;
+  --surface: rgba(30, 30, 50, 0.9);
+  --text: #e0e0e0;
+  --text-muted: #8888aa;
+  --border: rgba(255, 255, 255, 0.1);
+  --accent: #6366f1;
+  --accent-light: rgba(99, 102, 241, 0.15);
+  --shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .canvas {
+  background-color: #1a1a2e;
+  background-image:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+}
+
+[data-theme="dark"] .connector-label {
+  background: #2a2a4a;
+  color: #e0e0e0;
+}
+
+[data-theme="dark"] .shape__text {
+  color: #e0e0e0;
+}
+
+[data-theme="dark"] .text-element__content {
+  color: #e0e0e0;
+}
+
+[data-theme="dark"] .resize-handle {
+  background: #2a2a4a;
+}
+
+[data-theme="dark"] .rotation-handle {
+  background: #2a2a4a;
 }

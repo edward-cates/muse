@@ -12,7 +12,7 @@ test.describe('Rotation', () => {
     await canvas.drawShape(200, 200, 120, 80)
   })
 
-  test.fixme('selected shape shows rotation handle above bounding box', async ({ page }) => {
+  test('selected shape shows rotation handle above bounding box', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
@@ -25,7 +25,7 @@ test.describe('Rotation', () => {
     expect(handleBox!.y).toBeLessThan(shapeBox!.y)
   })
 
-  test.fixme('dragging rotation handle rotates shape', async ({ page }) => {
+  test('dragging rotation handle rotates shape', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
@@ -43,7 +43,7 @@ test.describe('Rotation', () => {
     expect(transform).toContain('rotate')
   })
 
-  test.fixme('Shift constrains rotation to 15-degree increments', async ({ page }) => {
+  test('Shift constrains rotation to 15-degree increments', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
@@ -64,7 +64,7 @@ test.describe('Rotation', () => {
     expect(angle % 15).toBe(0)
   })
 
-  test.fixme('rotation value shown in property panel', async ({ page }) => {
+  test('rotation value shown in property panel', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
@@ -72,7 +72,7 @@ test.describe('Rotation', () => {
     await expect(rotationInput).toHaveValue('0')
   })
 
-  test.fixme('typing rotation value in property panel rotates shape', async ({ page }) => {
+  test('typing rotation value in property panel rotates shape', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
@@ -85,7 +85,7 @@ test.describe('Rotation', () => {
     expect(transform).toContain('rotate(45deg)')
   })
 
-  test.fixme('rotation handle disappears when not in select mode', async ({ page }) => {
+  test('rotation handle disappears when not in select mode', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
     await expect(page.locator('.rotation-handle')).toBeVisible()
@@ -107,7 +107,7 @@ test.describe('Flip', () => {
     await canvas.drawShape(200, 200, 100, 80)
   })
 
-  test.fixme('flip horizontal mirrors shape', async ({ page }) => {
+  test('flip horizontal mirrors shape', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
@@ -118,7 +118,7 @@ test.describe('Flip', () => {
     expect(transform).toContain('scaleX(-1)')
   })
 
-  test.fixme('flip vertical mirrors shape', async ({ page }) => {
+  test('flip vertical mirrors shape', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
@@ -141,7 +141,7 @@ test.describe('Constrained transforms', () => {
     await canvas.drawShape(200, 200, 120, 80)
   })
 
-  test.fixme('Shift+resize maintains aspect ratio', async ({ page }) => {
+  test('Shift+resize maintains aspect ratio', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
@@ -162,7 +162,7 @@ test.describe('Constrained transforms', () => {
     expect(newAspectRatio).toBeCloseTo(aspectRatio, 1)
   })
 
-  test.fixme('Alt+resize grows from center', async ({ page }) => {
+  test('Alt+resize grows from center', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
@@ -187,7 +187,7 @@ test.describe('Constrained transforms', () => {
     expect(centerYAfter).toBeCloseTo(centerYBefore, 0)
   })
 
-  test.fixme('position and size shown in property panel', async ({ page }) => {
+  test('position and size shown in property panel', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
@@ -197,7 +197,7 @@ test.describe('Constrained transforms', () => {
     await expect(page.locator('.property-panel input[data-testid="size-h"]')).toBeVisible()
   })
 
-  test.fixme('editing position in property panel moves shape', async ({ page }) => {
+  test('editing position in property panel moves shape', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
@@ -210,7 +210,7 @@ test.describe('Constrained transforms', () => {
     expect(x).toBe(350)
   })
 
-  test.fixme('editing size in property panel resizes shape', async ({ page }) => {
+  test('editing size in property panel resizes shape', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
@@ -235,7 +235,7 @@ test.describe('Locking', () => {
     await canvas.drawShape(200, 200, 120, 80)
   })
 
-  test.fixme('locking a shape prevents it from being dragged', async ({ page }) => {
+  test('locking a shape prevents it from being dragged', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
@@ -255,7 +255,7 @@ test.describe('Locking', () => {
     expect(boxAfter!.y).toBe(boxBefore!.y)
   })
 
-  test.fixme('locked shape shows lock indicator', async ({ page }) => {
+  test('locked shape shows lock indicator', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
     await page.keyboard.press('Meta+l')
@@ -263,7 +263,7 @@ test.describe('Locking', () => {
     await expect(canvas.shapes.first().locator('.lock-indicator')).toBeVisible()
   })
 
-  test.fixme('locked shape cannot be resized', async ({ page }) => {
+  test('locked shape cannot be resized', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
     await page.keyboard.press('Meta+l')
@@ -272,7 +272,7 @@ test.describe('Locking', () => {
     await expect(page.locator('.resize-handle')).toHaveCount(0)
   })
 
-  test.fixme('locked shape cannot be deleted', async ({ page }) => {
+  test('locked shape cannot be deleted', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
     await page.keyboard.press('Meta+l')
@@ -281,7 +281,7 @@ test.describe('Locking', () => {
     await expect(canvas.shapes).toHaveCount(1) // still there
   })
 
-  test.fixme('unlocking restores full interaction', async ({ page }) => {
+  test('unlocking restores full interaction', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
     await page.keyboard.press('Meta+l') // lock

@@ -9,7 +9,7 @@ test.describe('Clipboard', () => {
     await canvas.goto()
   })
 
-  test.fixme('Cmd+C then Cmd+V duplicates selected shape', async ({ page }) => {
+  test('Cmd+C then Cmd+V duplicates selected shape', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     await canvas.selectTool('select')
@@ -20,7 +20,7 @@ test.describe('Clipboard', () => {
     await expect(canvas.shapes).toHaveCount(2)
   })
 
-  test.fixme('pasted shape is offset from original', async ({ page }) => {
+  test('pasted shape is offset from original', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     await canvas.selectTool('select')
@@ -36,7 +36,7 @@ test.describe('Clipboard', () => {
     expect(box2!.y).not.toEqual(box1!.y)
   })
 
-  test.fixme('Cmd+X cuts selected shape', async ({ page }) => {
+  test('Cmd+X cuts selected shape', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     await canvas.selectTool('select')
@@ -49,7 +49,7 @@ test.describe('Clipboard', () => {
     await expect(canvas.shapes).toHaveCount(1)
   })
 
-  test.fixme('Cmd+D duplicates selected shape', async ({ page }) => {
+  test('Cmd+D duplicates selected shape', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     await canvas.selectTool('select')
@@ -59,7 +59,7 @@ test.describe('Clipboard', () => {
     await expect(canvas.shapes).toHaveCount(2)
   })
 
-  test.fixme('copy preserves shape styling', async ({ page }) => {
+  test('copy preserves shape styling', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     await canvas.selectTool('select')
@@ -78,7 +78,7 @@ test.describe('Clipboard', () => {
     await expect(pastedRect).toHaveAttribute('fill', '#ff0000')
   })
 
-  test.fixme('copy-paste works with multiple selected shapes', async ({ page }) => {
+  test('copy-paste works with multiple selected shapes', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(100, 200, 80, 60)
     await canvas.selectTool('ellipse')
@@ -94,7 +94,7 @@ test.describe('Clipboard', () => {
     await expect(canvas.shapes).toHaveCount(4)
   })
 
-  test.fixme('copy-paste includes connected connectors', async ({ page }) => {
+  test('copy-paste includes connected connectors', async ({ page }) => {
     // Create two connected shapes
     await canvas.selectTool('rectangle')
     await canvas.drawShape(100, 200, 80, 60)
@@ -116,7 +116,7 @@ test.describe('Clipboard', () => {
     await expect(canvas.connectors).toHaveCount(2)
   })
 
-  test.fixme('Alt+drag clones shape', async ({ page }) => {
+  test('Alt+drag clones shape', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     await canvas.selectTool('select')

@@ -9,19 +9,19 @@ test.describe('Text tool', () => {
     await canvas.goto()
   })
 
-  test.fixme('T key activates text tool', async ({ page }) => {
+  test('T key activates text tool', async ({ page }) => {
     await page.keyboard.press('t')
     await expect(canvas.toolButton('text')).toHaveClass(/toolbar__btn--active/)
   })
 
-  test.fixme('clicking canvas with text tool creates text element', async ({ page }) => {
+  test('clicking canvas with text tool creates text element', async ({ page }) => {
     await page.keyboard.press('t')
     await page.mouse.click(300, 300)
 
     await expect(page.locator('[data-testid="text-element"]')).toHaveCount(1)
   })
 
-  test.fixme('text element starts in edit mode immediately', async ({ page }) => {
+  test('text element starts in edit mode immediately', async ({ page }) => {
     await page.keyboard.press('t')
     await page.mouse.click(300, 300)
 
@@ -29,7 +29,7 @@ test.describe('Text tool', () => {
     await expect(textarea).toBeFocused()
   })
 
-  test.fixme('typing updates the text element content', async ({ page }) => {
+  test('typing updates the text element content', async ({ page }) => {
     await page.keyboard.press('t')
     await page.mouse.click(300, 300)
     await page.keyboard.type('Hello world')
@@ -38,7 +38,7 @@ test.describe('Text tool', () => {
     await expect(textarea).toHaveValue('Hello world')
   })
 
-  test.fixme('text element has no visible border', async ({ page }) => {
+  test('text element has no visible border', async ({ page }) => {
     await page.keyboard.press('t')
     await page.mouse.click(300, 300)
     await page.keyboard.type('Borderless')
@@ -49,7 +49,7 @@ test.describe('Text tool', () => {
     await expect(el.locator('svg')).toHaveCount(0)
   })
 
-  test.fixme('text element can be moved with select tool', async ({ page }) => {
+  test('text element can be moved with select tool', async ({ page }) => {
     await page.keyboard.press('t')
     await page.mouse.click(300, 300)
     await page.keyboard.type('Movable')
@@ -70,7 +70,7 @@ test.describe('Text tool', () => {
     expect(boxAfter!.y).toBeGreaterThan(boxBefore!.y)
   })
 
-  test.fixme('text element can be deleted', async ({ page }) => {
+  test('text element can be deleted', async ({ page }) => {
     await page.keyboard.press('t')
     await page.mouse.click(300, 300)
     await page.keyboard.type('Delete me')
@@ -83,7 +83,7 @@ test.describe('Text tool', () => {
     await expect(page.locator('[data-testid="text-element"]')).toHaveCount(0)
   })
 
-  test.fixme('empty text element is removed on blur', async ({ page }) => {
+  test('empty text element is removed on blur', async ({ page }) => {
     await page.keyboard.press('t')
     await page.mouse.click(300, 300)
     // Don't type anything, just click away
@@ -101,7 +101,7 @@ test.describe('Text formatting', () => {
     await canvas.goto()
   })
 
-  test.fixme('font family can be changed in property panel', async ({ page }) => {
+  test('font family can be changed in property panel', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 150, 100)
     await canvas.shapes.first().dblclick()
@@ -118,7 +118,7 @@ test.describe('Text formatting', () => {
     await expect(textarea).toHaveCSS('font-family', /monospace/)
   })
 
-  test.fixme('font size can be changed in property panel', async ({ page }) => {
+  test('font size can be changed in property panel', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 150, 100)
     await canvas.selectTool('select')
@@ -132,20 +132,20 @@ test.describe('Text formatting', () => {
     await expect(textarea).toHaveCSS('font-size', '24px')
   })
 
-  test.fixme('text horizontal alignment can be set', async ({ page }) => {
+  test('text horizontal alignment can be set', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 150, 100)
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
-    const alignBtn = page.locator('.property-panel [data-testid="align-right"]')
+    const alignBtn = page.locator('.property-panel [data-testid="text-align-right"]')
     await alignBtn.click()
 
     const textarea = canvas.shapes.first().locator('textarea')
     await expect(textarea).toHaveCSS('text-align', 'right')
   })
 
-  test.fixme('text vertical alignment can be set', async ({ page }) => {
+  test('text vertical alignment can be set', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 150, 100)
     await canvas.selectTool('select')

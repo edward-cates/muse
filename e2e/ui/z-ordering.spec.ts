@@ -52,7 +52,7 @@ test.describe('Z-ordering', () => {
     expect(ids[1]).toBe(id)
   })
 
-  test.fixme('send backward moves shape down one level', async ({ page }) => {
+  test('send backward moves shape down one level', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.last().click() // select top shape
     const id = await canvas.shapes.last().getAttribute('data-shape-id')
@@ -63,7 +63,7 @@ test.describe('Z-ordering', () => {
     expect(ids[1]).toBe(id)
   })
 
-  test.fixme('bring to front on topmost shape is a no-op', async ({ page }) => {
+  test('bring to front on topmost shape is a no-op', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.last().click()
     const idsBefore = await canvas.shapes.evaluateAll(els => els.map(el => el.getAttribute('data-shape-id')))

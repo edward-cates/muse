@@ -24,7 +24,7 @@ test.describe('Alignment', () => {
     await page.mouse.up()
   })
 
-  test.fixme('align left aligns all shapes to leftmost edge', async ({ page }) => {
+  test('align left aligns all shapes to leftmost edge', async ({ page }) => {
     await page.locator('[data-testid="align-left"]').click()
 
     const lefts = await canvas.shapes.evaluateAll(els =>
@@ -36,7 +36,7 @@ test.describe('Alignment', () => {
     }
   })
 
-  test.fixme('align right aligns all shapes to rightmost edge', async ({ page }) => {
+  test('align right aligns all shapes to rightmost edge', async ({ page }) => {
     await page.locator('[data-testid="align-right"]').click()
 
     const rights = await canvas.shapes.evaluateAll(els =>
@@ -51,7 +51,7 @@ test.describe('Alignment', () => {
     }
   })
 
-  test.fixme('align top aligns all shapes to topmost edge', async ({ page }) => {
+  test('align top aligns all shapes to topmost edge', async ({ page }) => {
     await page.locator('[data-testid="align-top"]').click()
 
     const tops = await canvas.shapes.evaluateAll(els =>
@@ -63,7 +63,7 @@ test.describe('Alignment', () => {
     }
   })
 
-  test.fixme('align bottom aligns all shapes to bottommost edge', async ({ page }) => {
+  test('align bottom aligns all shapes to bottommost edge', async ({ page }) => {
     await page.locator('[data-testid="align-bottom"]').click()
 
     const bottoms = await canvas.shapes.evaluateAll(els =>
@@ -78,7 +78,7 @@ test.describe('Alignment', () => {
     }
   })
 
-  test.fixme('align center horizontal centers all shapes horizontally', async ({ page }) => {
+  test('align center horizontal centers all shapes horizontally', async ({ page }) => {
     await page.locator('[data-testid="align-center-h"]').click()
 
     const centers = await canvas.shapes.evaluateAll(els =>
@@ -93,7 +93,7 @@ test.describe('Alignment', () => {
     }
   })
 
-  test.fixme('align center vertical centers all shapes vertically', async ({ page }) => {
+  test('align center vertical centers all shapes vertically', async ({ page }) => {
     await page.locator('[data-testid="align-center-v"]').click()
 
     const centers = await canvas.shapes.evaluateAll(els =>
@@ -108,7 +108,7 @@ test.describe('Alignment', () => {
     }
   })
 
-  test.fixme('alignment buttons only show when multiple shapes selected', async ({ page }) => {
+  test('alignment buttons only show when multiple shapes selected', async ({ page }) => {
     // Deselect all, select just one
     await page.mouse.click(600, 50)
     await canvas.shapes.first().click()
@@ -140,7 +140,7 @@ test.describe('Distribution', () => {
     await page.mouse.up()
   })
 
-  test.fixme('distribute horizontally creates even spacing', async ({ page }) => {
+  test('distribute horizontally creates even spacing', async ({ page }) => {
     await page.locator('[data-testid="distribute-h"]').click()
 
     const positions = await canvas.shapes.evaluateAll(els =>
@@ -156,7 +156,7 @@ test.describe('Distribution', () => {
     expect(gap1).toBeCloseTo(gap2, 0)
   })
 
-  test.fixme('distribute vertically creates even spacing', async ({ page }) => {
+  test('distribute vertically creates even spacing', async ({ page }) => {
     // Reposition shapes vertically
     // (In practice, shapes would be at different Y positions)
     await page.locator('[data-testid="distribute-v"]').click()
@@ -173,7 +173,7 @@ test.describe('Distribution', () => {
     expect(gap1).toBeCloseTo(gap2, 0)
   })
 
-  test.fixme('distribute requires at least 3 selected elements', async ({ page }) => {
+  test('distribute requires at least 3 selected elements', async ({ page }) => {
     // Deselect all, select just two
     await page.mouse.click(600, 50)
     await canvas.shapes.first().click()

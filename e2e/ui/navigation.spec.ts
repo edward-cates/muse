@@ -9,18 +9,18 @@ test.describe('Hand tool', () => {
     await canvas.goto()
   })
 
-  test.fixme('H key activates hand tool', async ({ page }) => {
+  test('H key activates hand tool', async ({ page }) => {
     await page.keyboard.press('h')
     await expect(canvas.toolButton('hand')).toHaveClass(/toolbar__btn--active/)
     await expect(canvas.canvas).toHaveClass(/canvas--tool-hand/)
   })
 
-  test.fixme('hand tool shows grab cursor', async ({ page }) => {
+  test('hand tool shows grab cursor', async ({ page }) => {
     await page.keyboard.press('h')
     await expect(canvas.canvas).toHaveCSS('cursor', 'grab')
   })
 
-  test.fixme('dragging with hand tool pans canvas', async ({ page }) => {
+  test('dragging with hand tool pans canvas', async ({ page }) => {
     const transformBefore = await canvas.getWorldTransform()
 
     await page.keyboard.press('h')
@@ -33,7 +33,7 @@ test.describe('Hand tool', () => {
     expect(transformAfter).not.toEqual(transformBefore)
   })
 
-  test.fixme('hand tool does not select shapes when clicking on them', async ({ page }) => {
+  test('hand tool does not select shapes when clicking on them', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
 
@@ -52,13 +52,13 @@ test.describe('Zoom controls', () => {
     await canvas.goto()
   })
 
-  test.fixme('zoom level indicator is visible', async ({ page }) => {
+  test('zoom level indicator is visible', async ({ page }) => {
     const indicator = page.locator('[data-testid="zoom-level"]')
     await expect(indicator).toBeVisible()
     await expect(indicator).toContainText('100%')
   })
 
-  test.fixme('zoom level updates on scroll wheel', async ({ page }) => {
+  test('zoom level updates on scroll wheel', async ({ page }) => {
     await canvas.canvas.dispatchEvent('wheel', { deltaY: -100, clientX: 400, clientY: 300 })
 
     const indicator = page.locator('[data-testid="zoom-level"]')
@@ -66,7 +66,7 @@ test.describe('Zoom controls', () => {
     expect(text).not.toBe('100%')
   })
 
-  test.fixme('Cmd+0 resets zoom to 100%', async ({ page }) => {
+  test('Cmd+0 resets zoom to 100%', async ({ page }) => {
     // Zoom in first
     await canvas.canvas.dispatchEvent('wheel', { deltaY: -200, clientX: 400, clientY: 300 })
     await page.keyboard.press('Meta+0')
@@ -75,7 +75,7 @@ test.describe('Zoom controls', () => {
     await expect(indicator).toContainText('100%')
   })
 
-  test.fixme('Shift+1 zooms to fit all elements', async ({ page }) => {
+  test('Shift+1 zooms to fit all elements', async ({ page }) => {
     // Create shapes far apart
     await canvas.selectTool('rectangle')
     await canvas.drawShape(50, 50, 80, 60)
@@ -95,7 +95,7 @@ test.describe('Zoom controls', () => {
     expect(box2!.x + box2!.width).toBeLessThanOrEqual(viewport!.width)
   })
 
-  test.fixme('Shift+2 zooms to fit selection', async ({ page }) => {
+  test('Shift+2 zooms to fit selection', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(50, 50, 80, 60)
     await canvas.selectTool('rectangle')
@@ -113,21 +113,21 @@ test.describe('Zoom controls', () => {
     expect(box!.x).toBeLessThan(viewport!.width / 2)
   })
 
-  test.fixme('Cmd+= zooms in', async ({ page }) => {
+  test('Cmd+= zooms in', async ({ page }) => {
     const transformBefore = await canvas.getWorldTransform()
     await page.keyboard.press('Meta+=')
     const transformAfter = await canvas.getWorldTransform()
     expect(transformAfter).not.toEqual(transformBefore)
   })
 
-  test.fixme('Cmd+- zooms out', async ({ page }) => {
+  test('Cmd+- zooms out', async ({ page }) => {
     const transformBefore = await canvas.getWorldTransform()
     await page.keyboard.press('Meta+-')
     const transformAfter = await canvas.getWorldTransform()
     expect(transformAfter).not.toEqual(transformBefore)
   })
 
-  test.fixme('zoom has minimum limit', async ({ page }) => {
+  test('zoom has minimum limit', async ({ page }) => {
     // Zoom out many times
     for (let i = 0; i < 30; i++) {
       await canvas.canvas.dispatchEvent('wheel', { deltaY: 200, clientX: 400, clientY: 300 })
@@ -138,7 +138,7 @@ test.describe('Zoom controls', () => {
     expect(Number(match![1])).toBeGreaterThanOrEqual(0.1)
   })
 
-  test.fixme('zoom has maximum limit', async ({ page }) => {
+  test('zoom has maximum limit', async ({ page }) => {
     for (let i = 0; i < 50; i++) {
       await canvas.canvas.dispatchEvent('wheel', { deltaY: -200, clientX: 400, clientY: 300 })
     }
@@ -157,13 +157,13 @@ test.describe('Minimap', () => {
     await canvas.goto()
   })
 
-  test.fixme('minimap can be toggled visible', async ({ page }) => {
+  test('minimap can be toggled visible', async ({ page }) => {
     await expect(page.locator('.minimap')).toHaveCount(0)
     await page.locator('[data-testid="toggle-minimap"]').click()
     await expect(page.locator('.minimap')).toBeVisible()
   })
 
-  test.fixme('minimap shows shape positions', async ({ page }) => {
+  test('minimap shows shape positions', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
 
@@ -172,7 +172,7 @@ test.describe('Minimap', () => {
     await expect(page.locator('.minimap .minimap__shape')).toHaveCount(1)
   })
 
-  test.fixme('clicking minimap pans canvas to that area', async ({ page }) => {
+  test('clicking minimap pans canvas to that area', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     await page.locator('[data-testid="toggle-minimap"]').click()
@@ -185,7 +185,7 @@ test.describe('Minimap', () => {
     expect(transformAfter).not.toEqual(transformBefore)
   })
 
-  test.fixme('minimap shows viewport indicator', async ({ page }) => {
+  test('minimap shows viewport indicator', async ({ page }) => {
     await page.locator('[data-testid="toggle-minimap"]').click()
     await expect(page.locator('.minimap .minimap__viewport')).toBeVisible()
   })
@@ -199,14 +199,14 @@ test.describe('Dark mode', () => {
     await canvas.goto()
   })
 
-  test.fixme('dark mode toggle changes canvas background', async ({ page }) => {
+  test('dark mode toggle changes canvas background', async ({ page }) => {
     await page.locator('[data-testid="toggle-dark-mode"]').click()
     const bg = await canvas.canvas.evaluate(el => getComputedStyle(el).backgroundColor)
     // Dark mode should have a dark background
     expect(bg).not.toBe('rgb(255, 255, 255)')
   })
 
-  test.fixme('shapes remain visible in dark mode', async ({ page }) => {
+  test('shapes remain visible in dark mode', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
 

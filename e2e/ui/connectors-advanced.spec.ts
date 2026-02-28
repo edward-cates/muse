@@ -20,7 +20,7 @@ test.describe('Arrowhead styles', () => {
     await page.mouse.up()
   })
 
-  test.fixme('arrowhead style picker shows in property panel for connectors', async ({ page }) => {
+  test('arrowhead style picker shows in property panel for connectors', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.connectors.first().click()
 
@@ -30,7 +30,7 @@ test.describe('Arrowhead styles', () => {
     await expect(endPicker).toBeVisible()
   })
 
-  test.fixme('arrowhead style options include triangle, open, diamond, circle, none', async ({ page }) => {
+  test('arrowhead style options include triangle, open, diamond, circle, none', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.connectors.first().click()
 
@@ -43,7 +43,7 @@ test.describe('Arrowhead styles', () => {
     expect(values).toContain('None')
   })
 
-  test.fixme('changing end arrowhead to diamond renders diamond marker', async ({ page }) => {
+  test('changing end arrowhead to diamond renders diamond marker', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.connectors.first().click()
 
@@ -54,7 +54,7 @@ test.describe('Arrowhead styles', () => {
     expect(markerEnd).toContain('diamond')
   })
 
-  test.fixme('setting start arrowhead to triangle adds marker-start', async ({ page }) => {
+  test('setting start arrowhead to triangle adds marker-start', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.connectors.first().click()
 
@@ -65,7 +65,7 @@ test.describe('Arrowhead styles', () => {
     expect(markerStart).toBeTruthy()
   })
 
-  test.fixme('setting arrowhead to none removes marker', async ({ page }) => {
+  test('setting arrowhead to none removes marker', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.connectors.first().click()
 
@@ -95,7 +95,7 @@ test.describe('Connector labels', () => {
     await page.mouse.up()
   })
 
-  test.fixme('double-clicking connector opens label editor', async ({ page }) => {
+  test('double-clicking connector opens label editor', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.connectors.first().dblclick()
 
@@ -103,7 +103,7 @@ test.describe('Connector labels', () => {
     await expect(labelInput).toBeVisible()
   })
 
-  test.fixme('typing in label editor adds text to connector', async ({ page }) => {
+  test('typing in label editor adds text to connector', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.connectors.first().dblclick()
 
@@ -114,7 +114,7 @@ test.describe('Connector labels', () => {
     await expect(label).toContainText('connects to')
   })
 
-  test.fixme('connector label is positioned at connector midpoint', async ({ page }) => {
+  test('connector label is positioned at connector midpoint', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.connectors.first().dblclick()
     await page.keyboard.type('mid')
@@ -129,7 +129,7 @@ test.describe('Connector labels', () => {
     expect(labelBox!.x + labelBox!.width / 2).toBeCloseTo(connectorMidX, -1)
   })
 
-  test.fixme('connector label follows when shape is moved', async ({ page }) => {
+  test('connector label follows when shape is moved', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.connectors.first().dblclick()
     await page.keyboard.type('label')
@@ -148,7 +148,7 @@ test.describe('Connector labels', () => {
     expect(labelAfter!.y).not.toEqual(labelBefore!.y)
   })
 
-  test.fixme('connector label can be edited via property panel', async ({ page }) => {
+  test('connector label can be edited via property panel', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.connectors.first().click()
 
@@ -269,7 +269,7 @@ test.describe('Arbitrary anchor points', () => {
     expect(Math.abs(startY - 210)).toBeLessThan(20)
   })
 
-  test.fixme('connector snaps to midpoint when cursor is within threshold', async ({ page }) => {
+  test('connector snaps to midpoint when cursor is within threshold', async ({ page }) => {
     await canvas.selectTool('arrow')
     // Start from very close to the right midpoint
     await page.mouse.move(219, 241) // right midpoint is at x=220, y=240
@@ -284,7 +284,7 @@ test.describe('Arbitrary anchor points', () => {
     expect(startY).toBeCloseTo(240, 0)
   })
 
-  test.fixme('connection dots appear along full shape perimeter on hover', async ({ page }) => {
+  test('connection dots appear along full shape perimeter on hover', async ({ page }) => {
     await canvas.selectTool('arrow')
     await page.mouse.move(160, 240) // hover over first shape
 

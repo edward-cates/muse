@@ -9,7 +9,7 @@ test.describe('Grid', () => {
     await canvas.goto()
   })
 
-  test.fixme('grid can be toggled visible via keyboard shortcut', async ({ page }) => {
+  test('grid can be toggled visible via keyboard shortcut', async ({ page }) => {
     // Grid off by default
     await expect(page.locator('.canvas__grid')).toHaveCount(0)
 
@@ -20,7 +20,7 @@ test.describe('Grid', () => {
     await expect(page.locator('.canvas__grid')).toHaveCount(0)
   })
 
-  test.fixme('grid lines are visible when enabled', async ({ page }) => {
+  test('grid lines are visible when enabled', async ({ page }) => {
     await page.keyboard.press('Meta+Shift+g')
     const grid = page.locator('.canvas__grid')
     await expect(grid).toBeVisible()
@@ -29,7 +29,7 @@ test.describe('Grid', () => {
     expect(hasPattern).toBeTruthy()
   })
 
-  test.fixme('grid follows canvas pan', async ({ page }) => {
+  test('grid follows canvas pan', async ({ page }) => {
     await page.keyboard.press('Meta+Shift+g')
     const gridBefore = await page.locator('.canvas__grid').boundingBox()
 
@@ -46,7 +46,7 @@ test.describe('Grid', () => {
     expect(gridAfter!.x).not.toEqual(gridBefore!.x)
   })
 
-  test.fixme('grid scales with zoom', async ({ page }) => {
+  test('grid scales with zoom', async ({ page }) => {
     await page.keyboard.press('Meta+Shift+g')
 
     // Zoom in
@@ -65,7 +65,7 @@ test.describe('Snap to grid', () => {
     await canvas.goto()
   })
 
-  test.fixme('shapes snap to grid when grid snapping is enabled', async ({ page }) => {
+  test('shapes snap to grid when grid snapping is enabled', async ({ page }) => {
     // Enable grid + snap
     await page.keyboard.press('Meta+Shift+g')
 
@@ -82,7 +82,7 @@ test.describe('Snap to grid', () => {
     expect(y % 20).toBe(0)
   })
 
-  test.fixme('dragged shapes snap to grid', async ({ page }) => {
+  test('dragged shapes snap to grid', async ({ page }) => {
     await page.keyboard.press('Meta+Shift+g') // enable grid
 
     await canvas.selectTool('rectangle')
@@ -103,7 +103,7 @@ test.describe('Snap to grid', () => {
     expect(y % 20).toBe(0)
   })
 
-  test.fixme('resized shapes snap dimensions to grid', async ({ page }) => {
+  test('resized shapes snap dimensions to grid', async ({ page }) => {
     await page.keyboard.press('Meta+Shift+g')
 
     await canvas.selectTool('rectangle')
@@ -137,7 +137,7 @@ test.describe('Smart alignment guides', () => {
     await canvas.drawShape(200, 200, 100, 80)
   })
 
-  test.fixme('alignment guide appears when dragging shape near another shape edge', async ({ page }) => {
+  test('alignment guide appears when dragging shape near another shape edge', async ({ page }) => {
     // Create second shape
     await canvas.selectTool('rectangle')
     await canvas.drawShape(400, 300, 100, 80)
@@ -155,7 +155,7 @@ test.describe('Smart alignment guides', () => {
     await page.mouse.up()
   })
 
-  test.fixme('shape snaps to alignment guide position', async ({ page }) => {
+  test('shape snaps to alignment guide position', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(400, 300, 100, 80)
 
@@ -173,7 +173,7 @@ test.describe('Smart alignment guides', () => {
     expect(x).toBe(200)
   })
 
-  test.fixme('center alignment guide appears when shapes are center-aligned', async ({ page }) => {
+  test('center alignment guide appears when shapes are center-aligned', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(400, 300, 100, 80)
 

@@ -9,7 +9,7 @@ test.describe('Undo / Redo', () => {
     await canvas.goto()
   })
 
-  test.fixme('Cmd+Z undoes shape creation', async ({ page }) => {
+  test('Cmd+Z undoes shape creation', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     await expect(canvas.shapes).toHaveCount(1)
@@ -18,7 +18,7 @@ test.describe('Undo / Redo', () => {
     await expect(canvas.shapes).toHaveCount(0)
   })
 
-  test.fixme('Cmd+Shift+Z redoes undone shape creation', async ({ page }) => {
+  test('Cmd+Shift+Z redoes undone shape creation', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     await page.keyboard.press('Meta+z')
@@ -28,7 +28,7 @@ test.describe('Undo / Redo', () => {
     await expect(canvas.shapes).toHaveCount(1)
   })
 
-  test.fixme('undo reverts shape move', async ({ page }) => {
+  test('undo reverts shape move', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     const shape = canvas.shapes.first()
@@ -49,7 +49,7 @@ test.describe('Undo / Redo', () => {
     expect(boxAfter!.y).toBeCloseTo(boxBefore!.y, 0)
   })
 
-  test.fixme('undo reverts shape resize', async ({ page }) => {
+  test('undo reverts shape resize', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     const shape = canvas.shapes.first()
@@ -70,7 +70,7 @@ test.describe('Undo / Redo', () => {
     expect(boxAfter!.height).toBeCloseTo(boxBefore!.height, 0)
   })
 
-  test.fixme('undo reverts text edit', async ({ page }) => {
+  test('undo reverts text edit', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     const shape = canvas.shapes.first()
@@ -83,7 +83,7 @@ test.describe('Undo / Redo', () => {
     await expect(textarea).toHaveValue('')
   })
 
-  test.fixme('undo reverts shape deletion', async ({ page }) => {
+  test('undo reverts shape deletion', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     await page.keyboard.press('Delete')
@@ -93,7 +93,7 @@ test.describe('Undo / Redo', () => {
     await expect(canvas.shapes).toHaveCount(1)
   })
 
-  test.fixme('undo reverts connector creation', async ({ page }) => {
+  test('undo reverts connector creation', async ({ page }) => {
     // Create two shapes and connect them
     await canvas.selectTool('rectangle')
     await canvas.drawShape(100, 200, 80, 60)
@@ -111,7 +111,7 @@ test.describe('Undo / Redo', () => {
     await expect(canvas.connectors).toHaveCount(0)
   })
 
-  test.fixme('undo reverts style change', async ({ page }) => {
+  test('undo reverts style change', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     await canvas.selectTool('select')
@@ -128,7 +128,7 @@ test.describe('Undo / Redo', () => {
     await expect(svg).toHaveAttribute('fill', '#ffffff')
   })
 
-  test.fixme('multiple undos walk back through history', async ({ page }) => {
+  test('multiple undos walk back through history', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(100, 200, 80, 60)
     await canvas.selectTool('rectangle')
@@ -145,7 +145,7 @@ test.describe('Undo / Redo', () => {
     await expect(canvas.shapes).toHaveCount(0)
   })
 
-  test.fixme('redo after new action clears redo stack', async ({ page }) => {
+  test('redo after new action clears redo stack', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
     await canvas.selectTool('rectangle')

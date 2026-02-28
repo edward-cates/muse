@@ -21,6 +21,11 @@ export class CanvasPage {
   // --- Tool selection ---
 
   async selectTool(tool: ToolName) {
+    const FLYOUT_SHAPES: ToolName[] = ['triangle', 'hexagon', 'star', 'cloud']
+    if (FLYOUT_SHAPES.includes(tool)) {
+      // Open the shape picker flyout first
+      await this.page.locator('[data-testid="more-shapes"]').click()
+    }
     await this.page.locator(`[data-testid="tool-${tool}"]`).click()
   }
 
@@ -43,8 +48,20 @@ export class CanvasPage {
     return this.page.locator('.shape')
   }
 
-  shapesOfType(type: 'rectangle' | 'ellipse' | 'diamond'): Locator {
+  shapesOfType(type: 'rectangle' | 'ellipse' | 'diamond' | 'triangle' | 'hexagon' | 'star' | 'cloud'): Locator {
     return this.page.locator(`[data-testid="shape-${type}"]`)
+  }
+
+  get textElements(): Locator {
+    return this.page.locator('[data-testid="text-element"]')
+  }
+
+  get imageElements(): Locator {
+    return this.page.locator('[data-testid="image-element"]')
+  }
+
+  get frameElements(): Locator {
+    return this.page.locator('[data-testid="frame-element"]')
   }
 
   get selectedShape(): Locator {

@@ -9,7 +9,7 @@ test.describe('Additional shape types', () => {
     await canvas.goto()
   })
 
-  test.fixme('triangle shape can be created', async ({ page }) => {
+  test('triangle shape can be created', async ({ page }) => {
     await canvas.selectTool('triangle')
     await canvas.drawShape(200, 200, 100, 80)
 
@@ -19,28 +19,28 @@ test.describe('Additional shape types', () => {
     await expect(polygon).toHaveCount(1)
   })
 
-  test.fixme('hexagon shape can be created', async ({ page }) => {
+  test('hexagon shape can be created', async ({ page }) => {
     await canvas.selectTool('hexagon')
     await canvas.drawShape(200, 200, 100, 100)
 
     await expect(canvas.shapesOfType('hexagon')).toHaveCount(1)
   })
 
-  test.fixme('star shape can be created', async ({ page }) => {
+  test('star shape can be created', async ({ page }) => {
     await canvas.selectTool('star')
     await canvas.drawShape(200, 200, 100, 100)
 
     await expect(canvas.shapesOfType('star')).toHaveCount(1)
   })
 
-  test.fixme('cloud shape can be created', async ({ page }) => {
+  test('cloud shape can be created', async ({ page }) => {
     await canvas.selectTool('cloud')
     await canvas.drawShape(200, 200, 120, 80)
 
     await expect(canvas.shapesOfType('cloud')).toHaveCount(1)
   })
 
-  test.fixme('shape picker flyout shows all available shapes', async ({ page }) => {
+  test('shape picker flyout shows all available shapes', async ({ page }) => {
     const moreShapesBtn = page.locator('[data-testid="more-shapes"]')
     await moreShapesBtn.click()
 
@@ -54,7 +54,7 @@ test.describe('Additional shape types', () => {
     await expect(flyout.locator('[data-shape="cloud"]')).toBeVisible()
   })
 
-  test.fixme('selecting a shape from flyout activates that tool', async ({ page }) => {
+  test('selecting a shape from flyout activates that tool', async ({ page }) => {
     await page.locator('[data-testid="more-shapes"]').click()
     await page.locator('.shape-picker-flyout [data-shape="triangle"]').click()
 
@@ -63,7 +63,7 @@ test.describe('Additional shape types', () => {
     await expect(canvas.shapesOfType('triangle')).toHaveCount(1)
   })
 
-  test.fixme('all shape types support fill and stroke', async ({ page }) => {
+  test('all shape types support fill and stroke', async ({ page }) => {
     // Create a triangle and check it renders with fill/stroke
     await canvas.selectTool('triangle')
     await canvas.drawShape(200, 200, 100, 80)
@@ -79,7 +79,7 @@ test.describe('Additional shape types', () => {
     await expect(polygon).toHaveAttribute('fill', '#e74c3c')
   })
 
-  test.fixme('all shape types support text labels', async ({ page }) => {
+  test('all shape types support text labels', async ({ page }) => {
     await canvas.selectTool('triangle')
     await canvas.drawShape(200, 200, 120, 100)
 
@@ -91,7 +91,7 @@ test.describe('Additional shape types', () => {
     await expect(textarea).toHaveValue('Label')
   })
 
-  test.fixme('all shape types support resize', async ({ page }) => {
+  test('all shape types support resize', async ({ page }) => {
     await canvas.selectTool('triangle')
     await canvas.drawShape(200, 200, 100, 80)
 
@@ -109,7 +109,7 @@ test.describe('Image elements', () => {
     await canvas.goto()
   })
 
-  test.fixme('image can be inserted via toolbar', async ({ page }) => {
+  test('image can be inserted via toolbar', async ({ page }) => {
     const fileChooserPromise = page.waitForEvent('filechooser')
     await page.locator('[data-testid="insert-image"]').click()
     const fileChooser = await fileChooserPromise
@@ -122,7 +122,7 @@ test.describe('Image elements', () => {
     await expect(page.locator('[data-testid="image-element"]')).toHaveCount(1)
   })
 
-  test.fixme('image element can be moved', async ({ page }) => {
+  test('image element can be moved', async ({ page }) => {
     // Insert image (simplified)
     const fileChooserPromise = page.waitForEvent('filechooser')
     await page.locator('[data-testid="insert-image"]').click()
@@ -147,7 +147,7 @@ test.describe('Image elements', () => {
     expect(boxAfter!.x).toBeGreaterThan(boxBefore!.x)
   })
 
-  test.fixme('image element can be resized', async ({ page }) => {
+  test('image element can be resized', async ({ page }) => {
     const fileChooserPromise = page.waitForEvent('filechooser')
     await page.locator('[data-testid="insert-image"]').click()
     const fileChooser = await fileChooserPromise
@@ -162,7 +162,7 @@ test.describe('Image elements', () => {
     await expect(page.locator('.resize-handle')).toHaveCount(8)
   })
 
-  test.fixme('image element can be deleted', async ({ page }) => {
+  test('image element can be deleted', async ({ page }) => {
     const fileChooserPromise = page.waitForEvent('filechooser')
     await page.locator('[data-testid="insert-image"]').click()
     const fileChooser = await fileChooserPromise
@@ -188,19 +188,19 @@ test.describe('Frame / container', () => {
     await canvas.goto()
   })
 
-  test.fixme('F key activates frame tool', async ({ page }) => {
+  test('F key activates frame tool', async ({ page }) => {
     await page.keyboard.press('f')
     await expect(canvas.toolButton('frame')).toHaveClass(/toolbar__btn--active/)
   })
 
-  test.fixme('drawing with frame tool creates a frame element', async ({ page }) => {
+  test('drawing with frame tool creates a frame element', async ({ page }) => {
     await page.keyboard.press('f')
     await canvas.drawShape(100, 100, 400, 300)
 
     await expect(page.locator('[data-testid="frame-element"]')).toHaveCount(1)
   })
 
-  test.fixme('frame has a title/label', async ({ page }) => {
+  test('frame has a title/label', async ({ page }) => {
     await page.keyboard.press('f')
     await canvas.drawShape(100, 100, 400, 300)
 
@@ -208,7 +208,7 @@ test.describe('Frame / container', () => {
     await expect(title).toBeVisible()
   })
 
-  test.fixme('shapes dragged into a frame become children', async ({ page }) => {
+  test('shapes dragged into a frame become children', async ({ page }) => {
     // Create frame first
     await page.keyboard.press('f')
     await canvas.drawShape(100, 100, 400, 300)
@@ -231,7 +231,7 @@ test.describe('Frame / container', () => {
     await expect(childShapes).toHaveCount(1)
   })
 
-  test.fixme('moving a frame moves its children', async ({ page }) => {
+  test('moving a frame moves its children', async ({ page }) => {
     await page.keyboard.press('f')
     await canvas.drawShape(100, 100, 400, 300)
 
@@ -254,7 +254,7 @@ test.describe('Frame / container', () => {
     expect(childAfter!.x).toBeGreaterThan(childBefore!.x)
   })
 
-  test.fixme('frame clips overflowing children', async ({ page }) => {
+  test('frame clips overflowing children', async ({ page }) => {
     await page.keyboard.press('f')
     await canvas.drawShape(100, 100, 200, 150)
 
@@ -276,12 +276,12 @@ test.describe('Eraser tool', () => {
     await canvas.goto()
   })
 
-  test.fixme('E key activates eraser tool', async ({ page }) => {
+  test('E key activates eraser tool', async ({ page }) => {
     await page.keyboard.press('e')
     await expect(canvas.toolButton('eraser')).toHaveClass(/toolbar__btn--active/)
   })
 
-  test.fixme('clicking a shape with eraser deletes it', async ({ page }) => {
+  test('clicking a shape with eraser deletes it', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
 
@@ -291,7 +291,7 @@ test.describe('Eraser tool', () => {
     await expect(canvas.shapes).toHaveCount(0)
   })
 
-  test.fixme('dragging eraser across multiple shapes deletes them', async ({ page }) => {
+  test('dragging eraser across multiple shapes deletes them', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(100, 200, 80, 60)
     await canvas.selectTool('rectangle')
@@ -308,7 +308,7 @@ test.describe('Eraser tool', () => {
     await expect(canvas.shapes).toHaveCount(0)
   })
 
-  test.fixme('eraser works on freehand paths', async ({ page }) => {
+  test('eraser works on freehand paths', async ({ page }) => {
     await canvas.selectTool('draw')
     await page.mouse.move(200, 200)
     await page.mouse.down()

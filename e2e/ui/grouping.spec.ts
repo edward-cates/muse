@@ -15,7 +15,7 @@ test.describe('Grouping', () => {
     await canvas.drawShape(300, 200, 80, 60)
   })
 
-  test.fixme('Cmd+G groups selected shapes', async ({ page }) => {
+  test('Cmd+G groups selected shapes', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
     await canvas.shapes.nth(1).click({ modifiers: ['Shift'] })
@@ -24,7 +24,7 @@ test.describe('Grouping', () => {
     await expect(page.locator('[data-testid="group"]')).toHaveCount(1)
   })
 
-  test.fixme('clicking one shape in a group selects the whole group', async ({ page }) => {
+  test('clicking one shape in a group selects the whole group', async ({ page }) => {
     // Group both shapes
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
@@ -39,7 +39,7 @@ test.describe('Grouping', () => {
     await expect(page.locator('.shape--selected')).toHaveCount(2)
   })
 
-  test.fixme('Cmd+Shift+G ungroups', async ({ page }) => {
+  test('Cmd+Shift+G ungroups', async ({ page }) => {
     // Group
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
@@ -56,7 +56,7 @@ test.describe('Grouping', () => {
     await expect(page.locator('.shape--selected')).toHaveCount(1)
   })
 
-  test.fixme('double-click enters group to select individual child', async ({ page }) => {
+  test('double-click enters group to select individual child', async ({ page }) => {
     // Group both shapes
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
@@ -72,7 +72,7 @@ test.describe('Grouping', () => {
     await expect(page.locator('.shape--selected')).toHaveCount(1)
   })
 
-  test.fixme('dragging a group moves all children together', async ({ page }) => {
+  test('dragging a group moves all children together', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
     await canvas.shapes.nth(1).click({ modifiers: ['Shift'] })
@@ -96,7 +96,7 @@ test.describe('Grouping', () => {
     expect(box2After!.x - box2Before!.x).toBeCloseTo(dx, 0)
   })
 
-  test.fixme('deleting a group deletes all children', async ({ page }) => {
+  test('deleting a group deletes all children', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
     await canvas.shapes.nth(1).click({ modifiers: ['Shift'] })
@@ -108,7 +108,7 @@ test.describe('Grouping', () => {
     await expect(canvas.shapes).toHaveCount(0)
   })
 
-  test.fixme('nested groups work', async ({ page }) => {
+  test('nested groups work', async ({ page }) => {
     // Add a third shape
     await canvas.selectTool('diamond')
     await canvas.drawShape(500, 200, 80, 60)

@@ -2,12 +2,17 @@ import { useRef, useState, useCallback, useEffect, type MouseEvent, type WheelEv
 import { useCursors } from '../hooks/useCursors'
 import { useCollab } from '../collab/CollabContext'
 import { ShapeRenderer } from './ShapeRenderer'
+import { TextRenderer } from './TextRenderer'
+import { ImageRenderer } from './ImageRenderer'
+import { FrameRenderer } from './FrameRenderer'
 import { PathLayer } from './PathLayer'
 import { LineLayer, getAnchorPoint, findClosestAnchors } from './LineLayer'
 import { Cursors } from './Cursors'
 import { PropertyPanel } from './PropertyPanel'
-import { isShape, isPath, isLine } from '../types'
-import type { Tool, ShapeType, CanvasElement, Anchor, LineType, ShapeElement, PathElement, LineElement } from '../types'
+import { AlignmentToolbar } from './AlignmentToolbar'
+import { Minimap } from './Minimap'
+import { isShape, isPath, isLine, isText, isImage, isFrame } from '../types'
+import type { Tool, ShapeType, CanvasElement, Anchor, LineType, ShapeElement, PathElement, LineElement, TextElement, ImageElement, FrameElement } from '../types'
 
 interface Props {
   activeTool: Tool
@@ -21,15 +26,35 @@ interface Props {
   addPath: (x: number, y: number, points: number[], stroke: string, strokeWidth: number) => string
   addLine: (startShapeId: string, endShapeId: string, startAnchor: Anchor, endAnchor: Anchor, lineType?: LineType) => string
   addArrow: (startShapeId: string, endShapeId: string, startAnchor: Anchor, endAnchor: Anchor, startX: number, startY: number, endX: number, endY: number, lineType?: LineType) => string
-  updateElement: (id: string, updates: Partial<Omit<ShapeElement, 'id' | 'type'>> | Partial<Omit<PathElement, 'id' | 'type'>> | Partial<Omit<LineElement, 'id' | 'type'>>) => void
+  addText: (x: number, y: number) => string
+  addImage: (x: number, y: number, w: number, h: number, src: string) => string
+  addFrame: (x: number, y: number, w: number, h: number) => string
+  updateElement: (id: string, updates: Record<string, unknown>) => void
   deleteElement: (id: string) => void
+  gridEnabled: boolean
+  darkMode: boolean
+  minimapVisible: boolean
+  setLastUsedStyle: (fill: string, stroke: string) => void
+  groupElements: (ids: string[]) => string
+  ungroupElements: (groupId: string) => void
+  stopCapturing: () => void
 }
 
-const SHAPE_TOOLS: Tool[] = ['rectangle', 'ellipse', 'diamond']
+const SHAPE_TOOLS: Tool[] = ['rectangle', 'ellipse', 'diamond', 'triangle', 'hexagon', 'star', 'cloud']
 const MIN_SHAPE_SIZE = 10
+const GRID_SIZE = 20
 
-export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsChange, onToolChange, onShapeCreated, elements, addShape, addPath, addLine, addArrow, updateElement, deleteElement }: Props) {
-  // Compat: derive selectedId from selectedIds for single-select scenarios
+function snapToGrid(v: number, gridEnabled: boolean): number {
+  if (!gridEnabled) return v
+  return Math.round(v / GRID_SIZE) * GRID_SIZE
+}
+
+export function Canvas({
+  activeTool, activeLineType, selectedIds, onSelectedIdsChange, onToolChange, onShapeCreated,
+  elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame,
+  updateElement, deleteElement, gridEnabled, darkMode, minimapVisible,
+  setLastUsedStyle, groupElements, ungroupElements, stopCapturing,
+}: Props) {
   const selectedId = selectedIds.length === 1 ? selectedIds[0] : null
   const { awareness } = useCollab()
   const cursors = useCursors()
@@ -40,20 +65,26 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
+  // Recently used colors (persists across PropertyPanel mount/unmount)
+  const [recentColors, setRecentColors] = useState<string[]>([])
+  const handleRecentColorAdd = useCallback((color: string) => {
+    if (color && color !== 'transparent') {
+      setRecentColors(prev => {
+        if (prev.includes(color)) return prev
+        return [color, ...prev].slice(0, 8)
+      })
+    }
+  }, [])
+
   // Shape creation preview
   const [shapePreview, setShapePreview] = useState<{
     type: ShapeType
-    x: number
-    y: number
-    w: number
-    h: number
+    x: number; y: number; w: number; h: number
   } | null>(null)
 
   // Drawing state
   const [drawingPath, setDrawingPath] = useState<{
-    points: number[]
-    stroke: string
-    strokeWidth: number
+    points: number[]; stroke: string; strokeWidth: number
   } | null>(null)
 
   // Marquee selection state
@@ -65,6 +96,15 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
   const [lineStart, setLineStart] = useState<{ shapeId: string; anchor: Anchor; freeX: number; freeY: number } | null>(null)
   const [linePreviewEnd, setLinePreviewEnd] = useState<{ x: number; y: number } | null>(null)
   const [hoveredShapeId, setHoveredShapeId] = useState<string | null>(null)
+
+  // Alignment guides
+  const [alignmentGuides, setAlignmentGuides] = useState<{ x?: number; y?: number; center?: boolean }[]>([])
+
+  // Connector label editing state
+  const [editingLabelId, setEditingLabelId] = useState<string | null>(null)
+
+  // Eraser drag state
+  const isErasing = useRef(false)
 
   const panStart = useRef({ x: 0, y: 0 })
   const offsetStart = useRef({ x: 0, y: 0 })
@@ -84,10 +124,13 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
     [offset, scale],
   )
 
-  // Keep shapesRef current
+  // Keep element lists current
   const shapes = elements.filter(isShape)
   const paths = elements.filter(isPath)
   const lines = elements.filter(isLine)
+  const texts = elements.filter(isText)
+  const images = elements.filter(isImage)
+  const frames = elements.filter(isFrame)
   shapesRef.current = shapes
 
   // Space key for pan-anywhere
@@ -99,9 +142,7 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
       }
     }
     const up = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        setSpaceHeld(false)
-      }
+      if (e.code === 'Space') setSpaceHeld(false)
     }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
@@ -116,15 +157,91 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
     const handler = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).matches('textarea, input')) return
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0) {
+        // Check if any selected elements are locked
+        for (const id of selectedIds) {
+          const el = elements.find(el => el.id === id)
+          if (el && isShape(el) && el.locked) return // Don't delete locked shapes
+        }
         for (const id of selectedIds) {
           deleteElement(id)
         }
+        stopCapturing()
         onSelectedIdsChange([])
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selectedIds, deleteElement, onSelectedIdsChange])
+  }, [selectedIds, deleteElement, onSelectedIdsChange, elements])
+
+  // Zoom keyboard shortcuts — handled directly to ensure synchronous state updates
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).tagName === 'TEXTAREA' || (e.target as HTMLElement).tagName === 'INPUT') return
+      const meta = e.metaKey || e.ctrlKey
+
+      if (meta && (e.key === '=' || e.key === '+')) {
+        e.preventDefault()
+        setScale(s => Math.min(s * 1.2, 10))
+        return
+      }
+      if (meta && e.key === '-') {
+        e.preventDefault()
+        setScale(s => Math.max(s * 0.8, 0.1))
+        return
+      }
+      if (meta && e.key === '0') {
+        e.preventDefault()
+        setScale(1)
+        setOffset({ x: 0, y: 0 })
+        return
+      }
+      // Shift+1: zoom to fit all
+      if (e.shiftKey && (e.key === '!' || e.code === 'Digit1')) {
+        e.preventDefault()
+        if (elements.length > 0) fitElements(elements)
+        return
+      }
+      // Shift+2: zoom to fit selection
+      if (e.shiftKey && (e.key === '@' || e.code === 'Digit2')) {
+        e.preventDefault()
+        const selected = elements.filter(el => selectedIds.includes(el.id))
+        if (selected.length > 0) fitElements(selected)
+        return
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [elements, selectedIds])
+
+  const fitElements = useCallback((els: CanvasElement[]) => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const el of els) {
+      if ('x' in el && 'width' in el) {
+        const s = el as ShapeElement
+        minX = Math.min(minX, s.x)
+        minY = Math.min(minY, s.y)
+        maxX = Math.max(maxX, s.x + s.width)
+        maxY = Math.max(maxY, s.y + s.height)
+      } else if ('x' in el) {
+        minX = Math.min(minX, el.x)
+        minY = Math.min(minY, el.y)
+        maxX = Math.max(maxX, el.x + 100)
+        maxY = Math.max(maxY, el.y + 100)
+      }
+    }
+    if (minX === Infinity) return
+    const padding = 50
+    const bw = maxX - minX + padding * 2
+    const bh = maxY - minY + padding * 2
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const s = Math.min(vw / bw, vh / bh, 2)
+    setScale(s)
+    setOffset({
+      x: (vw - bw * s) / 2 - minX * s + padding * s,
+      y: (vh - bh * s) / 2 - minY * s + padding * s,
+    })
+  }, [])
 
   const startPan = useCallback(
     (clientX: number, clientY: number) => {
@@ -137,9 +254,37 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
   )
 
   function hitTestShape(world: { x: number; y: number }): ShapeElement | undefined {
-    return shapesRef.current.find(
-      (s) => world.x >= s.x && world.x <= s.x + s.width && world.y >= s.y && world.y <= s.y + s.height,
-    )
+    // Iterate in reverse order to hit topmost shape first
+    for (let i = shapesRef.current.length - 1; i >= 0; i--) {
+      const s = shapesRef.current[i]
+      if (world.x >= s.x && world.x <= s.x + s.width && world.y >= s.y && world.y <= s.y + s.height) {
+        return s
+      }
+    }
+    return undefined
+  }
+
+  function hitTestAnyElement(world: { x: number; y: number }): CanvasElement | undefined {
+    // Check shapes, text, images, frames
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const el = elements[i]
+      if (el.type === 'path') {
+        // Hit-test path by checking proximity to any segment
+        const pts = (el as PathElement).points
+        const HIT_DIST = 8
+        for (let j = 0; j < pts.length - 2; j += 2) {
+          const px = pts[j], py = pts[j + 1]
+          const dx = world.x - px, dy = world.y - py
+          if (dx * dx + dy * dy < HIT_DIST * HIT_DIST) return el
+        }
+      } else if ('width' in el && 'height' in el && 'x' in el && 'y' in el) {
+        const s = el as { x: number; y: number; width: number; height: number }
+        if (world.x >= s.x && world.x <= s.x + s.width && world.y >= s.y && world.y <= s.y + s.height) {
+          return el
+        }
+      }
+    }
+    return undefined
   }
 
   function closestAnchor(shape: ShapeElement, world: { x: number; y: number }): Anchor {
@@ -172,12 +317,28 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
       // Only process left clicks below
       if (e.button !== 0) return
 
+      // Hand tool — always pan
+      if (activeTool === 'hand') {
+        startPan(e.clientX, e.clientY)
+        return
+      }
+
+      // Eraser tool
+      if (activeTool === 'eraser') {
+        isErasing.current = true
+        // Hit test and delete
+        const hit = hitTestAnyElement(world)
+        if (hit) deleteElement(hit.id)
+        return
+      }
+
       if (activeTool === 'select') {
         // Click on empty canvas = deselect + start marquee
-        if (e.target === e.currentTarget) {
+        const target = e.target as HTMLElement
+        const isCanvasOrWorld = target === e.currentTarget || target.classList.contains('canvas__world')
+        if (isCanvasOrWorld) {
           onSelectedIdsChange([])
           setEditingId(null)
-          const world = screenToWorld(e.clientX, e.clientY)
           marqueeStart.current = { x: world.x, y: world.y }
           isMarquee.current = true
           setMarquee({ x: world.x, y: world.y, w: 0, h: 0 })
@@ -185,16 +346,29 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
         return
       }
 
-      if (SHAPE_TOOLS.includes(activeTool)) {
+      if (activeTool === 'text') {
+        const id = addText(world.x, world.y)
+        stopCapturing()
+        onSelectedIdsChange([id])
+        setEditingId(id)
+        onShapeCreated()
+        return
+      }
+
+      if (SHAPE_TOOLS.includes(activeTool) || activeTool === 'frame') {
         isCreatingShape.current = true
         shapeStart.current = { x: world.x, y: world.y }
-        setShapePreview({
-          type: activeTool as ShapeType,
-          x: world.x,
-          y: world.y,
-          w: 0,
-          h: 0,
-        })
+        if (activeTool === 'frame') {
+          setShapePreview({
+            type: 'rectangle',
+            x: world.x, y: world.y, w: 0, h: 0,
+          })
+        } else {
+          setShapePreview({
+            type: activeTool as ShapeType,
+            x: world.x, y: world.y, w: 0, h: 0,
+          })
+        }
         return
       }
 
@@ -203,11 +377,7 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
         lastDrawPoint.current = { x: world.x, y: world.y }
         const initialPoints = [world.x, world.y]
         drawingPointsRef.current = initialPoints
-        setDrawingPath({
-          points: initialPoints,
-          stroke: '#4f46e5',
-          strokeWidth: 2,
-        })
+        setDrawingPath({ points: initialPoints, stroke: '#4f46e5', strokeWidth: 2 })
         return
       }
 
@@ -233,13 +403,20 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
         return
       }
     },
-    [activeTool, screenToWorld, spaceHeld, startPan, onSelectedIdsChange],
+    [activeTool, screenToWorld, spaceHeld, startPan, onSelectedIdsChange, addText, onShapeCreated, deleteElement],
   )
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       const world = screenToWorld(e.clientX, e.clientY)
       awareness.setLocalStateField('cursor', world)
+
+      // Eraser drag
+      if (isErasing.current && activeTool === 'eraser') {
+        const hit = hitTestAnyElement(world)
+        if (hit) deleteElement(hit.id)
+        return
+      }
 
       if (isMarquee.current) {
         const sx = marqueeStart.current.x
@@ -298,11 +475,17 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
         return
       }
     },
-    [screenToWorld, activeTool, lineStart],
+    [screenToWorld, activeTool, lineStart, deleteElement],
   )
 
   const handleMouseUp = useCallback(
     (e: MouseEvent) => {
+      // Eraser
+      if (isErasing.current) {
+        isErasing.current = false
+        return
+      }
+
       if (isMarquee.current) {
         isMarquee.current = false
         const world = screenToWorld(e.clientX, e.clientY)
@@ -317,6 +500,13 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
         if (rect.w > 5 && rect.h > 5) {
           const ids: string[] = []
           for (const el of shapesRef.current) {
+            if (el.x + el.width > rect.x && el.x < rect.x + rect.w &&
+                el.y + el.height > rect.y && el.y < rect.y + rect.h) {
+              ids.push(el.id)
+            }
+          }
+          // Also include text elements
+          for (const el of elements.filter(isText)) {
             if (el.x + el.width > rect.x && el.x < rect.x + rect.w &&
                 el.y + el.height > rect.y && el.y < rect.y + rect.h) {
               ids.push(el.id)
@@ -337,8 +527,20 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
       if (isCreatingShape.current) {
         isCreatingShape.current = false
         if (shapePreview && shapePreview.w >= MIN_SHAPE_SIZE && shapePreview.h >= MIN_SHAPE_SIZE) {
-          const id = addShape(shapePreview.type, shapePreview.x, shapePreview.y, shapePreview.w, shapePreview.h)
-          onSelectedIdsChange([id])
+          const x = snapToGrid(shapePreview.x, gridEnabled)
+          const y = snapToGrid(shapePreview.y, gridEnabled)
+          const w = snapToGrid(shapePreview.w, gridEnabled) || shapePreview.w
+          const h = snapToGrid(shapePreview.h, gridEnabled) || shapePreview.h
+
+          if (activeTool === 'frame') {
+            const id = addFrame(x, y, w, h)
+            stopCapturing()
+            onSelectedIdsChange([id])
+          } else {
+            const id = addShape(shapePreview.type, x, y, w, h)
+            stopCapturing()
+            onSelectedIdsChange([id])
+          }
           onShapeCreated()
         }
         setShapePreview(null)
@@ -355,6 +557,7 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
             if (pts[i + 1] < minY) minY = pts[i + 1]
           }
           addPath(minX, minY, pts, '#4f46e5', 2)
+          stopCapturing()
         }
         drawingPointsRef.current = []
         setDrawingPath(null)
@@ -366,20 +569,18 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
         const hitShape = hitTestShape(world)
 
         if (activeTool === 'line') {
-          // Line tool: requires both endpoints on shapes
           if (hitShape && hitShape.id !== lineStart.shapeId) {
             const startShape = shapesRef.current.find((s) => s.id === lineStart.shapeId)
             if (startShape) {
               const { startAnchor, endAnchor } = findClosestAnchors(startShape, hitShape)
               addLine(startShape.id, hitShape.id, startAnchor, endAnchor, activeLineType)
+              stopCapturing()
             }
           }
         } else if (activeTool === 'arrow') {
-          // Arrow tool: allows free endpoints
           const startShapeId = lineStart.shapeId
           const endShapeId = hitShape ? hitShape.id : ''
 
-          // Determine anchors
           let startAnchor: Anchor = lineStart.anchor
           let endAnchor: Anchor = 'left'
 
@@ -395,7 +596,6 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
             endAnchor = closestAnchor(hitShape, world)
           }
 
-          // Only create if there's meaningful distance
           const dx = world.x - lineStart.freeX
           const dy = world.y - lineStart.freeY
           if (dx * dx + dy * dy > 100) {
@@ -406,6 +606,7 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
               world.x, world.y,
               activeLineType,
             )
+            stopCapturing()
           }
         }
 
@@ -414,14 +615,14 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
         return
       }
     },
-    [shapePreview, addShape, addPath, addLine, addArrow, onSelectedIdsChange, onShapeCreated, lineStart, screenToWorld, activeTool, activeLineType],
+    [shapePreview, addShape, addPath, addLine, addArrow, addFrame, onSelectedIdsChange, onShapeCreated, lineStart, screenToWorld, activeTool, activeLineType, gridEnabled, elements],
   )
 
   const handleWheel = useCallback(
     (e: WheelEvent) => {
       e.preventDefault()
       const factor = e.deltaY > 0 ? 0.92 : 1.08
-      const newScale = Math.min(Math.max(scale * factor, 0.1), 5)
+      const newScale = Math.min(Math.max(scale * factor, 0.1), 10)
       const cx = e.clientX
       const cy = e.clientY
       setOffset((prev) => ({
@@ -435,7 +636,24 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
 
   const handleSelect = useCallback(
     (id: string, shiftKey?: boolean) => {
+      if (activeTool === 'hand') return // Hand tool doesn't select
+      if (activeTool === 'eraser') {
+        deleteElement(id)
+        return
+      }
       if (activeTool === 'select') {
+        // Check if clicked element belongs to a group
+        const el = elements.find(e => e.id === id)
+        if (el && isShape(el) && el.groupId && !shiftKey) {
+          // Use outermost group (last in comma list) for selection
+          const outermostGroup = el.groupId.split(',').pop()!
+          const groupIds = elements
+            .filter(e => isShape(e) && (e as ShapeElement).groupId?.split(',').includes(outermostGroup))
+            .map(e => e.id)
+          onSelectedIdsChange(groupIds)
+          return
+        }
+
         if (shiftKey) {
           onSelectedIdsChange(
             selectedIds.includes(id)
@@ -447,13 +665,25 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
         }
       }
     },
-    [activeTool, onSelectedIdsChange, selectedIds],
+    [activeTool, onSelectedIdsChange, selectedIds, elements, deleteElement],
+  )
+
+  const handleDoubleClick = useCallback(
+    (id: string) => {
+      if (activeTool === 'select') {
+        // Check if element is in a group — double-click enters group
+        const el = elements.find(e => e.id === id)
+        if (el && isShape(el) && el.groupId) {
+          onSelectedIdsChange([id])
+          return
+        }
+      }
+    },
+    [activeTool, elements, onSelectedIdsChange],
   )
 
   const handleEndpointDrag = useCallback(
     (lineId: string, endpoint: 'start' | 'end', e: MouseEvent) => {
-      const startMouse = { x: e.clientX, y: e.clientY }
-
       const handleMove = (ev: globalThis.MouseEvent) => {
         const world = screenToWorld(ev.clientX, ev.clientY)
         if (endpoint === 'start') {
@@ -502,6 +732,10 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
     [activeTool, onSelectedIdsChange],
   )
 
+  const handleStopEdit = useCallback(() => {
+    setEditingId(null)
+  }, [])
+
   // Clear editing when selection changes away
   useEffect(() => {
     if (editingId && editingId !== selectedId) {
@@ -509,13 +743,21 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
     }
   }, [selectedId, editingId])
 
+  // Broadcast selected IDs via awareness for remote selection
+  useEffect(() => {
+    awareness.setLocalStateField('selectedIds', selectedIds)
+  }, [selectedIds, awareness])
+
   // Cursor class
   let cursorClass = 'canvas--tool-select'
   if (isPanning) cursorClass = 'canvas--panning'
   else if (spaceHeld) cursorClass = 'canvas--space-held'
   else if (activeTool === 'draw') cursorClass = 'canvas--tool-draw'
   else if (activeTool === 'line' || activeTool === 'arrow') cursorClass = 'canvas--tool-line'
-  else if (SHAPE_TOOLS.includes(activeTool)) cursorClass = 'canvas--tool-shape'
+  else if (SHAPE_TOOLS.includes(activeTool) || activeTool === 'frame') cursorClass = 'canvas--tool-shape'
+  else if (activeTool === 'hand') cursorClass = 'canvas--tool-hand'
+  else if (activeTool === 'eraser') cursorClass = 'canvas--tool-eraser'
+  else if (activeTool === 'text') cursorClass = 'canvas--tool-text'
 
   // Shape preview SVG
   const previewSvg = shapePreview && shapePreview.w > 0 && shapePreview.h > 0 ? (
@@ -538,6 +780,12 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
         )}
         {shapePreview.type === 'diamond' && (
           <polygon points={`${shapePreview.w / 2},1 ${shapePreview.w - 1},${shapePreview.h / 2} ${shapePreview.w / 2},${shapePreview.h - 1} 1,${shapePreview.h / 2}`} fill="none" stroke="#4f46e5" strokeWidth={1.5} strokeDasharray="6 3" />
+        )}
+        {shapePreview.type === 'triangle' && (
+          <polygon points={`${shapePreview.w / 2},1 ${shapePreview.w - 1},${shapePreview.h - 1} 1,${shapePreview.h - 1}`} fill="none" stroke="#4f46e5" strokeWidth={1.5} strokeDasharray="6 3" />
+        )}
+        {(shapePreview.type === 'hexagon' || shapePreview.type === 'star' || shapePreview.type === 'cloud') && (
+          <rect x={1} y={1} width={shapePreview.w - 2} height={shapePreview.h - 2} fill="none" stroke="#4f46e5" strokeWidth={1.5} strokeDasharray="6 3" />
         )}
       </svg>
     </div>
@@ -572,6 +820,23 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
       }
     : null
 
+  // Grid SVG
+  const gridSvg = gridEnabled ? (
+    <svg className="canvas__grid" style={{ position: 'absolute', top: -10000, left: -10000, width: 20000, height: 20000, pointerEvents: 'none' }}>
+      <defs>
+        <pattern id="grid-pattern" width={GRID_SIZE} height={GRID_SIZE} patternUnits="userSpaceOnUse">
+          <line x1={GRID_SIZE} y1={0} x2={GRID_SIZE} y2={GRID_SIZE} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" />
+          <line x1={0} y1={GRID_SIZE} x2={GRID_SIZE} y2={GRID_SIZE} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" />
+        </pattern>
+      </defs>
+      <rect width="20000" height="20000" fill="url(#grid-pattern)" />
+    </svg>
+  ) : null
+
+  // Get selected elements for PropertyPanel (only in select mode)
+  const selectedElements = elements.filter(el => selectedIds.includes(el.id))
+  const showPropertyPanel = selectedElements.length > 0 && activeTool === 'select'
+
   return (
     <div
       data-testid="canvas"
@@ -588,6 +853,7 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
           transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
         }}
       >
+        {gridSvg}
         <PathLayer
           paths={paths}
           selectedId={selectedId}
@@ -599,17 +865,143 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
           lines={lines}
           selectedId={selectedId}
           onSelect={handleSelect}
+          onDoubleClick={(id) => setEditingLabelId(id)}
           linePreview={linePreviewData}
+          editingLabelId={editingLabelId}
+          onLabelChange={(id, label) => updateElement(id, { label })}
+          onLabelEditDone={() => setEditingLabelId(null)}
         />
-        {shapes.map((shape) => (
-          <ShapeRenderer
-            key={shape.id}
-            shape={shape}
-            isSelected={selectedIds.includes(shape.id)}
+        {/* Frames rendered below shapes — compute child containment */}
+        {frames.map((frame) => {
+          const childShapes = shapes.filter(s =>
+            s.x >= frame.x && s.y >= frame.y &&
+            s.x + s.width <= frame.x + frame.width &&
+            s.y + s.height <= frame.y + frame.height
+          )
+          return (
+            <FrameRenderer
+              key={frame.id}
+              frame={frame}
+              isSelected={selectedIds.includes(frame.id)}
+              onSelect={handleSelect}
+              onUpdate={updateElement}
+              scale={scale}
+              activeTool={activeTool}
+              elements={elements}
+            >
+              {childShapes.length > 0 && (
+                <div style={{ position: 'absolute', left: -frame.x, top: -frame.y, width: 99999, height: 99999 }}>
+                  {childShapes.map((shape) => (
+                    <ShapeRenderer
+                      key={shape.id}
+                      shape={shape}
+                      isSelected={selectedIds.includes(shape.id)}
+                      onSelect={handleSelect}
+                      onUpdate={updateElement}
+                      onStartEdit={handleStartEdit}
+                      editingId={editingId}
+                      scale={scale}
+                      activeTool={activeTool}
+                    />
+                  ))}
+                </div>
+              )}
+            </FrameRenderer>
+          )
+        })}
+        {/* Group wrapper divs */}
+        {(() => {
+          const groupIds = new Set<string>()
+          for (const s of shapes) {
+            if (s.groupId) {
+              for (const gid of s.groupId.split(',')) {
+                if (gid) groupIds.add(gid)
+              }
+            }
+          }
+          return Array.from(groupIds).map(gid => (
+            <div key={`group-${gid}`} data-testid="group" data-group-id={gid} style={{ position: 'absolute', pointerEvents: 'none' }} />
+          ))
+        })()}
+        {shapes.map((shape) => {
+          // Compute group siblings for drag — use outermost group
+          const outermostGroup = shape.groupId ? shape.groupId.split(',').pop() : ''
+          const siblings = outermostGroup
+            ? shapes.filter(s => s.groupId && s.groupId.split(',').pop() === outermostGroup && s.id !== shape.id).map(s => ({ id: s.id, x: s.x, y: s.y }))
+            : undefined
+          return (
+            <ShapeRenderer
+              key={shape.id}
+              shape={shape}
+              isSelected={selectedIds.includes(shape.id)}
+              onSelect={handleSelect}
+              onUpdate={updateElement}
+              onStartEdit={handleStartEdit}
+              editingId={editingId}
+              scale={scale}
+              activeTool={activeTool}
+              gridEnabled={gridEnabled}
+              onClone={addShape}
+              groupSiblings={siblings}
+              onDragMove={(id, x, y) => {
+                // Compute alignment guides and snap
+                const THRESHOLD = 5
+                const dragging = shapes.find(s => s.id === id)
+                if (!dragging) return
+                const guides: { x?: number; y?: number; center?: boolean }[] = []
+                let snapX: number | undefined, snapY: number | undefined
+                const dragLeft = x, dragRight = x + dragging.width
+                const dragTop = y, dragBottom = y + dragging.height
+                const dragCx = x + dragging.width / 2, dragCy = y + dragging.height / 2
+                for (const other of shapes) {
+                  if (other.id === id) continue
+                  if (other.groupId && other.groupId === dragging.groupId) continue
+                  const oLeft = other.x, oRight = other.x + other.width
+                  const oTop = other.y, oBottom = other.y + other.height
+                  const oCx = other.x + other.width / 2, oCy = other.y + other.height / 2
+                  // Vertical guides (x alignment) — center takes priority
+                  if (Math.abs(dragCx - oCx) < THRESHOLD) { guides.push({ x: oCx, center: true }); snapX = oCx - dragging.width / 2 }
+                  else if (Math.abs(dragLeft - oLeft) < THRESHOLD) { guides.push({ x: oLeft }); snapX = oLeft }
+                  else if (Math.abs(dragRight - oRight) < THRESHOLD) { guides.push({ x: oRight }); snapX = oRight - dragging.width }
+                  // Horizontal guides (y alignment) — center takes priority
+                  if (Math.abs(dragCy - oCy) < THRESHOLD) { guides.push({ y: oCy, center: true }); snapY = oCy - dragging.height / 2 }
+                  else if (Math.abs(dragTop - oTop) < THRESHOLD) { guides.push({ y: oTop }); snapY = oTop }
+                  else if (Math.abs(dragBottom - oBottom) < THRESHOLD) { guides.push({ y: oBottom }); snapY = oBottom - dragging.height }
+                }
+                setAlignmentGuides(guides)
+                // Apply snap
+                if (snapX !== undefined || snapY !== undefined) {
+                  updateElement(id, { x: snapX ?? x, y: snapY ?? y })
+                }
+              }}
+              onDragEnd={() => setAlignmentGuides([])}
+            />
+          )
+        })}
+        {/* Text elements */}
+        {texts.map((textEl) => (
+          <TextRenderer
+            key={textEl.id}
+            element={textEl}
+            isSelected={selectedIds.includes(textEl.id)}
+            isEditing={editingId === textEl.id}
             onSelect={handleSelect}
             onUpdate={updateElement}
             onStartEdit={handleStartEdit}
-            editingId={editingId}
+            onStopEdit={handleStopEdit}
+            onDelete={deleteElement}
+            scale={scale}
+            activeTool={activeTool}
+          />
+        ))}
+        {/* Image elements */}
+        {images.map((img) => (
+          <ImageRenderer
+            key={img.id}
+            element={img}
+            isSelected={selectedIds.includes(img.id)}
+            onSelect={handleSelect}
+            onUpdate={updateElement}
             scale={scale}
             activeTool={activeTool}
           />
@@ -666,13 +1058,59 @@ export function Canvas({ activeTool, activeLineType, selectedIds, onSelectedIdsC
             }}
           />
         )}
+        {/* Alignment guides */}
+        {alignmentGuides.map((guide, i) => (
+          <div
+            key={i}
+            className={`alignment-guide ${guide.center ? 'alignment-guide--center' : ''}`}
+            style={{
+              position: 'absolute',
+              ...(guide.x !== undefined ? { left: guide.x, top: -5000, width: 1, height: 10000 } : {}),
+              ...(guide.y !== undefined ? { left: -5000, top: guide.y, width: 10000, height: 1 } : {}),
+            }}
+          />
+        ))}
         <Cursors cursors={cursors} />
       </div>
-      {selectedId && (() => {
-        const el = elements.find((e) => e.id === selectedId)
-        if (!el) return null
-        return <PropertyPanel element={el} onUpdate={updateElement} />
-      })()}
+
+      {/* Property panel */}
+      {showPropertyPanel && (
+        <div onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()}>
+          <PropertyPanel
+            elements={selectedElements}
+            onUpdate={updateElement}
+            setLastUsedStyle={setLastUsedStyle}
+            recentColors={recentColors}
+            onRecentColorAdd={handleRecentColorAdd}
+          />
+        </div>
+      )}
+
+      {/* Alignment toolbar */}
+      {selectedIds.length >= 2 && activeTool === 'select' && (
+        <div onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()}>
+          <AlignmentToolbar
+            selectedIds={selectedIds}
+            elements={elements}
+            updateElement={updateElement}
+          />
+        </div>
+      )}
+
+      {/* Zoom indicator */}
+      <div className="zoom-indicator" data-testid="zoom-level">
+        {Math.round(scale * 100)}%
+      </div>
+
+      {/* Minimap */}
+      {minimapVisible && (
+        <Minimap
+          elements={elements}
+          offset={offset}
+          scale={scale}
+          onPan={(x, y) => setOffset({ x, y })}
+        />
+      )}
     </div>
   )
 }
