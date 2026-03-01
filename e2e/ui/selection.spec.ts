@@ -98,6 +98,123 @@ test.describe('Multi-select', () => {
     expect(id3).not.toEqual(id2)
   })
 
+  test('switching to a different tool clears selection', async ({ page }) => {
+    // Select a shape
+    await canvas.selectTool('select')
+    await canvas.shapes.first().click()
+    await expect(page.locator('.shape--selected')).toHaveCount(1)
+
+    // Switch to arrow tool via toolbar
+    await canvas.selectTool('arrow')
+    await expect(page.locator('.shape--selected')).toHaveCount(0)
+  })
+
+  test('dragging one selected shape moves all and keeps highlights', async ({ page }) => {
+    await canvas.selectTool('select')
+
+    // Select first two shapes
+    await canvas.shapes.first().click()
+    await canvas.shapes.nth(1).click({ modifiers: ['Shift'] })
+    await expect(page.locator('.shape--selected')).toHaveCount(2)
+
+    // Record initial positions
+    const box1Before = await canvas.shapes.first().boundingBox()
+    const box2Before = await canvas.shapes.nth(1).boundingBox()
+    if (!box1Before || !box2Before) throw new Error('No bounding box')
+
+    // Click down on first shape to start drag — highlights should persist
+    await page.mouse.move(box1Before.x + 40, box1Before.y + 30)
+    await page.mouse.down()
+    // Both should still be highlighted after mousedown
+    await expect(page.locator('.shape--selected')).toHaveCount(2)
+
+    await page.mouse.move(box1Before.x + 140, box1Before.y + 130, { steps: 5 })
+    await page.mouse.up()
+
+    // Both should still be highlighted after drag
+    await expect(page.locator('.shape--selected')).toHaveCount(2)
+
+    // Both shapes should have moved by the same delta
+    const box1After = await canvas.shapes.first().boundingBox()
+    const box2After = await canvas.shapes.nth(1).boundingBox()
+    if (!box1After || !box2After) throw new Error('No bounding box')
+
+    const dx = box1After.x - box1Before.x
+    const dy = box1After.y - box1Before.y
+    expect(dx).toBeGreaterThan(50) // verify it actually moved
+    expect(Math.abs((box2After.x - box2Before.x) - dx)).toBeLessThan(5)
+    expect(Math.abs((box2After.y - box2Before.y) - dy)).toBeLessThan(5)
+  })
+
+  test('connector and shapes show highlights simultaneously', async ({ page }) => {
+    // Draw a free-floating arrow
+    await canvas.selectTool('arrow')
+    await page.mouse.move(100, 400)
+    await page.mouse.down()
+    await page.mouse.move(300, 400, { steps: 5 })
+    await page.mouse.up()
+
+    await expect(canvas.connectors).toHaveCount(1)
+
+    // Select all with Cmd+A (3 shapes + 1 arrow)
+    await canvas.selectTool('select')
+    await page.keyboard.press('Meta+a')
+
+    // All 3 shapes should be highlighted
+    await expect(page.locator('.shape--selected')).toHaveCount(3)
+
+    // The connector should also show selection glow simultaneously
+    const glowPaths = page.locator('svg.canvas__lines path[opacity="0.25"]')
+    await expect(glowPaths).toHaveCount(1)
+  })
+
+  test('free-floating arrow moves with multi-select drag', async ({ page }) => {
+    // Draw a free-floating arrow
+    await canvas.selectTool('arrow')
+    await page.mouse.move(100, 400)
+    await page.mouse.down()
+    await page.mouse.move(300, 400, { steps: 5 })
+    await page.mouse.up()
+    await expect(canvas.connectors).toHaveCount(1)
+
+    // Select all (3 shapes + 1 arrow)
+    await canvas.selectTool('select')
+    await page.keyboard.press('Meta+a')
+    await expect(page.locator('.shape--selected')).toHaveCount(3)
+
+    // Get arrow path's initial d attribute
+    const connector = canvas.connectors.first()
+    const dBefore = await connector.getAttribute('d')
+
+    // Drag one of the shapes
+    const box = await canvas.shapes.first().boundingBox()
+    if (!box) throw new Error('No bounding box')
+    await page.mouse.move(box.x + 40, box.y + 30)
+    await page.mouse.down()
+    await page.mouse.move(box.x + 140, box.y + 130, { steps: 5 })
+    await page.mouse.up()
+
+    // Arrow should have moved — its path should be different
+    const dAfter = await connector.getAttribute('d')
+    expect(dAfter).not.toEqual(dBefore)
+  })
+
+  test('clicking an already-selected shape preserves multi-selection', async ({ page }) => {
+    await canvas.selectTool('select')
+
+    // Select all three shapes
+    await canvas.shapes.first().click()
+    await canvas.shapes.nth(1).click({ modifiers: ['Shift'] })
+    await canvas.shapes.nth(2).click({ modifiers: ['Shift'] })
+    await expect(page.locator('.shape--selected')).toHaveCount(3)
+
+    // Click one of the already-selected shapes (no shift)
+    await canvas.shapes.nth(1).click()
+
+    // All three should still be selected
+    await expect(page.locator('.shape--selected')).toHaveCount(3)
+  })
+
   test('property panel handles multi-select (shared properties)', async ({ page }) => {
     await canvas.selectTool('select')
     await canvas.shapes.first().click()

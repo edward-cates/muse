@@ -87,9 +87,9 @@ test.describe('Property panel', () => {
     const strokeInput = page.locator('[data-testid="prop-stroke"]')
     const widthInput = page.locator('[data-testid="prop-stroke-width"]')
 
-    await expect(fillInput).toHaveValue('#ffffff')
-    await expect(strokeInput).toHaveValue('#4f46e5')
-    await expect(widthInput).toHaveValue('1.5')
+    await expect(fillInput).toHaveValue('#e8edfc')
+    await expect(strokeInput).toHaveValue('#4465e9')
+    await expect(widthInput).toHaveValue('2.5')
   })
 
   test('property panel appears when connector is selected', async ({ page }) => {
@@ -214,8 +214,8 @@ test.describe('Property panel', () => {
     await canvas.selectTool('ellipse')
     await canvas.drawShape(400, 200, 120, 80)
 
-    // The ellipse should now be selected with default fill
-    await expect(fillInput).toHaveValue('#ffffff')
+    // The ellipse inherits last-used style (red from the rectangle)
+    await expect(fillInput).toHaveValue('#ff0000')
 
     // Click the rectangle to select it
     await canvas.selectTool('select')

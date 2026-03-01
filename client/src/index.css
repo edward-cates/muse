@@ -14,6 +14,7 @@
   --border: rgba(0, 0, 0, 0.08);
   --accent: #4f46e5;
   --accent-light: rgba(79, 70, 229, 0.08);
+  --selection: #f59e0b;
   --shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
 
@@ -41,11 +42,9 @@ body {
   overflow: hidden;
   cursor: default;
   touch-action: none;
-  background-color: #ffffff;
-  background-image:
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.06) 1px, transparent 1px),
-    linear-gradient(to right, rgba(0, 0, 0, 0.06) 1px, transparent 1px);
-  background-size: 40px 40px;
+  background-color: #fafbfc;
+  background-image: radial-gradient(circle, rgba(0,0,0,0.10) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 .canvas--tool-select {
@@ -122,6 +121,9 @@ body {
 
 .shape--selected {
   z-index: 50;
+  outline: 2px solid var(--selection);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .shape__outline {
@@ -136,32 +138,28 @@ body {
 }
 
 .shape__text {
-  position: absolute;
-  top: 0;
-  left: 0;
   width: 100%;
-  height: 100%;
+  height: 0;
   background: none;
   border: none;
   resize: none;
   outline: none;
-  padding: 12px;
+  padding: 8px 12px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 18px;
+  font-weight: 500;
   line-height: 1.5;
   color: var(--text);
   text-align: center;
-  display: flex;
-  align-items: center;
   pointer-events: none;
   cursor: inherit;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .shape__text--editing {
   pointer-events: auto;
   cursor: text;
-  background: rgba(255, 255, 255, 0.5);
 }
 
 .shape__text::placeholder {
@@ -178,6 +176,7 @@ body {
   border-radius: 2px;
   z-index: 200;
   pointer-events: auto;
+  box-shadow: 0 0 0 0.5px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.1);
 }
 
 /* ── Paths (SVG layer) ── */
@@ -195,7 +194,7 @@ body {
 }
 
 .path--selected {
-  filter: drop-shadow(0 0 2px rgba(79, 70, 229, 0.3));
+  filter: drop-shadow(0 0 2px rgba(245, 158, 11, 0.3));
 }
 
 /* ── Lines (SVG layer) ── */
@@ -220,21 +219,22 @@ body {
   height: 10px;
   border-radius: 50%;
   background: white;
-  border: 2px solid var(--accent);
+  border: 2px solid var(--selection);
   cursor: crosshair;
   z-index: 300;
   pointer-events: auto;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08);
 }
 
 .endpoint-handle:hover {
-  background: var(--accent);
+  background: var(--selection);
 }
 
 /* ── Marquee selection ── */
 .marquee-selection {
   position: absolute;
-  border: 1.5px dashed var(--accent);
-  background: rgba(79, 70, 229, 0.06);
+  border: 1.5px dashed var(--selection);
+  background: rgba(245, 158, 11, 0.06);
   pointer-events: none;
   z-index: 200;
 }
@@ -357,6 +357,24 @@ body {
   cursor: pointer;
   color: var(--text-muted);
   transition: background 0.12s, color 0.12s;
+  position: relative;
+}
+
+.toolbar__shortcut {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-muted);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.toolbar__btn--active .toolbar__shortcut {
+  color: rgba(255, 255, 255, 0.7);
+  opacity: 1;
 }
 
 .toolbar__btn:hover {
@@ -586,6 +604,55 @@ body {
   border-color: var(--accent);
 }
 
+.property-panel__btn--wide {
+  width: auto;
+  flex: 1;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+/* ── Opacity Slider ── */
+.property-panel__field input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  outline: none;
+  border: none;
+  margin: 4px 0;
+  cursor: pointer;
+}
+
+.property-panel__field input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  transition: transform 0.1s ease;
+}
+
+.property-panel__field input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.property-panel__field input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: white;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
 /* ── Color Picker ── */
 .color-picker {
   display: flex;
@@ -594,14 +661,14 @@ body {
 }
 
 .color-picker__swatches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 3px;
 }
 
 .color-swatch {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 2px;
   cursor: pointer;
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -855,8 +922,8 @@ body {
 /* ── Rotation Handle ── */
 .rotation-handle {
   position: absolute;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   background: white;
   border: 1.5px solid var(--accent);
   border-radius: 50%;
@@ -864,8 +931,22 @@ body {
   z-index: 201;
   pointer-events: auto;
   left: 50%;
-  top: -28px;
+  top: -30px;
   transform: translateX(-50%);
+  box-shadow: 0 0 0 0.5px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.rotation-handle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
 }
 
 .rotation-handle:hover {
@@ -875,13 +956,14 @@ body {
 .rotation-line {
   position: absolute;
   width: 1px;
-  height: 20px;
+  height: 18px;
   background: var(--accent);
   left: 50%;
-  top: -20px;
+  top: -18px;
   transform: translateX(-50%);
   pointer-events: none;
   z-index: 200;
+  opacity: 0.5;
 }
 
 /* ── Lock Indicator ── */
@@ -1046,7 +1128,7 @@ body {
   width: 8px;
   height: 8px;
   background: white;
-  border: 1.5px solid var(--accent);
+  border: 1.5px solid var(--selection);
   border-radius: 50%;
   cursor: move;
   z-index: 300;
@@ -1098,9 +1180,8 @@ body {
 
 [data-theme="dark"] .canvas {
   background-color: #1a1a2e;
-  background-image:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 [data-theme="dark"] .connector-label {

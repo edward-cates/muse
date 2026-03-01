@@ -34,6 +34,14 @@ export function App({ drawingId }: { drawingId: string }) {
 
   const switchToSelect = useCallback(() => setActiveTool('select'), [])
 
+  // When switching to a non-select tool, clear the selection
+  const handleToolChange = useCallback((tool: Tool) => {
+    setActiveTool(tool)
+    if (tool !== 'select') {
+      setSelectedIds([])
+    }
+  }, [])
+
   // Capture last-used style when deselecting a shape
   const prevSelectedRef = useRef<string[]>([])
   useEffect(() => {
@@ -305,6 +313,19 @@ export function App({ drawingId }: { drawingId: string }) {
         return
       }
 
+      // Number shortcuts (Excalidraw-style)
+      const numberToolMap: Record<string, Tool> = {
+        '1': 'select', '2': 'hand', '3': 'rectangle', '4': 'ellipse',
+        '5': 'diamond', '6': 'line', '7': 'arrow', '8': 'draw',
+        '9': 'text', '0': 'frame',
+      }
+      if (!meta && numberToolMap[e.key]) {
+        const tool = numberToolMap[e.key]
+        setActiveTool(tool)
+        if (tool !== 'select') setSelectedIds([])
+        return
+      }
+
       // Tool shortcuts
       switch (e.key.toLowerCase()) {
         case 'v':
@@ -396,7 +417,7 @@ export function App({ drawingId }: { drawingId: string }) {
       <Toolbar
         activeTool={activeTool}
         activeLineType={activeLineType}
-        onToolChange={setActiveTool}
+        onToolChange={handleToolChange}
         onLineTypeChange={setActiveLineType}
         onInsertImage={(src, w, h) => {
           const id = addImage(200, 200, w, h, src)

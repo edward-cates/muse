@@ -154,9 +154,39 @@ test.describe('Text formatting', () => {
     const alignBtn = page.locator('.property-panel [data-testid="valign-bottom"]')
     await alignBtn.click()
 
-    const textarea = canvas.shapes.first().locator('textarea')
-    // vertical alignment often via justify-content on flex container
+    // vertical alignment via justify-content on flex container
     const parent = canvas.shapes.first().locator('.shape__text-container')
     await expect(parent).toHaveCSS('justify-content', 'flex-end')
+  })
+
+  test('vertical alignment visually moves text position', async ({ page }) => {
+    await canvas.selectTool('rectangle')
+    await canvas.drawShape(200, 200, 150, 120)
+    await canvas.selectTool('select')
+    await canvas.shapes.first().click()
+
+    // Type some text so we can measure its position
+    await canvas.shapes.first().dblclick()
+    await page.keyboard.type('Hello')
+    await page.mouse.click(600, 50) // deselect to stop editing
+    await canvas.shapes.first().click()
+
+    // Get textarea position with default 'middle' alignment
+    const textarea = canvas.shapes.first().locator('textarea')
+    const middleBox = await textarea.boundingBox()
+    if (!middleBox) throw new Error('No bounding box')
+
+    // Change to 'top'
+    await page.locator('.property-panel [data-testid="valign-top"]').click()
+    const topBox = await textarea.boundingBox()
+    if (!topBox) throw new Error('No bounding box')
+
+    // Change to 'bottom'
+    await page.locator('.property-panel [data-testid="valign-bottom"]').click()
+    const bottomBox = await textarea.boundingBox()
+    if (!bottomBox) throw new Error('No bounding box')
+
+    // Top alignment should position textarea higher than bottom alignment
+    expect(topBox.y).toBeLessThan(bottomBox.y)
   })
 })

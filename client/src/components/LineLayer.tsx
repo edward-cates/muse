@@ -4,9 +4,11 @@ import { buildPath } from '../lib/pathBuilders'
 interface Props {
   shapes: ShapeElement[]
   lines: LineElement[]
-  selectedId: string | null
-  onSelect: (id: string) => void
+  selectedIds: string[]
+  onSelect: (id: string, shiftKey?: boolean) => void
   onDoubleClick?: (id: string) => void
+  onDragMove?: (id: string, dx: number, dy: number) => void
+  onDragEnd?: () => void
   linePreview: { startShapeId: string; startAnchorX: number; startAnchorY: number; freeStartX: number; freeStartY: number; endX: number; endY: number } | null
   editingLabelId?: string | null
   onLabelChange?: (id: string, label: string) => void
@@ -40,24 +42,24 @@ function getStrokeDasharray(strokeStyle: string | undefined, strokeWidth: number
 }
 
 function renderMarker(id: string, style: ArrowheadStyle, stroke: string, isStart: boolean) {
-  const refX = isStart ? 1 : 9
+  const refX = isStart ? 1 : 11
   const orient = 'auto'
 
   switch (style) {
     case 'triangle':
       return (
-        <marker key={id} id={id} markerWidth="10" markerHeight="7" refX={String(refX)} refY="3.5" orient={orient}>
+        <marker key={id} id={id} markerWidth="12" markerHeight="8" refX={String(refX)} refY="4" orient={orient}>
           {isStart
-            ? <polygon points="10 0, 0 3.5, 10 7" fill={stroke} />
-            : <polygon points="0 0, 10 3.5, 0 7" fill={stroke} />}
+            ? <polygon points="12 0, 0 4, 12 8, 9 4" fill={stroke} />
+            : <polygon points="0 0, 12 4, 0 8, 3 4" fill={stroke} />}
         </marker>
       )
     case 'open':
       return (
-        <marker key={id} id={id} markerWidth="10" markerHeight="7" refX={String(refX)} refY="3.5" orient={orient}>
+        <marker key={id} id={id} markerWidth="12" markerHeight="8" refX={String(refX)} refY="4" orient={orient}>
           {isStart
-            ? <polyline points="10 0, 0 3.5, 10 7" fill="none" stroke={stroke} strokeWidth="1.5" />
-            : <polyline points="0 0, 10 3.5, 0 7" fill="none" stroke={stroke} strokeWidth="1.5" />}
+            ? <polyline points="12 0, 0 4, 12 8" fill="none" stroke={stroke} strokeWidth="1.5" />
+            : <polyline points="0 0, 12 4, 0 8" fill="none" stroke={stroke} strokeWidth="1.5" />}
         </marker>
       )
     case 'diamond':
@@ -77,7 +79,7 @@ function renderMarker(id: string, style: ArrowheadStyle, stroke: string, isStart
   }
 }
 
-export function LineLayer({ shapes, lines, selectedId, onSelect, onDoubleClick, linePreview, editingLabelId, onLabelChange, onLabelEditDone }: Props) {
+export function LineLayer({ shapes, lines, selectedIds, onSelect, onDoubleClick, onDragMove, onDragEnd, linePreview, editingLabelId, onLabelChange, onLabelEditDone }: Props) {
   const shapeMap = new Map(shapes.map((s) => [s.id, s]))
 
   const previewStart = linePreview
@@ -97,7 +99,7 @@ export function LineLayer({ shapes, lines, selectedId, onSelect, onDoubleClick, 
     >
       <defs>
         {lines.map((line) => {
-          const stroke = line.id === selectedId ? '#4f46e5' : line.stroke
+          const stroke = line.stroke
           const markers: React.ReactNode[] = []
 
           // End marker
@@ -115,8 +117,8 @@ export function LineLayer({ shapes, lines, selectedId, onSelect, onDoubleClick, 
           return markers
         })}
         {/* Preview arrowhead */}
-        <marker id="arrowhead-preview" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-          <polygon points="0 0, 10 3.5, 0 7" fill="#4f46e5" />
+        <marker id="arrowhead-preview" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+          <polygon points="0 0, 12 4, 0 8, 3 4" fill="#4465e9" />
         </marker>
       </defs>
 
@@ -127,8 +129,7 @@ export function LineLayer({ shapes, lines, selectedId, onSelect, onDoubleClick, 
         if (line.startShapeId && !shapeMap.has(line.startShapeId)) return null
         if (line.endShapeId && !shapeMap.has(line.endShapeId)) return null
 
-        const isSelected = line.id === selectedId
-        const stroke = isSelected ? '#4f46e5' : line.stroke
+        const isSelected = selectedIds.includes(line.id)
         const sw = isSelected ? line.strokeWidth + 1 : line.strokeWidth
         const d = buildPath(line.lineType, start, end)
         const dashArray = getStrokeDasharray(line.strokeStyle, sw)
@@ -144,27 +145,57 @@ export function LineLayer({ shapes, lines, selectedId, onSelect, onDoubleClick, 
         return (
           <g
             key={line.id}
-            style={{ cursor: 'pointer' }}
-            onMouseDown={(e) => { e.stopPropagation(); onSelect(line.id) }}
-            onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick?.(line.id) }}
           >
-            {/* Wide invisible hit area for easy clicking */}
+            {/* Wide invisible hit area for easy clicking — onMouseDown here
+                because <g> inherits pointer-events:none from .canvas__lines */}
             <path
               className="path-hitarea"
               d={d}
               stroke="transparent"
               strokeWidth={Math.max(12, sw + 10)}
               fill="none"
+              onMouseDown={(e) => {
+                e.stopPropagation()
+                onSelect(line.id, e.shiftKey)
+                const startX = e.clientX
+                const startY = e.clientY
+                const handleMove = (ev: globalThis.MouseEvent) => {
+                  onDragMove?.(line.id, ev.clientX - startX, ev.clientY - startY)
+                }
+                const handleUp = () => {
+                  onDragEnd?.()
+                  window.removeEventListener('mousemove', handleMove)
+                  window.removeEventListener('mouseup', handleUp)
+                }
+                window.addEventListener('mousemove', handleMove)
+                window.addEventListener('mouseup', handleUp)
+              }}
+              onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick?.(line.id) }}
             />
+            {/* Selection glow behind selected connectors */}
+            {isSelected && (
+              <path
+                d={d}
+                stroke="#f59e0b"
+                strokeWidth={sw + 4}
+                fill="none"
+                opacity={0.25}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ pointerEvents: 'none' }}
+              />
+            )}
             {/* Visible connector */}
             <path
               className="connector"
               d={d}
-              stroke={stroke}
+              stroke={line.stroke}
               strokeWidth={sw}
               fill="none"
               strokeDasharray={dashArray}
               opacity={lineOpacity}
+              strokeLinecap="round"
+              strokeLinejoin="round"
               markerEnd={endStyle !== 'none' ? `url(#arrowhead-${endStyle}-end-${line.id})` : undefined}
               markerStart={startStyle !== 'none' ? `url(#arrowhead-${startStyle}-start-${line.id})` : undefined}
               style={{ pointerEvents: 'none' }}
@@ -211,8 +242,8 @@ export function LineLayer({ shapes, lines, selectedId, onSelect, onDoubleClick, 
       {previewStart && linePreview && (
         <path
           d={`M ${previewStart.x} ${previewStart.y} L ${linePreview.endX} ${linePreview.endY}`}
-          stroke="#4f46e5"
-          strokeWidth={1.5}
+          stroke="#4465e9"
+          strokeWidth={2.5}
           fill="none"
           strokeDasharray="6 3"
           opacity={0.6}

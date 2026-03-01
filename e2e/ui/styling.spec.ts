@@ -277,17 +277,22 @@ test.describe('Style workflow', () => {
     await expect(rect).toHaveAttribute('rx', '12')
   })
 
-  test('shadow toggle adds drop shadow to shape', async ({ page }) => {
+  test('shadow toggle removes drop shadow from shape (default is on)', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 120, 80)
     await canvas.selectTool('select')
     await canvas.shapes.first().click()
 
+    // Shadow is on by default
+    const shape = canvas.shapes.first()
+    const filterBefore = await shape.evaluate(el => getComputedStyle(el).filter)
+    expect(filterBefore).toContain('drop-shadow')
+
+    // Toggle shadow off
     const shadowToggle = page.locator('.property-panel [data-testid="shadow-toggle"]')
     await shadowToggle.click()
 
-    const shape = canvas.shapes.first()
-    const filter = await shape.evaluate(el => getComputedStyle(el).filter)
-    expect(filter).toContain('drop-shadow')
+    const filterAfter = await shape.evaluate(el => getComputedStyle(el).filter)
+    expect(filterAfter === 'none' || !filterAfter.includes('drop-shadow')).toBeTruthy()
   })
 })

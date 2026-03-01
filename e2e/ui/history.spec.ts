@@ -125,7 +125,7 @@ test.describe('Undo / Redo', () => {
     // Check fill reverted to default
     await page.mouse.click(600, 50) // deselect
     const svg = canvas.shapes.first().locator('rect')
-    await expect(svg).toHaveAttribute('fill', '#ffffff')
+    await expect(svg).toHaveAttribute('fill', '#e8edfc')
   })
 
   test('multiple undos walk back through history', async ({ page }) => {

@@ -44,8 +44,9 @@ export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeCh
         data-testid="tool-select"
         className={`toolbar__btn ${activeTool === 'select' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('select')}
-        title="Select (V)"
+        title="Select (V / 1)"
       >
+        <span className="toolbar__shortcut">1</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
         </svg>
@@ -56,8 +57,9 @@ export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeCh
         data-testid="tool-hand"
         className={`toolbar__btn ${activeTool === 'hand' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('hand')}
-        title="Hand (H)"
+        title="Hand (H / 2)"
       >
+        <span className="toolbar__shortcut">2</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M18 11V6a2 2 0 00-4 0v2M14 8V4a2 2 0 00-4 0v6M10 10V5a2 2 0 00-4 0v9" />
           <path d="M18 11a2 2 0 014 0v3a8 8 0 01-8 8h-2c-2.5 0-5-1.5-7-4l-.7-.7a2 2 0 012.8-2.8L6 15.5V6" />
@@ -69,8 +71,9 @@ export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeCh
         data-testid="tool-rectangle"
         className={`toolbar__btn ${activeTool === 'rectangle' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('rectangle')}
-        title="Rectangle (R)"
+        title="Rectangle (R / 3)"
       >
+        <span className="toolbar__shortcut">3</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="3" width="18" height="18" rx="2" />
         </svg>
@@ -81,8 +84,9 @@ export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeCh
         data-testid="tool-ellipse"
         className={`toolbar__btn ${activeTool === 'ellipse' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('ellipse')}
-        title="Ellipse (O)"
+        title="Ellipse (O / 4)"
       >
+        <span className="toolbar__shortcut">4</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <ellipse cx="12" cy="12" rx="10" ry="8" />
         </svg>
@@ -93,8 +97,9 @@ export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeCh
         data-testid="tool-diamond"
         className={`toolbar__btn ${activeTool === 'diamond' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('diamond')}
-        title="Diamond (D)"
+        title="Diamond (D / 5)"
       >
+        <span className="toolbar__shortcut">5</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 2L22 12L12 22L2 12Z" />
         </svg>
@@ -140,29 +145,32 @@ export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeCh
         )}
       </div>
 
-      {/* Line */}
+      {/* Connector — connects two shapes */}
       <button
         data-testid="tool-line"
         className={`toolbar__btn ${activeTool === 'line' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('line')}
-        title="Line (L)"
+        title="Connector — snaps to shapes (L / 6)"
       >
+        <span className="toolbar__shortcut">6</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <line x1="5" y1="19" x2="19" y2="5" />
-          <polyline points="13 5 19 5 19 11" fill="none" />
+          <circle cx="5" cy="19" r="3" />
+          <circle cx="19" cy="5" r="3" />
+          <line x1="7.5" y1="16.5" x2="16.5" y2="7.5" />
         </svg>
       </button>
 
-      {/* Arrow */}
+      {/* Arrow — free-floating */}
       <button
         data-testid="tool-arrow"
         className={`toolbar__btn ${activeTool === 'arrow' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('arrow')}
-        title="Arrow (A)"
+        title="Arrow — free-floating (A / 7)"
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <span className="toolbar__shortcut">7</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="5" y1="19" x2="19" y2="5" />
-          <polyline points="10 5 19 5 19 14" fill="none" />
+          <polyline points="11 5 19 5 19 13" />
         </svg>
       </button>
 
@@ -171,8 +179,9 @@ export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeCh
         data-testid="tool-draw"
         className={`toolbar__btn ${activeTool === 'draw' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('draw')}
-        title="Draw (P)"
+        title="Draw (P / 8)"
       >
+        <span className="toolbar__shortcut">8</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 17c3.5-3.5 7-2 8.5-3.5C13 12 10 8 14 4c1.5-1.5 4-.5 5 1s.5 4-1 5c-4 4-8 1-8.5 2.5C8 14 11 17.5 7 21" />
         </svg>
@@ -183,8 +192,9 @@ export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeCh
         data-testid="tool-text"
         className={`toolbar__btn ${activeTool === 'text' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('text')}
-        title="Text (T)"
+        title="Text (T / 9)"
       >
+        <span className="toolbar__shortcut">9</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M4 7V4h16v3M9 20h6M12 4v16" />
         </svg>
@@ -195,8 +205,9 @@ export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeCh
         data-testid="tool-frame"
         className={`toolbar__btn ${activeTool === 'frame' ? 'toolbar__btn--active' : ''}`}
         onClick={() => onToolChange('frame')}
-        title="Frame (F)"
+        title="Frame (F / 0)"
       >
+        <span className="toolbar__shortcut">0</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 2" />
         </svg>

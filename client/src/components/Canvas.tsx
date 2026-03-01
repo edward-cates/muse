@@ -100,6 +100,26 @@ export function Canvas({
   // Alignment guides
   const [alignmentGuides, setAlignmentGuides] = useState<{ x?: number; y?: number; center?: boolean }[]>([])
 
+  // Track selected lines' start positions for multi-drag
+  const dragLineStarts = useRef<{ id: string; startX: number; startY: number; endX: number; endY: number }[]>([])
+
+  // Track selected paths' start positions for multi-drag (from ShapeRenderer drag)
+  const dragPathStarts = useRef<{ id: string; x: number; y: number; points: number[] }[]>([])
+
+  // Track path-initiated drag starting positions (for direct path dragging)
+  const pathDragOrigins = useRef<{
+    paths: { id: string; x: number; y: number; points: number[] }[]
+    shapes: { id: string; x: number; y: number }[]
+    lines: { id: string; startX: number; startY: number; endX: number; endY: number }[]
+  } | null>(null)
+
+  // Track line-initiated drag starting positions (for direct line dragging)
+  const lineDragOrigins = useRef<{
+    paths: { id: string; x: number; y: number; points: number[] }[]
+    shapes: { id: string; x: number; y: number }[]
+    lines: { id: string; startX: number; startY: number; endX: number; endY: number }[]
+  } | null>(null)
+
   // Connector label editing state
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null)
 
@@ -120,6 +140,10 @@ export function Canvas({
   const lastDrawPoint = useRef({ x: 0, y: 0 })
   const drawingPointsRef = useRef<number[]>([])
   const shapesRef = useRef<ShapeElement[]>([])
+  const pathsRef = useRef<PathElement[]>([])
+  const linesRef = useRef<LineElement[]>([])
+  const selectedIdsRef = useRef<string[]>(selectedIds)
+  selectedIdsRef.current = selectedIds
 
   const screenToWorld = useCallback(
     (sx: number, sy: number) => ({
@@ -137,6 +161,8 @@ export function Canvas({
   const images = elements.filter(isImage)
   const frames = elements.filter(isFrame)
   shapesRef.current = shapes
+  pathsRef.current = paths
+  linesRef.current = lines
 
   // Space key for pan-anywhere
   useEffect(() => {
@@ -416,7 +442,7 @@ export function Canvas({
         lastDrawPoint.current = { x: world.x, y: world.y }
         const initialPoints = [world.x, world.y]
         drawingPointsRef.current = initialPoints
-        setDrawingPath({ points: initialPoints, stroke: '#4f46e5', strokeWidth: 2 })
+        setDrawingPath({ points: initialPoints, stroke: '#4465e9', strokeWidth: 2.5 })
         return
       }
 
@@ -551,6 +577,31 @@ export function Canvas({
               ids.push(el.id)
             }
           }
+          // Also include freehand paths (bounding box from points)
+          for (const p of pathsRef.current) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+            for (let i = 0; i < p.points.length; i += 2) {
+              if (p.points[i] < minX) minX = p.points[i]
+              if (p.points[i] > maxX) maxX = p.points[i]
+              if (p.points[i + 1] < minY) minY = p.points[i + 1]
+              if (p.points[i + 1] > maxY) maxY = p.points[i + 1]
+            }
+            if (maxX > rect.x && minX < rect.x + rect.w &&
+                maxY > rect.y && minY < rect.y + rect.h) {
+              ids.push(p.id)
+            }
+          }
+          // Also include free-floating lines
+          for (const l of linesRef.current) {
+            const lMinX = Math.min(l.startX, l.endX)
+            const lMaxX = Math.max(l.startX, l.endX)
+            const lMinY = Math.min(l.startY, l.endY)
+            const lMaxY = Math.max(l.startY, l.endY)
+            if (lMaxX > rect.x && lMinX < rect.x + rect.w &&
+                lMaxY > rect.y && lMinY < rect.y + rect.h) {
+              ids.push(l.id)
+            }
+          }
           onSelectedIdsChange(ids)
         }
         setMarquee(null)
@@ -603,7 +654,7 @@ export function Canvas({
             if (pts[i] < minX) minX = pts[i]
             if (pts[i + 1] < minY) minY = pts[i + 1]
           }
-          addPath(minX, minY, pts, '#4f46e5', 2)
+          addPath(minX, minY, pts, '#4465e9', 2.5)
           stopCapturing()
         } else {
           // Click without drawing — auto-select shape under cursor
@@ -720,6 +771,8 @@ export function Canvas({
             ? selectedIds.filter((sid) => sid !== id)
             : [...selectedIds, id],
         )
+      } else if (selectedIds.includes(id)) {
+        // Already selected — keep the full selection so multi-drag works
       } else {
         onSelectedIdsChange([id])
       }
@@ -740,6 +793,83 @@ export function Canvas({
     },
     [activeTool, elements, onSelectedIdsChange],
   )
+
+  const handlePathDragMove = useCallback(
+    (id: string, dxScreen: number, dyScreen: number) => {
+      const dx = dxScreen / scaleRef.current
+      const dy = dyScreen / scaleRef.current
+      // Capture starting positions on first move
+      // Use refs to avoid stale closure — selectedIds/elements may not have flushed yet
+      if (!pathDragOrigins.current) {
+        const allIds = new Set(selectedIdsRef.current)
+        allIds.add(id)
+        const curPaths = pathsRef.current
+        const curShapes = shapesRef.current
+        const curLines = linesRef.current
+        pathDragOrigins.current = {
+          paths: curPaths.filter(p => allIds.has(p.id)).map(p => ({ id: p.id, x: p.x, y: p.y, points: [...p.points] })),
+          shapes: curShapes.filter(s => allIds.has(s.id)).map(s => ({ id: s.id, x: s.x, y: s.y })),
+          lines: curLines.filter(l => allIds.has(l.id) && !l.startShapeId && !l.endShapeId).map(l => ({ id: l.id, startX: l.startX, startY: l.startY, endX: l.endX, endY: l.endY })),
+        }
+      }
+      for (const ps of pathDragOrigins.current.paths) {
+        const newPoints = ps.points.map((v: number, i: number) => v + (i % 2 === 0 ? dx : dy))
+        updateElement(ps.id, { x: ps.x + dx, y: ps.y + dy, points: newPoints })
+      }
+      for (const ss of pathDragOrigins.current.shapes) {
+        updateElement(ss.id, { x: ss.x + dx, y: ss.y + dy })
+      }
+      for (const ls of pathDragOrigins.current.lines) {
+        updateElement(ls.id, {
+          startX: ls.startX + dx, startY: ls.startY + dy,
+          endX: ls.endX + dx, endY: ls.endY + dy,
+        })
+      }
+    },
+    [updateElement],
+  )
+
+  const handlePathDragEnd = useCallback(() => {
+    pathDragOrigins.current = null
+  }, [])
+
+  const handleLineDragMove = useCallback(
+    (id: string, dxScreen: number, dyScreen: number) => {
+      const dx = dxScreen / scaleRef.current
+      const dy = dyScreen / scaleRef.current
+      // Use refs to avoid stale closure
+      if (!lineDragOrigins.current) {
+        const allIds = new Set(selectedIdsRef.current)
+        allIds.add(id)
+        const curPaths = pathsRef.current
+        const curShapes = shapesRef.current
+        const curLines = linesRef.current
+        lineDragOrigins.current = {
+          paths: curPaths.filter(p => allIds.has(p.id)).map(p => ({ id: p.id, x: p.x, y: p.y, points: [...p.points] })),
+          shapes: curShapes.filter(s => allIds.has(s.id)).map(s => ({ id: s.id, x: s.x, y: s.y })),
+          lines: curLines.filter(l => allIds.has(l.id) && !l.startShapeId && !l.endShapeId).map(l => ({ id: l.id, startX: l.startX, startY: l.startY, endX: l.endX, endY: l.endY })),
+        }
+      }
+      for (const ps of lineDragOrigins.current.paths) {
+        const newPoints = ps.points.map((v: number, i: number) => v + (i % 2 === 0 ? dx : dy))
+        updateElement(ps.id, { x: ps.x + dx, y: ps.y + dy, points: newPoints })
+      }
+      for (const ss of lineDragOrigins.current.shapes) {
+        updateElement(ss.id, { x: ss.x + dx, y: ss.y + dy })
+      }
+      for (const ls of lineDragOrigins.current.lines) {
+        updateElement(ls.id, {
+          startX: ls.startX + dx, startY: ls.startY + dy,
+          endX: ls.endX + dx, endY: ls.endY + dy,
+        })
+      }
+    },
+    [updateElement],
+  )
+
+  const handleLineDragEnd = useCallback(() => {
+    lineDragOrigins.current = null
+  }, [])
 
   const handleEndpointDrag = useCallback(
     (lineId: string, endpoint: 'start' | 'end', e: MouseEvent) => {
@@ -832,19 +962,19 @@ export function Canvas({
     >
       <svg width={shapePreview.w} height={shapePreview.h} viewBox={`0 0 ${shapePreview.w} ${shapePreview.h}`}>
         {shapePreview.type === 'rectangle' && (
-          <rect x={1} y={1} width={shapePreview.w - 2} height={shapePreview.h - 2} rx={3} fill="none" stroke="#4f46e5" strokeWidth={1.5} strokeDasharray="6 3" />
+          <rect x={1} y={1} width={shapePreview.w - 2} height={shapePreview.h - 2} rx={8} fill="rgba(232, 237, 252, 0.5)" stroke="#4465e9" strokeWidth={2.5} strokeDasharray="6 3" />
         )}
         {shapePreview.type === 'ellipse' && (
-          <ellipse cx={shapePreview.w / 2} cy={shapePreview.h / 2} rx={(shapePreview.w - 2) / 2} ry={(shapePreview.h - 2) / 2} fill="none" stroke="#4f46e5" strokeWidth={1.5} strokeDasharray="6 3" />
+          <ellipse cx={shapePreview.w / 2} cy={shapePreview.h / 2} rx={(shapePreview.w - 2) / 2} ry={(shapePreview.h - 2) / 2} fill="rgba(232, 237, 252, 0.5)" stroke="#4465e9" strokeWidth={2.5} strokeDasharray="6 3" />
         )}
         {shapePreview.type === 'diamond' && (
-          <polygon points={`${shapePreview.w / 2},1 ${shapePreview.w - 1},${shapePreview.h / 2} ${shapePreview.w / 2},${shapePreview.h - 1} 1,${shapePreview.h / 2}`} fill="none" stroke="#4f46e5" strokeWidth={1.5} strokeDasharray="6 3" />
+          <polygon points={`${shapePreview.w / 2},1 ${shapePreview.w - 1},${shapePreview.h / 2} ${shapePreview.w / 2},${shapePreview.h - 1} 1,${shapePreview.h / 2}`} fill="rgba(232, 237, 252, 0.5)" stroke="#4465e9" strokeWidth={2.5} strokeDasharray="6 3" />
         )}
         {shapePreview.type === 'triangle' && (
-          <polygon points={`${shapePreview.w / 2},1 ${shapePreview.w - 1},${shapePreview.h - 1} 1,${shapePreview.h - 1}`} fill="none" stroke="#4f46e5" strokeWidth={1.5} strokeDasharray="6 3" />
+          <polygon points={`${shapePreview.w / 2},1 ${shapePreview.w - 1},${shapePreview.h - 1} 1,${shapePreview.h - 1}`} fill="rgba(232, 237, 252, 0.5)" stroke="#4465e9" strokeWidth={2.5} strokeDasharray="6 3" />
         )}
         {(shapePreview.type === 'hexagon' || shapePreview.type === 'star' || shapePreview.type === 'cloud') && (
-          <rect x={1} y={1} width={shapePreview.w - 2} height={shapePreview.h - 2} fill="none" stroke="#4f46e5" strokeWidth={1.5} strokeDasharray="6 3" />
+          <rect x={1} y={1} width={shapePreview.w - 2} height={shapePreview.h - 2} fill="rgba(232, 237, 252, 0.5)" stroke="#4465e9" strokeWidth={2.5} strokeDasharray="6 3" />
         )}
       </svg>
     </div>
@@ -921,16 +1051,20 @@ export function Canvas({
         {gridSvg}
         <PathLayer
           paths={paths}
-          selectedId={selectedId}
+          selectedIds={selectedIds}
           onSelect={handleSelect}
+          onDragMove={handlePathDragMove}
+          onDragEnd={handlePathDragEnd}
           drawingPath={drawingPath}
         />
         <LineLayer
           shapes={shapes}
           lines={lines}
-          selectedId={selectedId}
+          selectedIds={selectedIds}
           onSelect={handleSelect}
           onDoubleClick={(id) => setEditingLabelId(id)}
+          onDragMove={handleLineDragMove}
+          onDragEnd={handleLineDragEnd}
           linePreview={linePreviewData}
           editingLabelId={editingLabelId}
           onLabelChange={(id, label) => updateElement(id, { label })}
@@ -989,10 +1123,23 @@ export function Canvas({
           ))
         })()}
         {shapes.map((shape) => {
-          // Compute group siblings for drag — use outermost group
+          // Compute drag siblings: group members + other selected shapes
           const outermostGroup = shape.groupId ? shape.groupId.split(',').pop() : ''
-          const siblings = outermostGroup
-            ? shapes.filter(s => s.groupId && s.groupId.split(',').pop() === outermostGroup && s.id !== shape.id).map(s => ({ id: s.id, x: s.x, y: s.y }))
+          const groupSibs = outermostGroup
+            ? shapes.filter(s => s.groupId && s.groupId.split(',').pop() === outermostGroup && s.id !== shape.id)
+            : []
+          // If this shape is selected and there are other selected shapes, include them as drag siblings
+          const selectedSibs = selectedIds.includes(shape.id)
+            ? shapes.filter(s => selectedIds.includes(s.id) && s.id !== shape.id)
+            : []
+          // Merge, dedup by id
+          const sibIds = new Set(groupSibs.map(s => s.id))
+          const mergedSibs = [...groupSibs]
+          for (const s of selectedSibs) {
+            if (!sibIds.has(s.id)) mergedSibs.push(s)
+          }
+          const siblings = mergedSibs.length > 0
+            ? mergedSibs.map(s => ({ id: s.id, x: s.x, y: s.y }))
             : undefined
           return (
             <ShapeRenderer
@@ -1038,8 +1185,43 @@ export function Canvas({
                 if (snapX !== undefined || snapY !== undefined) {
                   updateElement(id, { x: snapX ?? x, y: snapY ?? y })
                 }
+
+                // Move selected free-floating lines by the same delta
+                const actualX = snapX ?? x
+                const actualY = snapY ?? y
+                if (dragLineStarts.current.length === 0) {
+                  // First move — capture starting positions using refs to avoid stale closures
+                  dragLineStarts.current = linesRef.current
+                    .filter(l => selectedIdsRef.current.includes(l.id) && !l.startShapeId && !l.endShapeId)
+                    .map(l => ({ id: l.id, startX: l.startX, startY: l.startY, endX: l.endX, endY: l.endY }))
+                }
+                const dx = actualX - dragging.x
+                const dy = actualY - dragging.y
+                if (dragLineStarts.current.length > 0) {
+                  for (const ls of dragLineStarts.current) {
+                    updateElement(ls.id, {
+                      startX: ls.startX + dx,
+                      startY: ls.startY + dy,
+                      endX: ls.endX + dx,
+                      endY: ls.endY + dy,
+                    })
+                  }
+                }
+
+                // Move selected freehand paths by the same delta
+                if (dragPathStarts.current.length === 0) {
+                  dragPathStarts.current = pathsRef.current
+                    .filter(p => selectedIdsRef.current.includes(p.id))
+                    .map(p => ({ id: p.id, x: p.x, y: p.y, points: [...p.points] }))
+                }
+                if (dragPathStarts.current.length > 0) {
+                  for (const ps of dragPathStarts.current) {
+                    const newPoints = ps.points.map((v: number, i: number) => v + (i % 2 === 0 ? dx : dy))
+                    updateElement(ps.id, { x: ps.x + dx, y: ps.y + dy, points: newPoints })
+                  }
+                }
               }}
-              onDragEnd={() => setAlignmentGuides([])}
+              onDragEnd={() => { setAlignmentGuides([]); dragLineStarts.current = []; dragPathStarts.current = [] }}
             />
           )
         })}
@@ -1073,44 +1255,46 @@ export function Canvas({
         ))}
         {previewSvg}
         {connectionHighlight}
-        {/* Endpoint handles for selected connector */}
-        {activeTool === 'select' && selectedId && (() => {
-          const selectedLine = lines.find((l) => l.id === selectedId)
-          if (!selectedLine) return null
+        {/* Endpoint handles for selected connectors */}
+        {activeTool === 'select' && (() => {
+          const selectedLines = lines.filter((l) => selectedIds.includes(l.id))
+          if (selectedLines.length === 0) return null
 
-          const startPt = selectedLine.startShapeId
-            ? (() => { const s = shapes.find(sh => sh.id === selectedLine.startShapeId); return s ? getAnchorPoint(s, selectedLine.startAnchorX, selectedLine.startAnchorY) : null })()
-            : { x: selectedLine.startX, y: selectedLine.startY }
-          const endPt = selectedLine.endShapeId
-            ? (() => { const s = shapes.find(sh => sh.id === selectedLine.endShapeId); return s ? getAnchorPoint(s, selectedLine.endAnchorX, selectedLine.endAnchorY) : null })()
-            : { x: selectedLine.endX, y: selectedLine.endY }
+          return selectedLines.map((selectedLine) => {
+            const startPt = selectedLine.startShapeId
+              ? (() => { const s = shapes.find(sh => sh.id === selectedLine.startShapeId); return s ? getAnchorPoint(s, selectedLine.startAnchorX, selectedLine.startAnchorY) : null })()
+              : { x: selectedLine.startX, y: selectedLine.startY }
+            const endPt = selectedLine.endShapeId
+              ? (() => { const s = shapes.find(sh => sh.id === selectedLine.endShapeId); return s ? getAnchorPoint(s, selectedLine.endAnchorX, selectedLine.endAnchorY) : null })()
+              : { x: selectedLine.endX, y: selectedLine.endY }
 
-          return (
-            <>
-              {startPt && (
-                <div
-                  className="endpoint-handle"
-                  data-endpoint="start"
-                  style={{ left: startPt.x - 5, top: startPt.y - 5 }}
-                  onMouseDown={(e) => {
-                    e.stopPropagation()
-                    handleEndpointDrag(selectedLine.id, 'start', e)
-                  }}
-                />
-              )}
-              {endPt && (
-                <div
-                  className="endpoint-handle"
-                  data-endpoint="end"
-                  style={{ left: endPt.x - 5, top: endPt.y - 5 }}
-                  onMouseDown={(e) => {
-                    e.stopPropagation()
-                    handleEndpointDrag(selectedLine.id, 'end', e)
-                  }}
-                />
-              )}
-            </>
-          )
+            return (
+              <div key={`endpoints-${selectedLine.id}`}>
+                {startPt && (
+                  <div
+                    className="endpoint-handle"
+                    data-endpoint="start"
+                    style={{ left: startPt.x - 5, top: startPt.y - 5 }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation()
+                      handleEndpointDrag(selectedLine.id, 'start', e)
+                    }}
+                  />
+                )}
+                {endPt && (
+                  <div
+                    className="endpoint-handle"
+                    data-endpoint="end"
+                    style={{ left: endPt.x - 5, top: endPt.y - 5 }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation()
+                      handleEndpointDrag(selectedLine.id, 'end', e)
+                    }}
+                  />
+                )}
+              </div>
+            )
+          })
         })()}
         {marquee && (
           <div

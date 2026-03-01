@@ -45,9 +45,8 @@ function getStrokeDasharray(strokeStyle: string | undefined, strokeWidth: number
   return undefined
 }
 
-function shapeSvg(type: ShapeElement['type'], w: number, h: number, fill: string, stroke: string, strokeWidth: number, isSelected: boolean, cornerRadius: number, strokeStyle?: string) {
-  const accentStroke = isSelected ? '#4f46e5' : stroke
-  const sw = isSelected ? strokeWidth + 0.5 : strokeWidth
+function shapeSvg(type: ShapeElement['type'], w: number, h: number, fill: string, stroke: string, strokeWidth: number, _isSelected: boolean, cornerRadius: number, strokeStyle?: string) {
+  const sw = strokeWidth
   const dashArray = getStrokeDasharray(strokeStyle, sw)
 
   switch (type) {
@@ -58,7 +57,7 @@ function shapeSvg(type: ShapeElement['type'], w: number, h: number, fill: string
           width={w - sw} height={h - sw}
           rx={cornerRadius}
           fill={fill === 'none' ? 'transparent' : fill}
-          stroke={accentStroke}
+          stroke={stroke}
           strokeWidth={sw}
           strokeDasharray={dashArray}
         />
@@ -70,18 +69,18 @@ function shapeSvg(type: ShapeElement['type'], w: number, h: number, fill: string
           rx={Math.max(0, (w - sw) / 2)}
           ry={Math.max(0, (h - sw) / 2)}
           fill={fill === 'none' ? 'transparent' : fill}
-          stroke={accentStroke}
+          stroke={stroke}
           strokeWidth={sw}
           strokeDasharray={dashArray}
         />
       )
     case 'diamond': {
       const pts = `${w / 2},${sw / 2} ${w - sw / 2},${h / 2} ${w / 2},${h - sw / 2} ${sw / 2},${h / 2}`
-      return <polygon points={pts} fill={fill === 'none' ? 'transparent' : fill} stroke={accentStroke} strokeWidth={sw} strokeDasharray={dashArray} />
+      return <polygon points={pts} fill={fill === 'none' ? 'transparent' : fill} stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray} />
     }
     case 'triangle': {
       const pts = `${w / 2},${sw / 2} ${w - sw / 2},${h - sw / 2} ${sw / 2},${h - sw / 2}`
-      return <polygon points={pts} fill={fill === 'none' ? 'transparent' : fill} stroke={accentStroke} strokeWidth={sw} strokeDasharray={dashArray} />
+      return <polygon points={pts} fill={fill === 'none' ? 'transparent' : fill} stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray} />
     }
     case 'hexagon': {
       const cx = w / 2, cy = h / 2
@@ -90,7 +89,7 @@ function shapeSvg(type: ShapeElement['type'], w: number, h: number, fill: string
         const angle = (Math.PI / 3) * i - Math.PI / 2
         return `${cx + rx * Math.cos(angle)},${cy + ry * Math.sin(angle)}`
       }).join(' ')
-      return <polygon points={pts} fill={fill === 'none' ? 'transparent' : fill} stroke={accentStroke} strokeWidth={sw} strokeDasharray={dashArray} />
+      return <polygon points={pts} fill={fill === 'none' ? 'transparent' : fill} stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray} />
     }
     case 'star': {
       const cx = w / 2, cy = h / 2
@@ -101,7 +100,7 @@ function shapeSvg(type: ShapeElement['type'], w: number, h: number, fill: string
         const r = i % 2 === 0 ? outerR : innerR
         return `${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`
       }).join(' ')
-      return <polygon points={pts} fill={fill === 'none' ? 'transparent' : fill} stroke={accentStroke} strokeWidth={sw} strokeDasharray={dashArray} />
+      return <polygon points={pts} fill={fill === 'none' ? 'transparent' : fill} stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray} />
     }
     case 'cloud': {
       const path = `M ${w * 0.25} ${h * 0.7}
@@ -110,7 +109,7 @@ function shapeSvg(type: ShapeElement['type'], w: number, h: number, fill: string
         C ${w * 0.55} ${h * 0.05}, ${w * 0.85} ${h * 0.1}, ${w * 0.8} ${h * 0.35}
         C ${w * 0.95} ${h * 0.4}, ${w * 0.95} ${h * 0.7}, ${w * 0.75} ${h * 0.7}
         Z`
-      return <path d={path} fill={fill === 'none' ? 'transparent' : fill} stroke={accentStroke} strokeWidth={sw} strokeDasharray={dashArray} />
+      return <path d={path} fill={fill === 'none' ? 'transparent' : fill} stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray} />
     }
   }
 }
@@ -318,19 +317,34 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
     [shape.id, shape.x, shape.y, shape.width, shape.height, scale, onUpdate],
   )
 
+  // Auto-size textarea to content so flex vertical alignment works on the actual text
+  const autoResize = useCallback(() => {
+    const ta = textRef.current
+    if (!ta) return
+    ta.style.height = '0'
+    ta.style.height = `${ta.scrollHeight}px`
+  }, [])
+
   // Focus textarea when editing starts
   useEffect(() => {
     if (isEditing && textRef.current) {
       textRef.current.focus()
+      autoResize()
     }
-  }, [isEditing])
+  }, [isEditing, autoResize])
 
   // Sync textarea with external text changes
   useEffect(() => {
     if (textRef.current && textRef.current !== document.activeElement) {
       textRef.current.value = shape.text
     }
-  }, [shape.text])
+    autoResize()
+  }, [shape.text, autoResize])
+
+  // Re-measure on font changes
+  useEffect(() => {
+    autoResize()
+  }, [shape.fontSize, shape.fontFamily, shape.width, autoResize])
 
   // Build transform string
   const transforms: string[] = []
@@ -358,7 +372,7 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
         height: shape.height,
         transform: transformStr,
         opacity: (shape.opacity ?? 100) / 100,
-        filter: shape.shadow ? 'drop-shadow(2px 4px 6px rgba(0,0,0,0.3))' : undefined,
+        filter: shape.shadow ? 'drop-shadow(0 1px 3px rgba(0,0,0,0.08)) drop-shadow(0 2px 8px rgba(0,0,0,0.06))' : undefined,
       }}
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
@@ -368,8 +382,10 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
         width={shape.width}
         height={shape.height}
         viewBox={`0 0 ${shape.width} ${shape.height}`}
+        strokeLinecap="round"
+        strokeLinejoin="round"
       >
-        {shapeSvg(shape.type, shape.width, shape.height, shape.fill, shape.stroke, shape.strokeWidth, isSelected, shape.cornerRadius ?? 3, shape.strokeStyle)}
+        {shapeSvg(shape.type, shape.width, shape.height, shape.fill, shape.stroke, shape.strokeWidth, isSelected, shape.cornerRadius ?? 8, shape.strokeStyle)}
       </svg>
       <div className="shape__text-container" style={{ justifyContent: vAlignMap[shape.verticalAlign || 'middle'] || 'center' }}>
         <textarea
@@ -382,7 +398,7 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
             fontSize: shape.fontSize ? `${shape.fontSize}px` : '14px',
             textAlign: shape.textAlign || 'center',
           }}
-          onChange={(e) => onUpdate(shape.id, { text: e.target.value })}
+          onChange={(e) => { onUpdate(shape.id, { text: e.target.value }); autoResize() }}
           onMouseDown={(e) => {
             if (isEditing) e.stopPropagation()
           }}
@@ -405,21 +421,13 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
         />
       ))}
       {showRotationHandle && (
-        <div
-          className="rotation-handle"
-          style={{
-            position: 'absolute',
-            left: shape.width / 2 - 5,
-            top: -25,
-            width: 10,
-            height: 10,
-            borderRadius: '50%',
-            background: 'white',
-            border: '2px solid #4f46e5',
-            cursor: 'grab',
-          }}
-          onMouseDown={handleRotationStart}
-        />
+        <>
+          <div className="rotation-line" />
+          <div
+            className="rotation-handle"
+            onMouseDown={handleRotationStart}
+          />
+        </>
       )}
     </div>
   )

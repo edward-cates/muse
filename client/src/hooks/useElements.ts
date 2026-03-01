@@ -51,8 +51,8 @@ export function readElement(m: Y.Map<YMapVal>): CanvasElement {
       startY: (m.get('startY') as number) || 0,
       endX: (m.get('endX') as number) || 0,
       endY: (m.get('endY') as number) || 0,
-      stroke: (m.get('stroke') as string) || '#4f46e5',
-      strokeWidth: (m.get('strokeWidth') as number) || 1.5,
+      stroke: (m.get('stroke') as string) || '#4465e9',
+      strokeWidth: (m.get('strokeWidth') as number) || 2.5,
       arrowStart: (m.get('arrowStart') as unknown as boolean) ?? false,
       arrowEnd: (m.get('arrowEnd') as unknown as boolean) ?? true,
       lineType: ((m.get('lineType') as string) || 'straight') as LineType,
@@ -97,17 +97,17 @@ export function readElement(m: Y.Map<YMapVal>): CanvasElement {
     width: m.get('width') as number,
     height: m.get('height') as number,
     text: (m.get('text') as string) || '',
-    fill: (m.get('fill') as string) || '#ffffff',
-    stroke: (m.get('stroke') as string) || '#4f46e5',
-    strokeWidth: (m.get('strokeWidth') as number) || 1.5,
-    fontSize: (m.get('fontSize') as number) || 14,
-    fontFamily: (m.get('fontFamily') as string) || 'sans-serif',
+    fill: (m.get('fill') as string) || '#e8edfc',
+    stroke: (m.get('stroke') as string) || '#4465e9',
+    strokeWidth: (m.get('strokeWidth') as number) || 2.5,
+    fontSize: (m.get('fontSize') as number) || 18,
+    fontFamily: (m.get('fontFamily') as string) || 'Inter, system-ui, sans-serif',
     textAlign: ((m.get('textAlign') as string) || 'center') as 'left' | 'center' | 'right',
     verticalAlign: ((m.get('verticalAlign') as string) || 'middle') as 'top' | 'middle' | 'bottom',
     strokeStyle: ((m.get('strokeStyle') as string) || 'solid') as 'solid' | 'dashed' | 'dotted',
     opacity: (m.get('opacity') as number) ?? 100,
-    cornerRadius: (m.get('cornerRadius') as number) || 3,
-    shadow: (m.get('shadow') as unknown as boolean) ?? false,
+    cornerRadius: (m.get('cornerRadius') as number) || 8,
+    shadow: (m.get('shadow') as unknown as boolean) ?? true,
     rotation: (m.get('rotation') as number) || 0,
     flipH: (m.get('flipH') as unknown as boolean) ?? false,
     flipV: (m.get('flipV') as unknown as boolean) ?? false,
@@ -127,7 +127,7 @@ export function useElements() {
   }, [yElements])
 
   // Track last-used fill/stroke for new shapes
-  const lastUsedStyleRef = useRef<{ fill: string; stroke: string }>({ fill: '#ffffff', stroke: '#4f46e5' })
+  const lastUsedStyleRef = useRef<{ fill: string; stroke: string }>({ fill: '#e8edfc', stroke: '#4465e9' })
 
   useEffect(() => {
     const sync = () => {
@@ -163,7 +163,7 @@ export function useElements() {
       yEl.set('text', '')
       yEl.set('fill', lastUsedStyleRef.current.fill)
       yEl.set('stroke', lastUsedStyleRef.current.stroke)
-      yEl.set('strokeWidth', 1.5)
+      yEl.set('strokeWidth', 2.5)
       yElements.push([yEl])
       return id
     },
@@ -203,8 +203,8 @@ export function useElements() {
       yEl.set('startY', 0)
       yEl.set('endX', 0)
       yEl.set('endY', 0)
-      yEl.set('stroke', '#4f46e5')
-      yEl.set('strokeWidth', 1.5)
+      yEl.set('stroke', '#4465e9')
+      yEl.set('strokeWidth', 2.5)
       yEl.set('arrowStart', 0)
       yEl.set('arrowEnd', 1)
       yEl.set('lineType', lineType)
@@ -230,8 +230,8 @@ export function useElements() {
       yEl.set('startY', startY)
       yEl.set('endX', endX)
       yEl.set('endY', endY)
-      yEl.set('stroke', '#4f46e5')
-      yEl.set('strokeWidth', 1.5)
+      yEl.set('stroke', '#4465e9')
+      yEl.set('strokeWidth', 2.5)
       yEl.set('arrowStart', 0)
       yEl.set('arrowEnd', 1)
       yEl.set('lineType', lineType)
