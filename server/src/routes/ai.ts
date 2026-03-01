@@ -61,6 +61,15 @@ router.post('/message', async (req, res) => {
         res.write(`data: ${JSON.stringify({ type: 'text_delta', text: event.delta.text })}\n\n`)
       }
 
+      // Server tool use (e.g. web_search)
+      if (event.type === 'content_block_start' && event.content_block.type === 'server_tool_use') {
+        res.write(`data: ${JSON.stringify({
+          type: 'server_tool_use_start',
+          name: event.content_block.name,
+          input: (event.content_block as unknown as Record<string, unknown>).input || {},
+        })}\n\n`)
+      }
+
       // Tool use block starts
       if (event.type === 'content_block_start' && event.content_block.type === 'tool_use') {
         res.write(`data: ${JSON.stringify({

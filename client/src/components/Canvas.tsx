@@ -5,14 +5,15 @@ import { ShapeRenderer } from './ShapeRenderer'
 import { TextRenderer } from './TextRenderer'
 import { ImageRenderer } from './ImageRenderer'
 import { FrameRenderer } from './FrameRenderer'
+import { WebCardRenderer } from './WebCardRenderer'
 import { PathLayer } from './PathLayer'
-import { LineLayer, getAnchorPoint } from './LineLayer'
+import { LineLayer, edgeIntersection } from './LineLayer'
 import { Cursors } from './Cursors'
 import { PropertyPanel } from './PropertyPanel'
 import { AlignmentToolbar } from './AlignmentToolbar'
 import { Minimap } from './Minimap'
-import { isShape, isPath, isLine, isText, isImage, isFrame } from '../types'
-import type { Tool, ShapeType, CanvasElement, LineType, ShapeElement, PathElement, LineElement, TextElement, ImageElement, FrameElement } from '../types'
+import { isShape, isPath, isLine, isText, isImage, isFrame, isWebCard } from '../types'
+import type { Tool, ShapeType, CanvasElement, LineType, ShapeElement, PathElement, LineElement, TextElement, ImageElement, FrameElement, WebCardElement } from '../types'
 
 interface Props {
   activeTool: Tool
@@ -24,8 +25,8 @@ interface Props {
   elements: CanvasElement[]
   addShape: (type: ShapeType, x: number, y: number, w: number, h: number) => string
   addPath: (x: number, y: number, points: number[], stroke: string, strokeWidth: number) => string
-  addLine: (startShapeId: string, endShapeId: string, startAnchorX: number, startAnchorY: number, endAnchorX: number, endAnchorY: number, lineType?: LineType) => string
-  addArrow: (startShapeId: string, endShapeId: string, startAnchorX: number, startAnchorY: number, endAnchorX: number, endAnchorY: number, startX: number, startY: number, endX: number, endY: number, lineType?: LineType) => string
+  addLine: (startShapeId: string, endShapeId: string, lineType?: LineType) => string
+  addArrow: (startShapeId: string, endShapeId: string, startX: number, startY: number, endX: number, endY: number, lineType?: LineType) => string
   addText: (x: number, y: number) => string
   addImage: (x: number, y: number, w: number, h: number, src: string) => string
   addFrame: (x: number, y: number, w: number, h: number) => string
@@ -93,7 +94,7 @@ export function Canvas({
   const isMarquee = useRef(false)
 
   // Line/Arrow tool state
-  const [lineStart, setLineStart] = useState<{ shapeId: string; anchorX: number; anchorY: number; freeX: number; freeY: number } | null>(null)
+  const [lineStart, setLineStart] = useState<{ shapeId: string; freeX: number; freeY: number } | null>(null)
   const [linePreviewEnd, setLinePreviewEnd] = useState<{ x: number; y: number } | null>(null)
   const [hoveredShapeId, setHoveredShapeId] = useState<string | null>(null)
 
@@ -160,6 +161,7 @@ export function Canvas({
   const texts = elements.filter(isText)
   const images = elements.filter(isImage)
   const frames = elements.filter(isFrame)
+  const webCards = elements.filter(isWebCard)
   shapesRef.current = shapes
   pathsRef.current = paths
   linesRef.current = lines
@@ -338,37 +340,6 @@ export function Canvas({
     return undefined
   }
 
-  function closestPointOnPerimeter(shape: ShapeElement, world: { x: number; y: number }): { ratioX: number; ratioY: number } {
-    const localX = (world.x - shape.x) / shape.width
-    const localY = (world.y - shape.y) / shape.height
-    const clampX = Math.max(0, Math.min(1, localX))
-    const clampY = Math.max(0, Math.min(1, localY))
-
-    switch (shape.type) {
-      case 'ellipse': {
-        const angle = Math.atan2(localY - 0.5, localX - 0.5)
-        return { ratioX: 0.5 + 0.5 * Math.cos(angle), ratioY: 0.5 + 0.5 * Math.sin(angle) }
-      }
-      case 'diamond': {
-        const angle = Math.atan2(localY - 0.5, localX - 0.5)
-        const t = 0.5 / (Math.abs(Math.cos(angle)) + Math.abs(Math.sin(angle)))
-        return { ratioX: 0.5 + t * Math.cos(angle), ratioY: 0.5 + t * Math.sin(angle) }
-      }
-      default: {
-        // Rectangle: project to nearest edge
-        const distLeft = clampX
-        const distRight = 1 - clampX
-        const distTop = clampY
-        const distBottom = 1 - clampY
-        const minDist = Math.min(distLeft, distRight, distTop, distBottom)
-        if (minDist === distLeft) return { ratioX: 0, ratioY: clampY }
-        if (minDist === distRight) return { ratioX: 1, ratioY: clampY }
-        if (minDist === distTop) return { ratioX: clampX, ratioY: 0 }
-        return { ratioX: clampX, ratioY: 1 }
-      }
-    }
-  }
-
   const handleMouseDown = useCallback(
     (e: MouseEvent) => {
       const world = screenToWorld(e.clientX, e.clientY)
@@ -449,8 +420,7 @@ export function Canvas({
       if (activeTool === 'line') {
         const hitShape = hitTestShape(world)
         if (hitShape) {
-          const { ratioX, ratioY } = closestPointOnPerimeter(hitShape, world)
-          setLineStart({ shapeId: hitShape.id, anchorX: ratioX, anchorY: ratioY, freeX: world.x, freeY: world.y })
+          setLineStart({ shapeId: hitShape.id, freeX: world.x, freeY: world.y })
           setLinePreviewEnd({ x: world.x, y: world.y })
         }
         return
@@ -459,10 +429,9 @@ export function Canvas({
       if (activeTool === 'arrow') {
         const hitShape = hitTestShape(world)
         if (hitShape) {
-          const { ratioX, ratioY } = closestPointOnPerimeter(hitShape, world)
-          setLineStart({ shapeId: hitShape.id, anchorX: ratioX, anchorY: ratioY, freeX: world.x, freeY: world.y })
+          setLineStart({ shapeId: hitShape.id, freeX: world.x, freeY: world.y })
         } else {
-          setLineStart({ shapeId: '', anchorX: 0.5, anchorY: 0.5, freeX: world.x, freeY: world.y })
+          setLineStart({ shapeId: '', freeX: world.x, freeY: world.y })
         }
         setLinePreviewEnd({ x: world.x, y: world.y })
         return
@@ -676,33 +645,18 @@ export function Canvas({
 
         if (activeTool === 'line') {
           if (hitShape && hitShape.id !== lineStart.shapeId) {
-            const endPerimeter = closestPointOnPerimeter(hitShape, world)
-            addLine(
-              lineStart.shapeId, hitShape.id,
-              lineStart.anchorX, lineStart.anchorY,
-              endPerimeter.ratioX, endPerimeter.ratioY,
-              activeLineType,
-            )
+            addLine(lineStart.shapeId, hitShape.id, activeLineType)
             stopCapturing()
           }
         } else if (activeTool === 'arrow') {
           const startShapeId = lineStart.shapeId
           const endShapeId = hitShape ? hitShape.id : ''
 
-          let endAnchorX = 0.5, endAnchorY = 0.5
-          if (endShapeId && hitShape) {
-            const endPerimeter = closestPointOnPerimeter(hitShape, world)
-            endAnchorX = endPerimeter.ratioX
-            endAnchorY = endPerimeter.ratioY
-          }
-
           const dx = world.x - lineStart.freeX
           const dy = world.y - lineStart.freeY
           if (dx * dx + dy * dy > 100) {
             addArrow(
               startShapeId, endShapeId,
-              lineStart.anchorX, lineStart.anchorY,
-              endAnchorX, endAnchorY,
               lineStart.freeX, lineStart.freeY,
               world.x, world.y,
               activeLineType,
@@ -742,7 +696,6 @@ export function Canvas({
 
   const handleSelect = useCallback(
     (id: string, shiftKey?: boolean) => {
-      if (activeTool === 'hand') return // Hand tool doesn't select
       if (activeTool === 'eraser') {
         deleteElement(id)
         return
@@ -890,11 +843,10 @@ export function Canvas({
         const hitShape = hitTestShape(world)
 
         if (hitShape) {
-          const { ratioX, ratioY } = closestPointOnPerimeter(hitShape, world)
           if (endpoint === 'start') {
-            updateElement(lineId, { startShapeId: hitShape.id, startAnchorX: ratioX, startAnchorY: ratioY })
+            updateElement(lineId, { startShapeId: hitShape.id, startAnchorX: 0.5, startAnchorY: 0.5 })
           } else {
-            updateElement(lineId, { endShapeId: hitShape.id, endAnchorX: ratioX, endAnchorY: ratioY })
+            updateElement(lineId, { endShapeId: hitShape.id, endAnchorX: 0.5, endAnchorY: 0.5 })
           }
         } else {
           if (endpoint === 'start') {
@@ -1006,8 +958,6 @@ export function Canvas({
   const linePreviewData = lineStart && linePreviewEnd
     ? {
         startShapeId: lineStart.shapeId,
-        startAnchorX: lineStart.anchorX,
-        startAnchorY: lineStart.anchorY,
         freeStartX: lineStart.freeX,
         freeStartY: lineStart.freeY,
         endX: linePreviewEnd.x,
@@ -1253,6 +1203,17 @@ export function Canvas({
             activeTool={activeTool}
           />
         ))}
+        {webCards.map((wc) => (
+          <WebCardRenderer
+            key={wc.id}
+            element={wc}
+            isSelected={selectedIds.includes(wc.id)}
+            onSelect={handleSelect}
+            onUpdate={updateElement}
+            scale={scale}
+            activeTool={activeTool}
+          />
+        ))}
         {previewSvg}
         {connectionHighlight}
         {/* Endpoint handles for selected connectors */}
@@ -1261,11 +1222,18 @@ export function Canvas({
           if (selectedLines.length === 0) return null
 
           return selectedLines.map((selectedLine) => {
+            const otherEndTarget = selectedLine.endShapeId
+              ? (() => { const s = shapes.find(sh => sh.id === selectedLine.endShapeId); return s ? { x: s.x + s.width / 2, y: s.y + s.height / 2 } : null })()
+              : { x: selectedLine.endX, y: selectedLine.endY }
+            const otherStartTarget = selectedLine.startShapeId
+              ? (() => { const s = shapes.find(sh => sh.id === selectedLine.startShapeId); return s ? { x: s.x + s.width / 2, y: s.y + s.height / 2 } : null })()
+              : { x: selectedLine.startX, y: selectedLine.startY }
+
             const startPt = selectedLine.startShapeId
-              ? (() => { const s = shapes.find(sh => sh.id === selectedLine.startShapeId); return s ? getAnchorPoint(s, selectedLine.startAnchorX, selectedLine.startAnchorY) : null })()
+              ? (() => { const s = shapes.find(sh => sh.id === selectedLine.startShapeId); return s && otherEndTarget ? edgeIntersection(s, otherEndTarget) : null })()
               : { x: selectedLine.startX, y: selectedLine.startY }
             const endPt = selectedLine.endShapeId
-              ? (() => { const s = shapes.find(sh => sh.id === selectedLine.endShapeId); return s ? getAnchorPoint(s, selectedLine.endAnchorX, selectedLine.endAnchorY) : null })()
+              ? (() => { const s = shapes.find(sh => sh.id === selectedLine.endShapeId); return s && otherStartTarget ? edgeIntersection(s, otherStartTarget) : null })()
               : { x: selectedLine.endX, y: selectedLine.endY }
 
             return (

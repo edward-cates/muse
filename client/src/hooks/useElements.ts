@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import * as Y from 'yjs'
 import { useCollab } from '../collab/CollabContext'
-import type { CanvasElement, ShapeType, ShapeElement, PathElement, LineElement, LineType } from '../types'
+import type { CanvasElement, ShapeType, ShapeElement, PathElement, LineElement, LineType, WebCardElement } from '../types'
 
 type YMapVal = string | number | number[]
 
@@ -86,6 +86,23 @@ export function readElement(m: Y.Map<YMapVal>): CanvasElement {
       height: (m.get('height') as number) || 300,
       label: (m.get('label') as string) || 'Frame',
       children: ((m.get('children') as unknown) as string[]) || [],
+      opacity: (m.get('opacity') as number) ?? 100,
+    }
+  }
+  if (type === 'webcard') {
+    return {
+      id: m.get('id') as string,
+      type: 'webcard',
+      x: m.get('x') as number,
+      y: m.get('y') as number,
+      width: (m.get('width') as number) || 280,
+      height: (m.get('height') as number) || 160,
+      url: (m.get('url') as string) || '',
+      title: (m.get('title') as string) || '',
+      snippet: (m.get('snippet') as string) || '',
+      faviconUrl: (m.get('faviconUrl') as string) || '',
+      content: (m.get('content') as string) || '',
+      sourceType: ((m.get('sourceType') as string) || 'manual') as 'search' | 'url' | 'manual',
       opacity: (m.get('opacity') as number) ?? 100,
     }
   }
@@ -188,17 +205,17 @@ export function useElements() {
   )
 
   const addLine = useCallback(
-    (startShapeId: string, endShapeId: string, startAnchorX: number, startAnchorY: number, endAnchorX: number, endAnchorY: number, lineType: LineType = 'straight'): string => {
+    (startShapeId: string, endShapeId: string, lineType: LineType = 'straight'): string => {
       const id = crypto.randomUUID()
       const yEl = new Y.Map<YMapVal>()
       yEl.set('id', id)
       yEl.set('type', 'line')
       yEl.set('startShapeId', startShapeId)
       yEl.set('endShapeId', endShapeId)
-      yEl.set('startAnchorX', startAnchorX)
-      yEl.set('startAnchorY', startAnchorY)
-      yEl.set('endAnchorX', endAnchorX)
-      yEl.set('endAnchorY', endAnchorY)
+      yEl.set('startAnchorX', 0.5)
+      yEl.set('startAnchorY', 0.5)
+      yEl.set('endAnchorX', 0.5)
+      yEl.set('endAnchorY', 0.5)
       yEl.set('startX', 0)
       yEl.set('startY', 0)
       yEl.set('endX', 0)
@@ -215,17 +232,17 @@ export function useElements() {
   )
 
   const addArrow = useCallback(
-    (startShapeId: string, endShapeId: string, startAnchorX: number, startAnchorY: number, endAnchorX: number, endAnchorY: number, startX: number, startY: number, endX: number, endY: number, lineType: LineType = 'straight'): string => {
+    (startShapeId: string, endShapeId: string, startX: number, startY: number, endX: number, endY: number, lineType: LineType = 'straight'): string => {
       const id = crypto.randomUUID()
       const yEl = new Y.Map<YMapVal>()
       yEl.set('id', id)
       yEl.set('type', 'line')
       yEl.set('startShapeId', startShapeId)
       yEl.set('endShapeId', endShapeId)
-      yEl.set('startAnchorX', startAnchorX)
-      yEl.set('startAnchorY', startAnchorY)
-      yEl.set('endAnchorX', endAnchorX)
-      yEl.set('endAnchorY', endAnchorY)
+      yEl.set('startAnchorX', 0.5)
+      yEl.set('startAnchorY', 0.5)
+      yEl.set('endAnchorX', 0.5)
+      yEl.set('endAnchorY', 0.5)
       yEl.set('startX', startX)
       yEl.set('startY', startY)
       yEl.set('endX', endX)
@@ -293,6 +310,28 @@ export function useElements() {
       yEl.set('width', w)
       yEl.set('height', h)
       yEl.set('label', 'Frame')
+      yElements.push([yEl])
+      return id
+    },
+    [yElements],
+  )
+
+  const addWebCard = useCallback(
+    (x: number, y: number, w: number, h: number, url: string, title: string, snippet: string): string => {
+      const id = crypto.randomUUID()
+      const yEl = new Y.Map<YMapVal>()
+      yEl.set('id', id)
+      yEl.set('type', 'webcard')
+      yEl.set('x', x)
+      yEl.set('y', y)
+      yEl.set('width', w)
+      yEl.set('height', h)
+      yEl.set('url', url)
+      yEl.set('title', title)
+      yEl.set('snippet', snippet)
+      yEl.set('faviconUrl', '')
+      yEl.set('content', '')
+      yEl.set('sourceType', 'manual')
       yElements.push([yEl])
       return id
     },
@@ -418,7 +457,7 @@ export function useElements() {
   }, [])
 
   return {
-    elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame,
+    elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame, addWebCard,
     updateElement, deleteElement, undo, redo, stopCapturing,
     reorderElement, groupElements, ungroupElements,
     setLastUsedStyle, doc, yElements,

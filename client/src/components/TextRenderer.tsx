@@ -22,6 +22,11 @@ export function TextRenderer({ element, isSelected, isEditing, onSelect, onUpdat
   const handleMouseDown = useCallback(
     (e: MouseEvent) => {
       if (isEditing && (e.target as HTMLElement).tagName === 'TEXTAREA') return
+      if (activeTool === 'hand') {
+        e.stopPropagation()
+        onSelect(element.id, e.shiftKey)
+        return
+      }
       if (activeTool !== 'select') return
 
       e.stopPropagation()

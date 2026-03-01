@@ -9,29 +9,79 @@ interface Props {
   onDoubleClick?: (id: string) => void
   onDragMove?: (id: string, dx: number, dy: number) => void
   onDragEnd?: () => void
-  linePreview: { startShapeId: string; startAnchorX: number; startAnchorY: number; freeStartX: number; freeStartY: number; endX: number; endY: number } | null
+  linePreview: { startShapeId: string; freeStartX: number; freeStartY: number; endX: number; endY: number } | null
   editingLabelId?: string | null
   onLabelChange?: (id: string, label: string) => void
   onLabelEditDone?: () => void
 }
 
-export function getAnchorPoint(shape: ShapeElement, ratioX: number, ratioY: number): { x: number; y: number } {
-  return { x: shape.x + ratioX * shape.width, y: shape.y + ratioY * shape.height }
+/** Compute where a ray from shape center toward `target` exits the shape boundary. */
+export function edgeIntersection(
+  shape: ShapeElement,
+  target: { x: number; y: number },
+): { x: number; y: number } {
+  const cx = shape.x + shape.width / 2
+  const cy = shape.y + shape.height / 2
+  const dx = target.x - cx
+  const dy = target.y - cy
+
+  // Degenerate: target is at center → default to right edge
+  if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) {
+    return { x: cx + shape.width / 2, y: cy }
+  }
+
+  const hw = shape.width / 2
+  const hh = shape.height / 2
+
+  switch (shape.type) {
+    case 'ellipse': {
+      const angle = Math.atan2(dy, dx)
+      return { x: cx + hw * Math.cos(angle), y: cy + hh * Math.sin(angle) }
+    }
+    case 'diamond': {
+      const angle = Math.atan2(dy, dx)
+      const cosA = Math.cos(angle)
+      const sinA = Math.sin(angle)
+      const dist = (hw * hh) / (hh * Math.abs(cosA) + hw * Math.abs(sinA))
+      return { x: cx + dist * cosA, y: cy + dist * sinA }
+    }
+    default: {
+      // Rectangle (and other shapes treated as bounding box)
+      const t = Math.min(hw / Math.abs(dx), hh / Math.abs(dy))
+      return { x: cx + dx * t, y: cy + dy * t }
+    }
+  }
 }
 
-function resolveEndpoint(
-  shapeId: string,
-  anchorX: number,
-  anchorY: number,
-  freeX: number,
-  freeY: number,
+function resolveLineEndpoints(
+  line: LineElement,
   shapeMap: Map<string, ShapeElement>,
-): { x: number; y: number } {
-  if (shapeId) {
-    const shape = shapeMap.get(shapeId)
-    if (shape) return getAnchorPoint(shape, anchorX, anchorY)
+): { start: { x: number; y: number }; end: { x: number; y: number } } | null {
+  const startShape = line.startShapeId ? shapeMap.get(line.startShapeId) : undefined
+  const endShape = line.endShapeId ? shapeMap.get(line.endShapeId) : undefined
+
+  // If a shape ID references a deleted shape, hide the line
+  if (line.startShapeId && !startShape) return null
+  if (line.endShapeId && !endShape) return null
+
+  const freeStart = { x: line.startX, y: line.startY }
+  const freeEnd = { x: line.endX, y: line.endY }
+
+  if (startShape && endShape) {
+    const endCenter = { x: endShape.x + endShape.width / 2, y: endShape.y + endShape.height / 2 }
+    const startCenter = { x: startShape.x + startShape.width / 2, y: startShape.y + startShape.height / 2 }
+    return {
+      start: edgeIntersection(startShape, endCenter),
+      end: edgeIntersection(endShape, startCenter),
+    }
   }
-  return { x: freeX, y: freeY }
+  if (startShape) {
+    return { start: edgeIntersection(startShape, freeEnd), end: freeEnd }
+  }
+  if (endShape) {
+    return { start: freeStart, end: edgeIntersection(endShape, freeStart) }
+  }
+  return { start: freeStart, end: freeEnd }
 }
 
 function getStrokeDasharray(strokeStyle: string | undefined, strokeWidth: number): string | undefined {
@@ -86,7 +136,7 @@ export function LineLayer({ shapes, lines, selectedIds, onSelect, onDoubleClick,
     ? (() => {
         if (linePreview.startShapeId) {
           const shape = shapeMap.get(linePreview.startShapeId)
-          if (shape) return getAnchorPoint(shape, linePreview.startAnchorX, linePreview.startAnchorY)
+          if (shape) return edgeIntersection(shape, { x: linePreview.endX, y: linePreview.endY })
         }
         return { x: linePreview.freeStartX, y: linePreview.freeStartY }
       })()
@@ -123,11 +173,9 @@ export function LineLayer({ shapes, lines, selectedIds, onSelect, onDoubleClick,
       </defs>
 
       {lines.map((line) => {
-        const start = resolveEndpoint(line.startShapeId, line.startAnchorX, line.startAnchorY, line.startX, line.startY, shapeMap)
-        const end = resolveEndpoint(line.endShapeId, line.endAnchorX, line.endAnchorY, line.endX, line.endY, shapeMap)
-
-        if (line.startShapeId && !shapeMap.has(line.startShapeId)) return null
-        if (line.endShapeId && !shapeMap.has(line.endShapeId)) return null
+        const endpoints = resolveLineEndpoints(line, shapeMap)
+        if (!endpoints) return null
+        const { start, end } = endpoints
 
         const isSelected = selectedIds.includes(line.id)
         const sw = isSelected ? line.strokeWidth + 1 : line.strokeWidth

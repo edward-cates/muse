@@ -50,8 +50,19 @@ const mockAuth = {
   signOut: async () => {},
 }
 
+declare global {
+  interface Window {
+    __testDoc?: Y.Doc
+    __testY?: typeof Y
+  }
+}
+
 export function TestRoot() {
   const [instance] = useState(createLocalCollab)
+
+  // Expose doc + Y module for e2e tests to create elements programmatically
+  window.__testDoc = instance.doc
+  window.__testY = Y
 
   return (
     <AuthContext.Provider value={mockAuth}>

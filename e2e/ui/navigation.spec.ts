@@ -33,14 +33,28 @@ test.describe('Hand tool', () => {
     expect(transformAfter).not.toEqual(transformBefore)
   })
 
-  test('hand tool does not select shapes when clicking on them', async ({ page }) => {
+  test('clicking a shape in hand mode selects it and switches to select tool', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 100, 80)
 
     await page.keyboard.press('h')
     await canvas.shapes.first().click()
 
-    await expect(page.locator('.shape--selected')).toHaveCount(0)
+    await expect(page.locator('.shape--selected')).toHaveCount(1)
+    await expect(canvas.toolButton('select')).toHaveClass(/toolbar__btn--active/)
+  })
+
+  test('dragging on empty canvas in hand mode still pans', async ({ page }) => {
+    const transformBefore = await canvas.getWorldTransform()
+
+    await page.keyboard.press('h')
+    await page.mouse.move(500, 400)
+    await page.mouse.down()
+    await page.mouse.move(600, 500, { steps: 5 })
+    await page.mouse.up()
+
+    const transformAfter = await canvas.getWorldTransform()
+    expect(transformAfter).not.toEqual(transformBefore)
   })
 })
 

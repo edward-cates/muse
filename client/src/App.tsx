@@ -26,7 +26,7 @@ export function App({ drawingId }: { drawingId: string }) {
   const styleClipboardRef = useRef<Record<string, unknown> | null>(null)
 
   const {
-    elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame,
+    elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame, addWebCard,
     updateElement, deleteElement, undo, redo, stopCapturing,
     reorderElement, groupElements, ungroupElements,
     setLastUsedStyle, doc,
@@ -136,8 +136,6 @@ export function App({ drawingId }: { drawingId: string }) {
                 const endId = el.endShapeId ? (idMap.get(el.endShapeId) || el.endShapeId) : ''
                 const id = addArrow(
                   startId, endId,
-                  el.startAnchorX, el.startAnchorY,
-                  el.endAnchorX, el.endAnchorY,
                   el.startX + 20, el.startY + 20,
                   el.endX + 20, el.endY + 20,
                   el.lineType,
@@ -182,7 +180,7 @@ export function App({ drawingId }: { drawingId: string }) {
               } else if (isLine(el)) {
                 const startId = el.startShapeId ? (idMap.get(el.startShapeId) || el.startShapeId) : ''
                 const endId = el.endShapeId ? (idMap.get(el.endShapeId) || el.endShapeId) : ''
-                const id = addArrow(startId, endId, el.startAnchorX, el.startAnchorY, el.endAnchorX, el.endAnchorY, el.startX + 20, el.startY + 20, el.endX + 20, el.endY + 20, el.lineType)
+                const id = addArrow(startId, endId, el.startX + 20, el.startY + 20, el.endX + 20, el.endY + 20, el.lineType)
                 newIds.push(id)
               } else if (isText(el)) {
                 const id = addText(el.x + 20, el.y + 20)
@@ -435,7 +433,11 @@ export function App({ drawingId }: { drawingId: string }) {
         open={aiOpen}
         onClose={() => setAiOpen(false)}
         elements={elements}
-        elementActions={{ addShape, addLine, updateElement, deleteElement }}
+        elementActions={{
+          addShape, addLine, addArrow, addText, addWebCard,
+          updateElement, deleteElement,
+          getElements: () => elements,
+        }}
       />
       <DrawingTitle drawingId={drawingId} />
       <DrawingsList currentDrawingId={drawingId} />

@@ -1,8 +1,12 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../auth/AuthContext'
-import { CANVAS_TOOLS } from '../ai/tools'
-import { buildSystemPrompt } from '../ai/systemPrompt'
 import { executeToolCall, type ToolCall, type ElementActions } from '../ai/executeToolCall'
+import { captureCanvas } from '../ai/canvasCapture'
+import { classifyIntent } from '../ai/router'
+import { buildCanvasEditorConfig } from '../ai/agents/canvasEditor'
+import { buildResearcherConfig } from '../ai/agents/researcher'
+import type { AgentConfig } from '../ai/agents/types'
 import type { CanvasElement } from '../types'
 
 // ── Types ──
@@ -21,8 +25,9 @@ interface ApiMessage {
 
 /** Display message for the chat UI */
 interface ChatMessage {
-  role: 'user' | 'assistant' | 'tool'
+  role: 'user' | 'assistant' | 'tool' | 'status'
   content: string
+  imageBase64?: string
 }
 
 // ── SSE parsing types ──
@@ -32,9 +37,10 @@ interface SseToolUseStart { type: 'tool_use_start'; id: string; name: string }
 interface SseInputJsonDelta { type: 'input_json_delta'; partial_json: string }
 interface SseContentBlockStop { type: 'content_block_stop' }
 interface SseMessageDelta { type: 'message_delta'; stop_reason: string }
+interface SseServerToolUseStart { type: 'server_tool_use_start'; name: string; input: Record<string, unknown> }
 interface SseError { error: string }
 
-type SseEvent = SseTextDelta | SseToolUseStart | SseInputJsonDelta | SseContentBlockStop | SseMessageDelta | SseError
+type SseEvent = SseTextDelta | SseToolUseStart | SseInputJsonDelta | SseContentBlockStop | SseMessageDelta | SseServerToolUseStart | SseError
 
 // ── Component ──
 
@@ -44,8 +50,6 @@ interface Props {
   elements: CanvasElement[]
   elementActions: ElementActions
 }
-
-const MAX_TURNS = 10
 
 export function AiPanel({ open, onClose, elements, elementActions }: Props) {
   const { session } = useAuth()
@@ -65,6 +69,7 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
   async function parseStream(
     res: Response,
     signal: AbortSignal,
+    onStatus?: (status: string) => void,
   ): Promise<{ textContent: string; toolCalls: ToolCall[]; stopReason: string }> {
     const reader = res.body!.getReader()
     const decoder = new TextDecoder()
@@ -137,6 +142,12 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
           case 'message_delta':
             stopReason = event.stop_reason
             break
+
+          case 'server_tool_use_start':
+            if (event.name === 'web_search' && event.input?.query) {
+              onStatus?.(`Searching for "${event.input.query}"...`)
+            }
+            break
         }
       }
     }
@@ -146,20 +157,212 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
 
   function describeToolCalls(calls: ToolCall[]): string {
     const parts: string[] = []
-    let shapes = 0, lines = 0, updates = 0, deletes = 0
+    let shapes = 0, lines = 0, arrows = 0, texts = 0, updates = 0, deletes = 0, arranges = 0, webcards = 0, fetches = 0
     for (const c of calls) {
       switch (c.name) {
         case 'add_shape': shapes++; break
         case 'add_line': lines++; break
+        case 'add_arrow': arrows++; break
+        case 'add_text': texts++; break
         case 'update_element': updates++; break
         case 'delete_element': deletes++; break
+        case 'arrange_grid': case 'arrange_flow': arranges++; break
+        case 'add_web_card': webcards++; break
+        case 'fetch_url': fetches++; break
       }
     }
     if (shapes) parts.push(`${shapes} shape${shapes > 1 ? 's' : ''} added`)
     if (lines) parts.push(`${lines} line${lines > 1 ? 's' : ''} connected`)
+    if (arrows) parts.push(`${arrows} arrow${arrows > 1 ? 's' : ''} added`)
+    if (texts) parts.push(`${texts} text${texts > 1 ? 's' : ''} added`)
+    if (webcards) parts.push(`${webcards} card${webcards > 1 ? 's' : ''} added`)
+    if (fetches) parts.push(`${fetches} page${fetches > 1 ? 's' : ''} fetched`)
     if (updates) parts.push(`${updates} element${updates > 1 ? 's' : ''} updated`)
     if (deletes) parts.push(`${deletes} element${deletes > 1 ? 's' : ''} removed`)
+    if (arranges) parts.push(`${arranges} layout${arranges > 1 ? 's' : ''} applied`)
     return parts.join(', ')
+  }
+
+  function describeToolAction(tc: ToolCall): string {
+    const inp = tc.input
+    switch (tc.name) {
+      case 'add_shape': {
+        const label = inp.text ? `: ${String(inp.text).slice(0, 30)}` : ''
+        return `Adding ${inp.shape_type || 'shape'}${label}...`
+      }
+      case 'add_text': return `Adding text...`
+      case 'add_line': return `Connecting shapes...`
+      case 'add_arrow': return `Adding arrow...`
+      case 'update_element': return `Updating element...`
+      case 'delete_element': return `Removing element...`
+      case 'arrange_grid': return `Arranging layout...`
+      case 'arrange_flow': return `Arranging flow...`
+      case 'add_web_card': {
+        const title = inp.title ? `: ${String(inp.title).slice(0, 30)}` : ''
+        return `Creating card${title}...`
+      }
+      case 'fetch_url': {
+        try {
+          const hostname = new URL(String(inp.url)).hostname
+          return `Reading ${hostname}...`
+        } catch {
+          return `Fetching page...`
+        }
+      }
+      default: return `Running ${tc.name}...`
+    }
+  }
+
+  function buildAgentConfig(): AgentConfig {
+    const intent = classifyIntent(input)
+    switch (intent) {
+      case 'canvas_edit':
+        return buildCanvasEditorConfig(elements)
+      case 'research':
+        return buildResearcherConfig(elements)
+      case 'chat':
+      default:
+        return {
+          name: 'chat',
+          systemPrompt: `You are a helpful assistant for Muse, a collaborative canvas app. The canvas currently has ${elements.length} elements. Answer questions conversationally and concisely.`,
+          tools: [],
+          maxTurns: 1,
+        }
+    }
+  }
+
+  /** Fetch URL via server proxy */
+  async function fetchUrlViaServer(url: string): Promise<{ title: string; text: string; url: string }> {
+    const res = await fetch('/api/fetch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session!.access_token}`,
+      },
+      body: JSON.stringify({ url }),
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.error || `Fetch failed (${res.status})`)
+    }
+    return res.json()
+  }
+
+  async function runAgentLoop(
+    config: AgentConfig,
+    initialMessages: ApiMessage[],
+    abort: AbortController,
+    screenshotBase64: string | null,
+  ): Promise<ApiMessage[]> {
+    let currentApiMessages = initialMessages
+    let turns = 0
+    let looping = true
+    let consecutiveFailTurns = 0
+
+    // Build tools array: custom tools + native tools
+    const allTools: unknown[] = [...config.tools]
+    if (config.nativeTools) {
+      allTools.push(...config.nativeTools)
+    }
+
+    while (looping && turns < config.maxTurns) {
+      turns++
+
+      // Add placeholder assistant message for streaming
+      if (turns === 1) {
+        setChatMessages((prev) => [...prev, { role: 'assistant', content: '' }])
+      }
+
+      const res = await fetch('/api/ai/message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session!.access_token}`,
+        },
+        body: JSON.stringify({
+          messages: currentApiMessages,
+          system: config.systemPrompt,
+          tools: allTools.length > 0 ? allTools : undefined,
+        }),
+        signal: abort.signal,
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Request failed')
+      }
+
+      const { textContent, toolCalls, stopReason } = await parseStream(res, abort.signal, setStatus)
+
+      if (stopReason === 'tool_use' && toolCalls.length > 0) {
+        // Build the assistant's API message with all content blocks
+        const assistantBlocks: ContentBlock[] = []
+        if (textContent) assistantBlocks.push({ type: 'text', text: textContent })
+        for (const tc of toolCalls) {
+          assistantBlocks.push({ type: 'tool_use', id: tc.id, name: tc.name, input: tc.input })
+        }
+        currentApiMessages = [
+          ...currentApiMessages,
+          { role: 'assistant', content: assistantBlocks },
+        ]
+
+        // Execute tools — show per-tool status
+        const statusParts = toolCalls.map(tc => describeToolAction(tc))
+        setStatus(statusParts.join(' '))
+        const toolResults = await Promise.all(
+          toolCalls.map((tc) => executeToolCall(tc, elementActions, fetchUrlViaServer))
+        )
+
+        // Check for consecutive failures
+        const allFailed = toolResults.every(r => {
+          try { return !!JSON.parse(r.content).error } catch { return false }
+        })
+        consecutiveFailTurns = allFailed ? consecutiveFailTurns + 1 : 0
+
+        // Add tool indicator to chat
+        const description = describeToolCalls(toolCalls)
+        setChatMessages((prev) => [...prev, { role: 'tool', content: description }])
+
+        // Build tool_result user message
+        currentApiMessages = [
+          ...currentApiMessages,
+          {
+            role: 'user',
+            content: toolResults.map((r) => ({
+              type: 'tool_result' as const,
+              tool_use_id: r.tool_use_id,
+              content: r.content,
+            })),
+          },
+        ]
+
+        setStatus(null)
+
+        // Stop after 3 consecutive all-fail turns
+        if (consecutiveFailTurns >= 3) {
+          setChatMessages((prev) => [...prev, {
+            role: 'assistant',
+            content: 'Stopped — repeated tool failures. Try rephrasing your request.',
+          }])
+          looping = false
+          continue
+        }
+
+        // Add placeholder for the next assistant response
+        setChatMessages((prev) => [...prev, { role: 'assistant', content: '' }])
+      } else {
+        // Final response — record assistant text in API messages
+        if (textContent) {
+          currentApiMessages = [
+            ...currentApiMessages,
+            { role: 'assistant', content: textContent },
+          ]
+        }
+        looping = false
+      }
+    }
+
+    return currentApiMessages
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -167,105 +370,58 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
     const text = input.trim()
     if (!text || streaming || !session?.access_token) return
 
+    // Build agent config BEFORE clearing input (classifyIntent reads it)
+    const agentConfig = buildAgentConfig()
+
     setInput('')
     setStreaming(true)
     setStatus(null)
 
-    // Add user message to chat display
-    setChatMessages((prev) => [...prev, { role: 'user', content: text }])
+    // Capture canvas screenshot if available (before adding message so thumbnail is ready)
+    let screenshotBase64: string | null = null
+    const canvasEl = document.querySelector<HTMLDivElement>('[data-testid="canvas"]')
+    if (canvasEl) {
+      try {
+        screenshotBase64 = await captureCanvas(canvasEl)
+      } catch {
+        // Screenshot capture is best-effort
+      }
+    }
+
+    // Add user message to chat display (with screenshot thumbnail)
+    setChatMessages((prev) => [...prev, {
+      role: 'user',
+      content: text,
+      ...(screenshotBase64 ? { imageBase64: screenshotBase64 } : {}),
+    }])
+
+    // Show which agent is handling this
+    if (agentConfig.name !== 'chat') {
+      const agentLabel = agentConfig.name === 'researcher' ? 'Researching' : 'Editing canvas'
+      setChatMessages((prev) => [...prev, { role: 'status', content: agentLabel }])
+    }
+
+    // Build user content: screenshot + text
+    const userContent: ContentBlock[] = []
+    if (screenshotBase64) {
+      userContent.push({
+        type: 'image',
+        source: { type: 'base64', media_type: 'image/png', data: screenshotBase64 },
+      } as unknown as ContentBlock)
+    }
+    userContent.push({ type: 'text', text })
 
     // Build API messages
-    let currentApiMessages: ApiMessage[] = [
+    const currentApiMessages: ApiMessage[] = [
       ...apiMessages,
-      { role: 'user', content: text },
+      { role: 'user', content: screenshotBase64 ? userContent : text },
     ]
 
     const abort = new AbortController()
     abortRef.current = abort
 
     try {
-      let turns = 0
-      let looping = true
-
-      while (looping && turns < MAX_TURNS) {
-        turns++
-
-        // Add placeholder assistant message for streaming
-        if (turns === 1) {
-          setChatMessages((prev) => [...prev, { role: 'assistant', content: '' }])
-        }
-
-        const system = buildSystemPrompt(elements)
-
-        const res = await fetch('/api/ai/message', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            messages: currentApiMessages,
-            system,
-            tools: CANVAS_TOOLS,
-          }),
-          signal: abort.signal,
-        })
-
-        if (!res.ok) {
-          const data = await res.json()
-          throw new Error(data.error || 'Request failed')
-        }
-
-        const { textContent, toolCalls, stopReason } = await parseStream(res, abort.signal)
-
-        if (stopReason === 'tool_use' && toolCalls.length > 0) {
-          // Build the assistant's API message with all content blocks
-          const assistantBlocks: ContentBlock[] = []
-          if (textContent) assistantBlocks.push({ type: 'text', text: textContent })
-          for (const tc of toolCalls) {
-            assistantBlocks.push({ type: 'tool_use', id: tc.id, name: tc.name, input: tc.input })
-          }
-          currentApiMessages = [
-            ...currentApiMessages,
-            { role: 'assistant', content: assistantBlocks },
-          ]
-
-          // Execute tools
-          setStatus('Editing canvas...')
-          const toolResults = toolCalls.map((tc) => executeToolCall(tc, elementActions))
-
-          // Add tool indicator to chat
-          const description = describeToolCalls(toolCalls)
-          setChatMessages((prev) => [...prev, { role: 'tool', content: description }])
-
-          // Build tool_result user message
-          currentApiMessages = [
-            ...currentApiMessages,
-            {
-              role: 'user',
-              content: toolResults.map((r) => ({
-                type: 'tool_result' as const,
-                tool_use_id: r.tool_use_id,
-                content: r.content,
-              })),
-            },
-          ]
-
-          setStatus(null)
-
-          // Add placeholder for the next assistant response
-          setChatMessages((prev) => [...prev, { role: 'assistant', content: '' }])
-        } else {
-          // Final response — record assistant text in API messages
-          if (textContent) {
-            currentApiMessages = [
-              ...currentApiMessages,
-              { role: 'assistant', content: textContent },
-            ]
-          }
-          looping = false
-        }
-      }
+      const finalMessages = await runAgentLoop(agentConfig, currentApiMessages, abort, screenshotBase64)
 
       // Clean up empty trailing assistant messages
       setChatMessages((prev) => prev.filter(
@@ -273,10 +429,18 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
       ))
 
       // Save final API messages state for future conversation turns
-      setApiMessages(currentApiMessages)
+      setApiMessages(finalMessages)
 
     } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') return
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setChatMessages((prev) => {
+          const filtered = prev.filter(
+            (m, i) => !(m.role === 'assistant' && m.content === '' && i === prev.length - 1),
+          )
+          return [...filtered, { role: 'assistant', content: 'Stopped.' }]
+        })
+        return
+      }
       const errMsg = err instanceof Error ? err.message : 'Something went wrong'
       setChatMessages((prev) => {
         const updated = [...prev]
@@ -310,7 +474,7 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
 
       <div style={styles.messages}>
         {chatMessages.length === 0 && (
-          <p style={styles.empty}>Ask me to create or edit diagrams on your canvas...</p>
+          <p style={styles.empty}>Ask me to create diagrams, research topics, or chat...</p>
         )}
         {chatMessages.map((msg, i) => {
           if (msg.role === 'tool') {
@@ -319,6 +483,13 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
+                <span>{msg.content}</span>
+              </div>
+            )
+          }
+          if (msg.role === 'status') {
+            return (
+              <div key={i} style={styles.agentChip}>
                 <span>{msg.content}</span>
               </div>
             )
@@ -337,9 +508,22 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
                 ...(msg.role === 'user' ? styles.userMsg : styles.assistantMsg),
               }}
             >
-              <p style={styles.messageText}>
-                {msg.content || (streaming && i === chatMessages.length - 1 ? '...' : '')}
-              </p>
+              {msg.imageBase64 && (
+                <img
+                  src={`data:image/png;base64,${msg.imageBase64}`}
+                  alt="Canvas screenshot"
+                  style={styles.screenshotThumb}
+                />
+              )}
+              {msg.role === 'assistant' ? (
+                <div className="ai-chat-markdown">
+                  <ReactMarkdown>{msg.content || (streaming && i === chatMessages.length - 1 ? '...' : '')}</ReactMarkdown>
+                </div>
+              ) : (
+                <p style={styles.messageText}>
+                  {msg.content || (streaming && i === chatMessages.length - 1 ? '...' : '')}
+                </p>
+              )}
             </div>
           )
         })}
@@ -355,17 +539,30 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
       <form onSubmit={handleSubmit} style={styles.inputArea}>
         <input
           type="text"
-          placeholder="Draw a flowchart..."
+          placeholder="Draw a flowchart, research a topic, or ask a question..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={streaming}
           style={styles.input}
         />
-        <button type="submit" disabled={streaming || !input.trim()} style={styles.sendBtn}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-          </svg>
-        </button>
+        {streaming ? (
+          <button
+            type="button"
+            onClick={() => abortRef.current?.abort()}
+            style={styles.stopBtn}
+            data-testid="stop-btn"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+            </svg>
+          </button>
+        ) : (
+          <button type="submit" disabled={!input.trim()} style={styles.sendBtn}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+            </svg>
+          </button>
+        )}
       </form>
     </div>
   )
@@ -434,6 +631,13 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#f3f4f6',
     color: '#111',
   },
+  screenshotThumb: {
+    maxWidth: 240,
+    borderRadius: 6,
+    border: '1px solid rgba(255,255,255,0.15)',
+    marginBottom: 6,
+    display: 'block',
+  },
   messageText: {
     fontSize: 14,
     lineHeight: 1.5,
@@ -451,6 +655,17 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 8,
     fontSize: 12,
     fontWeight: 500,
+  },
+  agentChip: {
+    alignSelf: 'center',
+    padding: '4px 12px',
+    background: 'rgba(0, 0, 0, 0.04)',
+    color: '#6b7280',
+    borderRadius: 12,
+    fontSize: 11,
+    fontWeight: 500,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
   },
   statusChip: {
     alignSelf: 'flex-start',
@@ -490,6 +705,18 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     background: '#111',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 10,
+    cursor: 'pointer',
+  },
+  stopBtn: {
+    width: 40,
+    height: 40,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#dc2626',
     color: '#fff',
     border: 'none',
     borderRadius: 10,

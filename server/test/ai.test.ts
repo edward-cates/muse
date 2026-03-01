@@ -400,4 +400,94 @@ describe('AI message route', () => {
       `Expected error in response, got status ${res.status}: ${text.slice(0, 200)}`,
     )
   })
+
+  it('passes image content blocks through to Anthropic API', async () => {
+    mockKeyExists()
+
+    let capturedBody: Record<string, unknown> | null = null
+    setAnthropicMock({
+      events: textOnlyEvents('I can see the canvas!'),
+      captureBody: (body) => { capturedBody = body },
+    })
+
+    // Small base64 image (1x1 red pixel PNG)
+    const tinyPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
+
+    await fetch(url('/api/ai/message'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/png', data: tinyPng } },
+            { type: 'text', text: 'What do you see?' },
+          ],
+        }],
+      }),
+    })
+
+    assert.ok(capturedBody, 'should have captured request body')
+    const messages = capturedBody!.messages as Array<{ content: unknown }>
+    assert.ok(Array.isArray(messages[0].content), 'user content should be an array')
+    const blocks = messages[0].content as Array<Record<string, unknown>>
+    const imageBlock = blocks.find((b) => b.type === 'image')
+    assert.ok(imageBlock, 'should have image content block')
+    assert.equal((imageBlock!.source as Record<string, unknown>).media_type, 'image/png')
+  })
+
+  it('forwards server_tool_use events for web_search', async () => {
+    mockKeyExists()
+
+    const serverToolEvents = [
+      'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_test","type":"message","role":"assistant","content":[],"model":"claude-opus-4-6","stop_reason":null,"usage":{"input_tokens":10,"output_tokens":1}}}\n\n',
+      'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":{"query":"CRDTs explained"}}}\n\n',
+      'event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n',
+      'event: content_block_start\ndata: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}\n\n',
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Here are results."}}\n\n',
+      'event: content_block_stop\ndata: {"type":"content_block_stop","index":1}\n\n',
+      'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":10}}\n\n',
+      'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+    ]
+    setAnthropicMock({ events: serverToolEvents })
+
+    const res = await fetch(url('/api/ai/message'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'search for CRDTs' }] }),
+    })
+    assert.equal(res.status, 200)
+
+    const events = await parseSSE(res)
+
+    const serverToolStart = events.find((e) => typeof e === 'object' && e.type === 'server_tool_use_start') as Record<string, unknown>
+    assert.ok(serverToolStart, 'should have server_tool_use_start event')
+    assert.equal(serverToolStart.name, 'web_search')
+    assert.deepEqual(serverToolStart.input, { query: 'CRDTs explained' })
+  })
+
+  it('handles large payloads up to 10MB', async () => {
+    mockKeyExists()
+    setAnthropicMock({ events: textOnlyEvents('OK') })
+
+    // Create a ~5MB base64 payload
+    const largePng = 'A'.repeat(5 * 1024 * 1024)
+
+    const res = await fetch(url('/api/ai/message'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/png', data: largePng } },
+            { type: 'text', text: 'hi' },
+          ],
+        }],
+      }),
+    })
+
+    // Should succeed (not 413 Payload Too Large)
+    assert.equal(res.status, 200)
+  })
 })

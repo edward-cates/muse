@@ -22,6 +22,11 @@ export function FrameRenderer({ frame, isSelected, onSelect, onUpdate, scale, ac
 
   const handleMouseDown = useCallback(
     (e: MouseEvent) => {
+      if (activeTool === 'hand') {
+        e.stopPropagation()
+        onSelect(frame.id, e.shiftKey)
+        return
+      }
       if (activeTool !== 'select') return
       e.stopPropagation()
       onSelect(frame.id, e.shiftKey)

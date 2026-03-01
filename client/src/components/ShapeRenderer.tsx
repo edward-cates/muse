@@ -126,6 +126,11 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
   const handleMouseDown = useCallback(
     (e: MouseEvent) => {
       if (isEditing && (e.target as HTMLElement).tagName === 'TEXTAREA') return
+      if (activeTool === 'hand') {
+        e.stopPropagation()
+        onSelect(shape.id, e.shiftKey)
+        return
+      }
       if (activeTool !== 'select') return
 
       e.stopPropagation()

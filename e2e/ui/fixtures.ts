@@ -64,6 +64,10 @@ export class CanvasPage {
     return this.page.locator('[data-testid="frame-element"]')
   }
 
+  get webCardElements(): Locator {
+    return this.page.locator('[data-testid="webcard-element"]')
+  }
+
   get selectedShape(): Locator {
     return this.page.locator('.shape--selected')
   }

@@ -253,20 +253,23 @@ test.describe('Arbitrary anchor points', () => {
     await canvas.drawShape(400, 200, 120, 80)
   })
 
-  test('connector attaches at cursor position on shape edge, not just midpoint', async ({ page }) => {
+  test('connector routes center-to-center and exits at shape edge', async ({ page }) => {
     await canvas.selectTool('arrow')
-    // Start from near the top-right area of first shape (not at midpoint)
-    await page.mouse.move(190, 210)
+    // Connect first shape to second shape
+    await page.mouse.move(160, 240)
     await page.mouse.down()
-    await page.mouse.move(410, 250, { steps: 5 })
+    await page.mouse.move(460, 240, { steps: 5 })
     await page.mouse.up()
 
-    // The connector start point should be near where we clicked, not snapped to midpoint
+    // The connector start point should be at the right edge of the first shape
+    // (center-to-center routing: exits from edge toward other shape's center)
     const path = await canvas.connectors.first().getAttribute('d')
     const match = path!.match(/^M ([\d.]+) ([\d.]+)/)
+    const startX = Number(match![1])
     const startY = Number(match![2])
-    // Should be near 210, not 240 (the right midpoint Y)
-    expect(Math.abs(startY - 210)).toBeLessThan(20)
+    // Right edge of first shape (x=100+120=220), center Y (y=200+40=240)
+    expect(Math.abs(startX - 220)).toBeLessThan(5)
+    expect(Math.abs(startY - 240)).toBeLessThan(5)
   })
 
   test('connection highlight appears on shape hover', async ({ page }) => {

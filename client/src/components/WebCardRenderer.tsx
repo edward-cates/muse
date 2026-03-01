@@ -1,8 +1,8 @@
 import { useRef, useCallback, type MouseEvent } from 'react'
-import type { ImageElement, Tool } from '../types'
+import type { WebCardElement, Tool } from '../types'
 
 interface Props {
-  element: ImageElement
+  element: WebCardElement
   isSelected: boolean
   onSelect: (id: string, shiftKey?: boolean) => void
   onUpdate: (id: string, updates: Record<string, unknown>) => void
@@ -21,7 +21,16 @@ const HANDLES: { dir: string; x: number; y: number; cursor: string }[] = [
   { dir: 'w', x: 0, y: 0.5, cursor: 'ew-resize' },
 ]
 
-export function ImageRenderer({ element, isSelected, onSelect, onUpdate, scale, activeTool }: Props) {
+function faviconUrl(pageUrl: string): string {
+  try {
+    const u = new URL(pageUrl)
+    return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=32`
+  } catch {
+    return ''
+  }
+}
+
+export function WebCardRenderer({ element, isSelected, onSelect, onUpdate, scale, activeTool }: Props) {
   const dragStart = useRef({ x: 0, y: 0 })
   const elStart = useRef({ x: 0, y: 0 })
 
@@ -69,10 +78,10 @@ export function ImageRenderer({ element, isSelected, onSelect, onUpdate, scale, 
         const dy = (ev.clientY - startMouse.y) / scale
         let { x, y, w, h } = startEl
 
-        if (dir.includes('e')) w = Math.max(10, startEl.w + dx)
-        if (dir.includes('w')) { const newW = Math.max(10, startEl.w - dx); x = startEl.x + startEl.w - newW; w = newW }
-        if (dir.includes('s')) h = Math.max(10, startEl.h + dy)
-        if (dir.includes('n')) { const newH = Math.max(10, startEl.h - dy); y = startEl.y + startEl.h - newH; h = newH }
+        if (dir.includes('e')) w = Math.max(200, startEl.w + dx)
+        if (dir.includes('w')) { const newW = Math.max(200, startEl.w - dx); x = startEl.x + startEl.w - newW; w = newW }
+        if (dir.includes('s')) h = Math.max(120, startEl.h + dy)
+        if (dir.includes('n')) { const newH = Math.max(120, startEl.h - dy); y = startEl.y + startEl.h - newH; h = newH }
 
         onUpdate(element.id, { x, y, width: w, height: h })
       }
@@ -89,12 +98,13 @@ export function ImageRenderer({ element, isSelected, onSelect, onUpdate, scale, 
   )
 
   const showHandles = isSelected && activeTool === 'select'
+  const favicon = element.faviconUrl || faviconUrl(element.url)
 
   return (
     <div
-      data-testid="image-element"
+      data-testid="webcard-element"
       data-shape-id={element.id}
-      className={`shape image-element ${isSelected ? 'shape--selected' : ''}`}
+      className={`shape webcard-element ${isSelected ? 'shape--selected' : ''}`}
       style={{
         left: element.x,
         top: element.y,
@@ -104,11 +114,17 @@ export function ImageRenderer({ element, isSelected, onSelect, onUpdate, scale, 
       }}
       onMouseDown={handleMouseDown}
     >
-      <img
-        src={element.src}
-        alt=""
-        style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }}
-      />
+      <div className="webcard__inner">
+        <div className="webcard__header">
+          {favicon && <img src={favicon} alt="" className="webcard__favicon" />}
+          <span className="webcard__title">{element.title || 'Untitled'}</span>
+        </div>
+        <a className="webcard__url" href={element.url} target="_blank" rel="noopener noreferrer"
+           onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+          {element.url}
+        </a>
+        <div className="webcard__snippet">{element.snippet}</div>
+      </div>
       {showHandles && HANDLES.map(({ dir, x, y, cursor }) => (
         <div
           key={dir}

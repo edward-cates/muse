@@ -109,7 +109,8 @@ body {
 }
 
 .shape.text-element,
-.shape.image-element {
+.shape.image-element,
+.shape.webcard-element {
   pointer-events: auto;
 }
 
@@ -906,6 +907,82 @@ body {
   pointer-events: none;
 }
 
+/* ── Web Card Element ── */
+.webcard-element {
+  position: absolute;
+  cursor: grab;
+  user-select: none;
+}
+
+.webcard__inner {
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.webcard__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.webcard__favicon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.webcard__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.webcard__url {
+  font-size: 11px;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.webcard__url:hover {
+  text-decoration: underline;
+  color: #4465e9;
+}
+
+.webcard__snippet {
+  font-size: 12px;
+  color: #374151;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  flex: 1;
+}
+
 /* ── Shape Text Container (vertical align) ── */
 .shape__text-container {
   position: absolute;
@@ -1204,3 +1281,17 @@ body {
 [data-theme="dark"] .rotation-handle {
   background: #2a2a4a;
 }
+
+/* ── AI Chat Markdown ── */
+.ai-chat-markdown { font-size: 14px; line-height: 1.5; }
+.ai-chat-markdown p { margin: 0 0 8px; }
+.ai-chat-markdown p:last-child { margin-bottom: 0; }
+.ai-chat-markdown h1, .ai-chat-markdown h2, .ai-chat-markdown h3 { font-size: 14px; font-weight: 600; margin: 12px 0 4px; }
+.ai-chat-markdown h1:first-child, .ai-chat-markdown h2:first-child, .ai-chat-markdown h3:first-child { margin-top: 0; }
+.ai-chat-markdown ul, .ai-chat-markdown ol { margin: 4px 0; padding-left: 20px; }
+.ai-chat-markdown li { margin: 2px 0; }
+.ai-chat-markdown code { background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
+.ai-chat-markdown pre { background: rgba(0,0,0,0.06); padding: 8px; border-radius: 6px; overflow-x: auto; margin: 4px 0; }
+.ai-chat-markdown pre code { background: none; padding: 0; }
+.ai-chat-markdown a { color: #4465e9; text-decoration: none; }
+.ai-chat-markdown a:hover { text-decoration: underline; }
