@@ -2,8 +2,10 @@ import type { PathElement } from '../types'
 
 interface Props {
   paths: PathElement[]
-  selectedId: string | null
-  onSelect: (id: string) => void
+  selectedIds: string[]
+  onSelect: (id: string, shiftKey?: boolean) => void
+  onDragMove?: (id: string, dx: number, dy: number) => void
+  onDragEnd?: () => void
   drawingPath: { points: number[]; stroke: string; strokeWidth: number } | null
 }
 
@@ -31,15 +33,20 @@ function pointsToSvgPath(pts: number[]): string {
   return d
 }
 
-export function PathLayer({ paths, selectedId, onSelect, drawingPath }: Props) {
+export function PathLayer({ paths, selectedIds, onSelect, onDragMove, onDragEnd, drawingPath }: Props) {
   return (
-    <svg className="canvas__paths" style={{ overflow: 'visible', position: 'absolute', top: 0, left: 0 }}>
+    <svg className="canvas__paths" style={{ overflow: 'visible', position: 'absolute', top: 0, left: 0, width: 5000, height: 5000 }}>
       {paths.map((p) => {
         const d = pointsToSvgPath(p.points.map((v, i) => (i % 2 === 0 ? v - p.x : v - p.y)))
-        const isSelected = p.id === selectedId
+        const isSelected = selectedIds.includes(p.id)
         return (
-          <g key={p.id} transform={`translate(${p.x},${p.y})`}>
-            {/* Invisible fat hit area */}
+          <g
+            key={p.id}
+            transform={`translate(${p.x},${p.y})`}
+          >
+            {/* Invisible fat hit area — onMouseDown here because <g> inherits
+                pointer-events:none from .canvas__paths, so only <path> children
+                with pointer-events:stroke reliably receive events */}
             <path
               className="path-hitarea"
               d={d}
@@ -50,18 +57,48 @@ export function PathLayer({ paths, selectedId, onSelect, drawingPath }: Props) {
               strokeLinejoin="round"
               onMouseDown={(e) => {
                 e.stopPropagation()
-                onSelect(p.id)
+                onSelect(p.id, e.shiftKey)
+
+                // Start drag — per-event listeners (same pattern as ShapeRenderer)
+                const startX = e.clientX
+                const startY = e.clientY
+                const handleMove = (ev: globalThis.MouseEvent) => {
+                  const dx = ev.clientX - startX
+                  const dy = ev.clientY - startY
+                  onDragMove?.(p.id, dx, dy)
+                }
+                const handleUp = () => {
+                  onDragEnd?.()
+                  window.removeEventListener('mousemove', handleMove)
+                  window.removeEventListener('mouseup', handleUp)
+                }
+                window.addEventListener('mousemove', handleMove)
+                window.addEventListener('mouseup', handleUp)
               }}
             />
+            {/* Selection glow behind selected paths */}
+            {isSelected && (
+              <path
+                d={d}
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth={p.strokeWidth + 6}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.25}
+                style={{ pointerEvents: 'none' }}
+              />
+            )}
             {/* Visible stroke */}
             <path
               d={d}
               fill="none"
-              stroke={isSelected ? '#4f46e5' : p.stroke}
+              stroke={p.stroke}
               strokeWidth={isSelected ? p.strokeWidth + 1 : p.strokeWidth}
               strokeLinecap="round"
               strokeLinejoin="round"
               className={isSelected ? 'path--selected' : ''}
+              style={{ pointerEvents: 'none' }}
             />
           </g>
         )

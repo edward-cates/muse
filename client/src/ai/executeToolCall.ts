@@ -1,4 +1,4 @@
-import type { Anchor, ShapeType } from '../types'
+import type { ShapeType } from '../types'
 
 export interface ToolCall {
   id: string
@@ -8,7 +8,7 @@ export interface ToolCall {
 
 export interface ElementActions {
   addShape: (type: ShapeType, x: number, y: number, w: number, h: number) => string
-  addLine: (startShapeId: string, endShapeId: string, startAnchor: Anchor, endAnchor: Anchor) => string
+  addLine: (startShapeId: string, endShapeId: string, startAnchorX: number, startAnchorY: number, endAnchorX: number, endAnchorY: number) => string
   updateElement: (id: string, updates: Record<string, unknown>) => void
   deleteElement: (id: string) => void
 }
@@ -45,12 +45,15 @@ export function executeToolCall(
       }
 
       case 'add_line': {
-        const { start_shape_id, end_shape_id, start_anchor, end_anchor } = call.input as {
-          start_shape_id: string; end_shape_id: string; start_anchor: string; end_anchor: string
+        const { start_shape_id, end_shape_id, start_anchor_x, start_anchor_y, end_anchor_x, end_anchor_y } = call.input as {
+          start_shape_id: string; end_shape_id: string
+          start_anchor_x?: number; start_anchor_y?: number
+          end_anchor_x?: number; end_anchor_y?: number
         }
         const id = actions.addLine(
           start_shape_id, end_shape_id,
-          start_anchor as Anchor, end_anchor as Anchor,
+          start_anchor_x ?? 1, start_anchor_y ?? 0.5,
+          end_anchor_x ?? 0, end_anchor_y ?? 0.5,
         )
         return { tool_use_id: call.id, content: JSON.stringify({ id, success: true }) }
       }

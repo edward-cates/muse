@@ -33,6 +33,11 @@ test.describe('Pan and Zoom', () => {
     await expect(canvas.canvas).not.toHaveClass(/canvas--space-held/)
   })
 
+  test('canvas has touch-action none to prevent browser pinch zoom', async ({ page }) => {
+    const touchAction = await canvas.canvas.evaluate(el => getComputedStyle(el).touchAction)
+    expect(touchAction).toBe('none')
+  })
+
   test('cursor class changes per active tool', async () => {
     await canvas.selectTool('rectangle')
     await expect(canvas.canvas).toHaveClass(/canvas--tool-shape/)

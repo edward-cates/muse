@@ -40,6 +40,11 @@ test.describe('Keyboard shortcuts', () => {
     await expect(canvas.toolButton('line')).toHaveClass(/toolbar__btn--active/)
   })
 
+  test('A key switches to arrow tool', async ({ page }) => {
+    await page.keyboard.press('a')
+    await expect(canvas.toolButton('arrow')).toHaveClass(/toolbar__btn--active/)
+  })
+
   test('Escape deselects and switches to select', async ({ page }) => {
     // Create a shape so there's something selected
     await canvas.selectTool('rectangle')
