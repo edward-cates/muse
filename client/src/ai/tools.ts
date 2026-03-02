@@ -78,12 +78,12 @@ export const CANVAS_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'add_line',
-    description: 'Add a connector line between two shapes. Routing is automatic — just specify the two shape IDs.',
+    description: 'Add a connector line between two shapes. Routing is automatic. Reference shapes by full ID or short ID (first 8 chars).',
     input_schema: {
       type: 'object',
       properties: {
-        start_shape_id: { type: 'string', description: 'ID of the shape where the line starts' },
-        end_shape_id: { type: 'string', description: 'ID of the shape where the line ends' },
+        start_shape_id: { type: 'string', description: 'ID of the start shape (full UUID or first 8 chars)' },
+        end_shape_id: { type: 'string', description: 'ID of the end shape (full UUID or first 8 chars)' },
         lineType: {
           type: 'string',
           enum: ['straight', 'elbow', 'curve'],
@@ -97,12 +97,12 @@ export const CANVAS_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'add_arrow',
-    description: 'Add an arrow connector. Either or both endpoints can attach to shapes (via shape ID) or be free-floating (via x,y coordinates). Routing is automatic.',
+    description: 'Add an arrow connector. Either or both endpoints can attach to shapes (via ID) or be free-floating (via x,y coordinates). Routing is automatic.',
     input_schema: {
       type: 'object',
       properties: {
-        start_shape_id: { type: 'string', description: 'ID of the shape where the arrow starts (empty string or omit for free endpoint)' },
-        end_shape_id: { type: 'string', description: 'ID of the shape where the arrow ends (empty string or omit for free endpoint)' },
+        start_shape_id: { type: 'string', description: 'ID of the start shape (full UUID or first 8 chars, omit for free endpoint)' },
+        end_shape_id: { type: 'string', description: 'ID of the end shape (full UUID or first 8 chars, omit for free endpoint)' },
         start_x: { type: 'number', description: 'X coordinate for free-floating start point' },
         start_y: { type: 'number', description: 'Y coordinate for free-floating start point' },
         end_x: { type: 'number', description: 'X coordinate for free-floating end point' },
@@ -138,6 +138,26 @@ export const CANVAS_TOOLS: ToolDefinition[] = [
         gap_y: { type: 'number', description: 'Vertical gap between elements (default 40)' },
       },
       required: ['element_ids'],
+    },
+  },
+  {
+    name: 'set_viewport',
+    description: 'Control the user\'s viewport. Viewport auto-fits after each tool call, so this is only needed to focus on a subset of elements.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        mode: {
+          type: 'string',
+          enum: ['fit_all', 'fit_elements'],
+          description: 'fit_all zooms to show all elements; fit_elements focuses on specific elements',
+        },
+        element_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'IDs of elements to focus on (for fit_elements mode)',
+        },
+      },
+      required: ['mode'],
     },
   },
   {

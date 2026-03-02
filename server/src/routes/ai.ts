@@ -9,16 +9,15 @@ function getSupabase() {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
-router.post('/message', async (req, res) => {
-  const userId = req.userId!
-  const { messages, system, tools, model = 'claude-opus-4-6' } = req.body
-
-  if (!messages || !Array.isArray(messages)) {
-    res.status(400).json({ error: 'messages array is required' })
-    return
+class ApiKeyError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
   }
+}
 
-  // Fetch and decrypt the user's API key
+async function decryptUserApiKey(userId: string): Promise<string> {
   const supabase = getSupabase()
   const { data: secret } = await supabase
     .from('user_secrets')
@@ -28,16 +27,95 @@ router.post('/message', async (req, res) => {
     .maybeSingle()
 
   if (!secret) {
-    res.status(400).json({ error: 'No API key configured. Add one in Settings.' })
+    throw new ApiKeyError('No API key configured. Add one in Settings.', 400)
+  }
+
+  try {
+    return decrypt(secret.encrypted_key)
+  } catch {
+    throw new ApiKeyError('Failed to decrypt API key', 500)
+  }
+}
+
+// ── POST /classify — LLM-based intent classification ──
+
+const CLASSIFY_SYSTEM = `Classify the user's message into exactly one category. Reply with ONLY the category name, nothing else.
+
+canvas_edit — The user wants to create, modify, or arrange visual elements on a drawing canvas. Examples: "draw a flowchart", "wireframe a dashboard", "connect the two shapes", "make a mind map of React concepts".
+
+research — The user wants to find information, look something up, or learn about a topic. Includes bare URLs. Examples: "what is a CRDT?", "search for React hooks best practices", "https://example.com summarize this".
+
+chat — General conversation that is neither canvas editing nor research. Examples: "hello", "what can you do?", "thanks".`
+
+const VALID_INTENTS = ['canvas_edit', 'research', 'chat'] as const
+
+router.post('/classify', async (req, res) => {
+  const userId = req.userId!
+  const { message } = req.body
+
+  if (!message || typeof message !== 'string') {
+    res.status(400).json({ error: 'message string is required' })
     return
   }
 
   let apiKey: string
   try {
-    apiKey = decrypt(secret.encrypted_key)
-  } catch {
-    res.status(500).json({ error: 'Failed to decrypt API key' })
+    apiKey = await decryptUserApiKey(userId)
+  } catch (err) {
+    if (err instanceof ApiKeyError) {
+      res.status(err.status).json({ error: err.message })
+      return
+    }
+    throw err
+  }
+
+  try {
+    const client = new Anthropic({ apiKey })
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 20,
+      system: CLASSIFY_SYSTEM,
+      messages: [{ role: 'user', content: message }],
+    })
+
+    const text = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('')
+      .trim()
+      .toLowerCase()
+
+    const intent = VALID_INTENTS.includes(text as typeof VALID_INTENTS[number])
+      ? text as typeof VALID_INTENTS[number]
+      : 'chat'
+
+    res.json({ intent })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Classification failed'
+    res.status(500).json({ error: message })
+  }
+})
+
+// ── POST /message — streaming AI proxy ──
+
+router.post('/message', async (req, res) => {
+  const userId = req.userId!
+  const { messages, system, tools, model = 'claude-opus-4-6' } = req.body
+
+  if (!messages || !Array.isArray(messages)) {
+    res.status(400).json({ error: 'messages array is required' })
     return
+  }
+
+  let apiKey: string
+  try {
+    apiKey = await decryptUserApiKey(userId)
+  } catch (err) {
+    if (err instanceof ApiKeyError) {
+      res.status(err.status).json({ error: err.message })
+      return
+    }
+    throw err
   }
 
   // Stream response via SSE

@@ -11,11 +11,17 @@ const CANVAS_KEYWORDS = [
   'layout', 'arrange', 'diagram', 'flowchart', 'shape', 'box', 'circle',
   'arrow', 'mind map', 'organize', 'place', 'position', 'resize',
   'update', 'change', 'modify', 'rename', 'label', 'color',
+  'wireframe', 'sketch', 'design', 'build', 'make',
+  'tree', 'graph', 'chart', 'dashboard', 'grid',
+  'table', 'hierarchy', 'architecture',
 ]
 
 const URL_RE = /https?:\/\/[^\s]+/i
 
-export function classifyIntent(message: string): AgentIntent {
+const VALID_INTENTS: readonly AgentIntent[] = ['canvas_edit', 'research', 'chat']
+
+/** Keyword-based intent heuristic (synchronous fallback) */
+export function classifyIntentLocal(message: string): AgentIntent {
   const lower = message.toLowerCase().trim()
 
   // URL-only or URL + short instruction → research
@@ -37,4 +43,33 @@ export function classifyIntent(message: string): AgentIntent {
   if (researchScore > canvasScore) return 'research'
   if (canvasScore > 0) return 'canvas_edit'
   return 'chat'
+}
+
+/** LLM-based intent classification with keyword fallback */
+export async function classifyIntent(
+  message: string,
+  token: string,
+  signal?: AbortSignal,
+): Promise<AgentIntent> {
+  try {
+    const res = await fetch('/api/ai/classify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ message }),
+      signal,
+    })
+
+    if (!res.ok) return classifyIntentLocal(message)
+
+    const data = await res.json() as { intent?: string }
+    if (data.intent && VALID_INTENTS.includes(data.intent as AgentIntent)) {
+      return data.intent as AgentIntent
+    }
+    return classifyIntentLocal(message)
+  } catch {
+    return classifyIntentLocal(message)
+  }
 }

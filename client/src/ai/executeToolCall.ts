@@ -17,6 +17,8 @@ export interface ElementActions {
   updateElement: (id: string, updates: Record<string, unknown>) => void
   deleteElement: (id: string) => void
   getElements: () => CanvasElement[]
+  fitToContent?: () => void
+  fitToElements?: (ids: string[]) => void
 }
 
 export interface FetchUrlFn {
@@ -25,6 +27,24 @@ export interface FetchUrlFn {
 
 function findElement(elements: CanvasElement[], id: string): CanvasElement | undefined {
   return elements.find(el => el.id === id)
+}
+
+/**
+ * Flexible shape lookup: tries exact ID → prefix match (8+ chars only).
+ * The model should reference shapes by full UUID or the 8-char short ID
+ * shown in the system prompt (e.g. Shape<82d47c83>).
+ */
+export function resolveShape(elements: CanvasElement[], ref: string): CanvasElement | undefined {
+  if (!ref) return undefined
+  // 1. Exact ID match
+  const exact = elements.find(el => el.id === ref)
+  if (exact) return exact
+  // 2. Prefix match — only for 8+ char refs to avoid collisions with short strings
+  if (ref.length >= 8 && ref.length < 36) {
+    const prefix = elements.find(el => el.id.startsWith(ref))
+    if (prefix) return prefix
+  }
+  return undefined
 }
 
 export async function executeToolCall(
@@ -85,7 +105,8 @@ export async function executeToolCall(
 
       case 'update_element': {
         const { id, ...updates } = call.input as { id: string; [key: string]: unknown }
-        if (!findElement(elements, id)) {
+        const resolved = resolveShape(elements, id) || findElement(elements, id)
+        if (!resolved) {
           return { tool_use_id: call.id, content: JSON.stringify({ error: `Element "${id}" not found. Available IDs: ${elements.map(e => e.id.slice(0, 8)).join(', ')}` }) }
         }
         const warnings: string[] = []
@@ -99,7 +120,7 @@ export async function executeToolCall(
           updates.stroke = v.normalized
           if (v.warning) warnings.push(v.warning)
         }
-        actions.updateElement(id, updates)
+        actions.updateElement(resolved.id, updates)
         const result = warnings.length > 0
           ? { success: true, warnings }
           : { success: true }
@@ -108,10 +129,11 @@ export async function executeToolCall(
 
       case 'delete_element': {
         const { id } = call.input as { id: string }
-        if (!findElement(elements, id)) {
+        const resolved = resolveShape(elements, id) || findElement(elements, id)
+        if (!resolved) {
           return { tool_use_id: call.id, content: JSON.stringify({ error: `Element "${id}" not found` }) }
         }
-        actions.deleteElement(id)
+        actions.deleteElement(resolved.id)
         return { tool_use_id: call.id, content: JSON.stringify({ success: true }) }
       }
 
@@ -120,11 +142,13 @@ export async function executeToolCall(
           start_shape_id: string; end_shape_id: string
           lineType?: string; stroke?: string; strokeWidth?: number
         }
-        if (!findElement(elements, start_shape_id)) return { tool_use_id: call.id, content: JSON.stringify({ error: `Start shape "${start_shape_id}" not found` }) }
-        if (!findElement(elements, end_shape_id)) return { tool_use_id: call.id, content: JSON.stringify({ error: `End shape "${end_shape_id}" not found` }) }
+        const startEl = resolveShape(elements, start_shape_id)
+        if (!startEl) return { tool_use_id: call.id, content: JSON.stringify({ error: `Start shape "${start_shape_id}" not found. Available: ${elements.filter(e => isShape(e)).map(e => `${e.id.slice(0,8)}${isShape(e) && e.text ? ' "'+e.text+'"' : ''}`).join(', ')}` }) }
+        const endEl = resolveShape(elements, end_shape_id)
+        if (!endEl) return { tool_use_id: call.id, content: JSON.stringify({ error: `End shape "${end_shape_id}" not found. Available: ${elements.filter(e => isShape(e)).map(e => `${e.id.slice(0,8)}${isShape(e) && e.text ? ' "'+e.text+'"' : ''}`).join(', ')}` }) }
 
         const id = actions.addLine(
-          start_shape_id, end_shape_id,
+          startEl.id, endEl.id,
           (lineType as LineType) || 'straight',
         )
         const updates: Record<string, unknown> = {}
@@ -150,8 +174,10 @@ export async function executeToolCall(
           lineType?: string; stroke?: string; strokeWidth?: number
         }
 
-        const sId = start_shape_id || ''
-        const eId = end_shape_id || ''
+        const startResolved = start_shape_id ? resolveShape(elements, start_shape_id) : undefined
+        const endResolved = end_shape_id ? resolveShape(elements, end_shape_id) : undefined
+        const sId = startResolved?.id || ''
+        const eId = endResolved?.id || ''
 
         const id = actions.addArrow(
           sId, eId,
@@ -180,7 +206,7 @@ export async function executeToolCall(
         const cols = columns || Math.ceil(Math.sqrt(element_ids.length))
         let moved = 0
         for (let i = 0; i < element_ids.length; i++) {
-          const el = findElement(elements, element_ids[i])
+          const el = resolveShape(elements, element_ids[i]) || findElement(elements, element_ids[i])
           if (!el) continue
           const col = i % cols
           const row = Math.floor(i / cols)
@@ -188,7 +214,7 @@ export async function executeToolCall(
           const elH = isShape(el) ? el.height : 80
           const x = start_x + col * (elW + gap_x)
           const y = start_y + row * (elH + gap_y)
-          actions.updateElement(element_ids[i], { x, y })
+          actions.updateElement(el.id, { x, y })
           moved++
         }
         return { tool_use_id: call.id, content: JSON.stringify({ success: true, moved, columns: cols }) }
@@ -201,9 +227,9 @@ export async function executeToolCall(
         let cx = start_x, cy = start_y
         let moved = 0
         for (const eid of element_ids) {
-          const el = findElement(elements, eid)
+          const el = resolveShape(elements, eid) || findElement(elements, eid)
           if (!el) continue
-          actions.updateElement(eid, { x: cx, y: cy })
+          actions.updateElement(el.id, { x: cx, y: cy })
           const elW = isShape(el) ? el.width : 160
           const elH = isShape(el) ? el.height : 80
           if (direction === 'horizontal') cx += elW + gap
@@ -211,6 +237,36 @@ export async function executeToolCall(
           moved++
         }
         return { tool_use_id: call.id, content: JSON.stringify({ success: true, moved, direction }) }
+      }
+
+      case 'set_viewport': {
+        const { mode, element_ids } = call.input as { mode: string; element_ids?: string[] }
+        if (mode === 'fit_all') {
+          if (!actions.fitToContent) {
+            return { tool_use_id: call.id, content: JSON.stringify({ error: 'Viewport control not available' }) }
+          }
+          actions.fitToContent()
+          return { tool_use_id: call.id, content: JSON.stringify({ success: true, message: 'Viewport fitted to all content' }) }
+        }
+        if (mode === 'fit_elements') {
+          if (!actions.fitToElements) {
+            return { tool_use_id: call.id, content: JSON.stringify({ error: 'Viewport control not available' }) }
+          }
+          if (!element_ids || element_ids.length === 0) {
+            return { tool_use_id: call.id, content: JSON.stringify({ error: 'element_ids required for fit_elements mode' }) }
+          }
+          const resolvedIds: string[] = []
+          for (const eid of element_ids) {
+            const el = resolveShape(elements, eid) || findElement(elements, eid)
+            if (el) resolvedIds.push(el.id)
+          }
+          if (resolvedIds.length === 0) {
+            return { tool_use_id: call.id, content: JSON.stringify({ error: 'No matching elements found' }) }
+          }
+          actions.fitToElements(resolvedIds)
+          return { tool_use_id: call.id, content: JSON.stringify({ success: true, message: `Viewport fitted to ${resolvedIds.length} elements` }) }
+        }
+        return { tool_use_id: call.id, content: JSON.stringify({ error: `Unknown viewport mode: ${mode}` }) }
       }
 
       case 'add_web_card': {

@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect, type MouseEvent } from 'react'
+import { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, type MouseEvent, type Ref } from 'react'
 import { useCursors } from '../hooks/useCursors'
 import { useCollab } from '../collab/CollabContext'
 import { ShapeRenderer } from './ShapeRenderer'
@@ -41,6 +41,11 @@ interface Props {
   stopCapturing: () => void
 }
 
+export interface CanvasHandle {
+  fitToContent: () => void
+  fitToElements: (ids: string[]) => void
+}
+
 const SHAPE_TOOLS: Tool[] = ['rectangle', 'ellipse', 'diamond', 'triangle', 'hexagon', 'star', 'cloud']
 const MIN_SHAPE_SIZE = 10
 const GRID_SIZE = 20
@@ -50,12 +55,12 @@ function snapToGrid(v: number, gridEnabled: boolean): number {
   return Math.round(v / GRID_SIZE) * GRID_SIZE
 }
 
-export function Canvas({
+export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
   activeTool, activeLineType, selectedIds, onSelectedIdsChange, onToolChange, onShapeCreated,
   elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame,
   updateElement, deleteElement, gridEnabled, darkMode, minimapVisible,
   setLastUsedStyle, groupElements, ungroupElements, stopCapturing,
-}: Props) {
+}, ref) {
   const selectedId = selectedIds.length === 1 ? selectedIds[0] : null
   const { awareness } = useCollab()
   const cursors = useCursors()
@@ -275,6 +280,16 @@ export function Canvas({
       y: (vh - bh * s) / 2 - minY * s + padding * s,
     })
   }, [])
+
+  useImperativeHandle(ref, () => ({
+    fitToContent() {
+      if (elements.length > 0) fitElements(elements)
+    },
+    fitToElements(ids: string[]) {
+      const filtered = elements.filter(el => ids.includes(el.id))
+      if (filtered.length > 0) fitElements(filtered)
+    },
+  }), [elements, fitElements])
 
   const startPan = useCallback(
     (clientX: number, clientY: number) => {
@@ -1330,4 +1345,4 @@ export function Canvas({
       )}
     </div>
   )
-}
+})

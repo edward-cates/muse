@@ -10,3 +10,5 @@ test-results
 playwright-report
 integration-report
 .auth-state.json
+ai-logs/
+muse-data/

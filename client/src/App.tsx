@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Canvas } from './components/Canvas'
+import { Canvas, type CanvasHandle } from './components/Canvas'
 import { Toolbar } from './components/Toolbar'
 import { StatusBar } from './components/StatusBar'
 import { SettingsPanel } from './components/SettingsPanel'
 import { AiPanel } from './components/AiPanel'
 import { DrawingsList } from './components/DrawingsList'
 import { DrawingTitle } from './components/DrawingTitle'
-import { useElements } from './hooks/useElements'
+import { useElements, readElement } from './hooks/useElements'
 import type { Tool, LineType, CanvasElement } from './types'
 import { isShape, isLine, isText } from './types'
 
@@ -20,6 +20,9 @@ export function App({ drawingId }: { drawingId: string }) {
   const [darkMode, setDarkMode] = useState(false)
   const [minimapVisible, setMinimapVisible] = useState(false)
 
+  // Canvas handle for viewport control
+  const canvasRef = useRef<CanvasHandle>(null)
+
   // Clipboard buffer
   const clipboardRef = useRef<CanvasElement[]>([])
   // Style clipboard
@@ -29,7 +32,7 @@ export function App({ drawingId }: { drawingId: string }) {
     elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame, addWebCard,
     updateElement, deleteElement, undo, redo, stopCapturing,
     reorderElement, groupElements, ungroupElements,
-    setLastUsedStyle, doc,
+    setLastUsedStyle, doc, yElements,
   } = useElements()
 
   const switchToSelect = useCallback(() => setActiveTool('select'), [])
@@ -75,6 +78,15 @@ export function App({ drawingId }: { drawingId: string }) {
       if (meta && e.key.toLowerCase() === 'z' && e.shiftKey) {
         e.preventDefault()
         redo()
+        return
+      }
+
+      // Don't intercept keys when typing in a textarea/input (except undo/redo above)
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'TEXTAREA' || tag === 'INPUT') {
+        if (e.key === 'Escape') {
+          (e.target as HTMLElement).blur()
+        }
         return
       }
 
@@ -282,14 +294,6 @@ export function App({ drawingId }: { drawingId: string }) {
         return
       }
 
-      // Don't intercept non-meta keys when typing in a textarea/input
-      if ((e.target as HTMLElement).tagName === 'TEXTAREA' || (e.target as HTMLElement).tagName === 'INPUT') {
-        if (e.key === 'Escape') {
-          (e.target as HTMLElement).blur()
-        }
-        return
-      }
-
       // Select all
       if (meta && e.key.toLowerCase() === 'a') {
         e.preventDefault()
@@ -388,6 +392,7 @@ export function App({ drawingId }: { drawingId: string }) {
   return (
     <div className="app">
       <Canvas
+        ref={canvasRef}
         activeTool={activeTool}
         activeLineType={activeLineType}
         selectedIds={selectedIds}
@@ -436,7 +441,9 @@ export function App({ drawingId }: { drawingId: string }) {
         elementActions={{
           addShape, addLine, addArrow, addText, addWebCard,
           updateElement, deleteElement,
-          getElements: () => elements,
+          getElements: () => yElements.toArray().map(readElement),
+          fitToContent: () => canvasRef.current?.fitToContent(),
+          fitToElements: (ids: string[]) => canvasRef.current?.fitToElements(ids),
         }}
       />
       <DrawingTitle drawingId={drawingId} />

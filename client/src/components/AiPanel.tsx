@@ -2,12 +2,43 @@ import { useState, useRef, useEffect, type FormEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../auth/AuthContext'
 import { executeToolCall, type ToolCall, type ElementActions } from '../ai/executeToolCall'
-import { captureCanvas } from '../ai/canvasCapture'
-import { classifyIntent } from '../ai/router'
+import { captureCanvas, computeBounds } from '../ai/canvasCapture'
+import { classifyIntent, type AgentIntent } from '../ai/router'
 import { buildCanvasEditorConfig } from '../ai/agents/canvasEditor'
 import { buildResearcherConfig } from '../ai/agents/researcher'
 import type { AgentConfig } from '../ai/agents/types'
 import type { CanvasElement } from '../types'
+
+// ── AI interaction logger ──
+
+function makeConversationId(): string {
+  return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+}
+
+async function logToFile(
+  token: string,
+  conversationId: string,
+  turn: number,
+  filename: string,
+  data: unknown,
+) {
+  try {
+    await fetch('/api/ailog/write', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ conversation: conversationId, turn, filename, data }),
+    })
+  } catch { /* best-effort */ }
+}
+
+function snapshotElements(elements: CanvasElement[]) {
+  return elements.map(e => ({
+    id: e.id.slice(0, 8),
+    type: e.type,
+    ...('text' in e ? { text: (e as { text: string }).text } : {}),
+    ...('x' in e ? { x: (e as { x: number }).x, y: (e as { y: number }).y } : {}),
+  }))
+}
 
 // ── Types ──
 
@@ -66,15 +97,23 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages, status])
 
-  async function parseStream(
+  /** Tools that mutate canvas content (trigger auto-fit after execution) */
+  const CANVAS_MUTATING_TOOLS = new Set([
+    'add_shape', 'add_text', 'add_line', 'add_arrow', 'add_web_card',
+    'update_element', 'delete_element', 'arrange_grid', 'arrange_flow',
+  ])
+
+  async function parseStreamAndExecute(
     res: Response,
     signal: AbortSignal,
+    onToolCall: (tc: ToolCall) => Promise<{ tool_use_id: string; content: string }>,
     onStatus?: (status: string) => void,
-  ): Promise<{ textContent: string; toolCalls: ToolCall[]; stopReason: string }> {
+  ): Promise<{ textContent: string; toolCalls: ToolCall[]; toolResults: { tool_use_id: string; content: string }[]; stopReason: string }> {
     const reader = res.body!.getReader()
     const decoder = new TextDecoder()
     let textContent = ''
     const toolCalls: ToolCall[] = []
+    const toolResults: { tool_use_id: string; content: string }[] = []
     let currentTool: { id: string; name: string; inputJson: string } | null = null
     let stopReason = 'end_turn'
     let buffer = ''
@@ -134,8 +173,15 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
               try {
                 input = JSON.parse(currentTool.inputJson)
               } catch { /* empty */ }
-              toolCalls.push({ id: currentTool.id, name: currentTool.name, input })
+              const tc: ToolCall = { id: currentTool.id, name: currentTool.name, input }
+              toolCalls.push(tc)
               currentTool = null
+
+              // Execute immediately as tool completes
+              if (!signal.aborted) {
+                const result = await onToolCall(tc)
+                toolResults.push(result)
+              }
             }
             break
 
@@ -152,35 +198,7 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
       }
     }
 
-    return { textContent, toolCalls, stopReason }
-  }
-
-  function describeToolCalls(calls: ToolCall[]): string {
-    const parts: string[] = []
-    let shapes = 0, lines = 0, arrows = 0, texts = 0, updates = 0, deletes = 0, arranges = 0, webcards = 0, fetches = 0
-    for (const c of calls) {
-      switch (c.name) {
-        case 'add_shape': shapes++; break
-        case 'add_line': lines++; break
-        case 'add_arrow': arrows++; break
-        case 'add_text': texts++; break
-        case 'update_element': updates++; break
-        case 'delete_element': deletes++; break
-        case 'arrange_grid': case 'arrange_flow': arranges++; break
-        case 'add_web_card': webcards++; break
-        case 'fetch_url': fetches++; break
-      }
-    }
-    if (shapes) parts.push(`${shapes} shape${shapes > 1 ? 's' : ''} added`)
-    if (lines) parts.push(`${lines} line${lines > 1 ? 's' : ''} connected`)
-    if (arrows) parts.push(`${arrows} arrow${arrows > 1 ? 's' : ''} added`)
-    if (texts) parts.push(`${texts} text${texts > 1 ? 's' : ''} added`)
-    if (webcards) parts.push(`${webcards} card${webcards > 1 ? 's' : ''} added`)
-    if (fetches) parts.push(`${fetches} page${fetches > 1 ? 's' : ''} fetched`)
-    if (updates) parts.push(`${updates} element${updates > 1 ? 's' : ''} updated`)
-    if (deletes) parts.push(`${deletes} element${deletes > 1 ? 's' : ''} removed`)
-    if (arranges) parts.push(`${arranges} layout${arranges > 1 ? 's' : ''} applied`)
-    return parts.join(', ')
+    return { textContent, toolCalls, toolResults, stopReason }
   }
 
   function describeToolAction(tc: ToolCall): string {
@@ -209,12 +227,12 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
           return `Fetching page...`
         }
       }
+      case 'set_viewport': return `Adjusting view...`
       default: return `Running ${tc.name}...`
     }
   }
 
-  function buildAgentConfig(): AgentConfig {
-    const intent = classifyIntent(input)
+  function buildAgentConfigFromIntent(intent: AgentIntent): AgentConfig {
     switch (intent) {
       case 'canvas_edit':
         return buildCanvasEditorConfig(elements)
@@ -229,6 +247,15 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
           maxTurns: 1,
         }
     }
+  }
+
+  async function buildAgentConfig(
+    text: string,
+    token: string,
+    signal?: AbortSignal,
+  ): Promise<AgentConfig> {
+    const intent = await classifyIntent(text, token, signal)
+    return buildAgentConfigFromIntent(intent)
   }
 
   /** Fetch URL via server proxy */
@@ -258,12 +285,20 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
     let turns = 0
     let looping = true
     let consecutiveFailTurns = 0
+    const conversationId = makeConversationId()
+    const token = session!.access_token
+    const log = (turn: number, filename: string, data: unknown) =>
+      logToFile(token, conversationId, turn, filename, data)
 
     // Build tools array: custom tools + native tools
     const allTools: unknown[] = [...config.tools]
     if (config.nativeTools) {
       allTools.push(...config.nativeTools)
     }
+
+    // Log conversation setup
+    log(0, 'config.json', { agent: config.name, maxTurns: config.maxTurns, vqa: !!config.vqa, toolCount: allTools.length })
+    log(0, 'system-prompt.txt', config.systemPrompt)
 
     while (looping && turns < config.maxTurns) {
       turns++
@@ -273,11 +308,20 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
         setChatMessages((prev) => [...prev, { role: 'assistant', content: '' }])
       }
 
+      // Log request (redact base64 images)
+      const redactedMessages = currentApiMessages.map(m => {
+        if (typeof m.content === 'string') return m
+        return { ...m, content: (m.content as ContentBlock[]).map(b =>
+          'source' in (b as Record<string, unknown>) ? { type: 'image', note: '(base64 omitted)' } : b
+        )}
+      })
+      log(turns, 'request.json', { messages: redactedMessages })
+
       const res = await fetch('/api/ai/message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session!.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           messages: currentApiMessages,
@@ -292,7 +336,40 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
         throw new Error(data.error || 'Request failed')
       }
 
-      const { textContent, toolCalls, stopReason } = await parseStream(res, abort.signal, setStatus)
+      // Stream-and-execute: tools are executed inline as they complete
+      let failCount = 0
+      const { textContent, toolCalls, toolResults, stopReason } = await parseStreamAndExecute(
+        res, abort.signal,
+        async (tc) => {
+          setStatus(describeToolAction(tc))
+          const result = await executeToolCall(tc, elementActions, fetchUrlViaServer)
+
+          const parsed = (() => { try { return JSON.parse(result.content) } catch { return {} } })()
+
+          // Show per-tool chip (success or error)
+          if (parsed.error) {
+            failCount++
+            setChatMessages((prev) => [...prev, { role: 'tool', content: `Failed: ${parsed.error}` }])
+          } else {
+            setChatMessages((prev) => [...prev, { role: 'tool', content: describeToolAction(tc).replace(/\.\.\.$/, '') }])
+          }
+
+          // Auto-fit viewport after canvas-mutating tools
+          if (CANVAS_MUTATING_TOOLS.has(tc.name) && elementActions.fitToContent) {
+            elementActions.fitToContent()
+          }
+
+          return result
+        },
+        setStatus,
+      )
+
+      // Log model response
+      log(turns, 'response.json', {
+        stopReason,
+        textContent: textContent || null,
+        toolCalls: toolCalls.map(tc => ({ id: tc.id, name: tc.name, input: tc.input })),
+      })
 
       if (stopReason === 'tool_use' && toolCalls.length > 0) {
         // Build the assistant's API message with all content blocks
@@ -306,44 +383,73 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
           { role: 'assistant', content: assistantBlocks },
         ]
 
-        // Execute tools — show per-tool status
-        const statusParts = toolCalls.map(tc => describeToolAction(tc))
-        setStatus(statusParts.join(' '))
-        const toolResults = await Promise.all(
-          toolCalls.map((tc) => executeToolCall(tc, elementActions, fetchUrlViaServer))
-        )
-
-        // Check for consecutive failures
-        const allFailed = toolResults.every(r => {
-          try { return !!JSON.parse(r.content).error } catch { return false }
+        // Log all tool results + store snapshot
+        log(turns, 'tool-results.json', {
+          results: toolResults.map(r => ({ tool_use_id: r.tool_use_id, ...(() => { try { return JSON.parse(r.content) } catch { return { raw: r.content } } })() })),
+          failCount,
+          storeSnapshot: snapshotElements(elementActions.getElements()),
         })
-        consecutiveFailTurns = allFailed ? consecutiveFailTurns + 1 : 0
 
-        // Add tool indicator to chat
-        const description = describeToolCalls(toolCalls)
-        setChatMessages((prev) => [...prev, { role: 'tool', content: description }])
+        // Track failure rate — >50% failures counts as a bad turn
+        const failRate = toolCalls.length > 0 ? failCount / toolCalls.length : 0
+        consecutiveFailTurns = failRate > 0.5 ? consecutiveFailTurns + 1 : 0
 
         // Build tool_result user message
+        const toolResultBlocks: ContentBlock[] = toolResults.map((r) => ({
+          type: 'tool_result' as const,
+          tool_use_id: r.tool_use_id,
+          content: r.content,
+        }))
+
+        // VQA: capture post-execution screenshot for canvas editor
+        if (config.vqa) {
+          const canvasEl = document.querySelector<HTMLDivElement>('[data-testid="canvas"]')
+          if (canvasEl) {
+            try {
+              // Fit viewport before screenshot so the capture shows all content
+              if (elementActions.fitToContent) elementActions.fitToContent()
+
+              const currentElements = elementActions.getElements()
+              const bounds = computeBounds(currentElements)
+              const vqaScreenshot = await captureCanvas(canvasEl)
+
+              // Show screenshot in chat so the user can see what the model sees
+              setChatMessages((prev) => [...prev, {
+                role: 'tool',
+                content: 'Canvas screenshot',
+                imageBase64: vqaScreenshot,
+              }])
+
+              const boundsText = bounds
+                ? `Content bounds: x=${bounds.x} y=${bounds.y} ${bounds.width}×${bounds.height}`
+                : 'Canvas is empty'
+              toolResultBlocks.push({
+                type: 'text',
+                text: `[Screenshot of canvas after your changes. ${boundsText}. Verify the layout looks correct — fix overlaps or missing connections.]`,
+              } as unknown as ContentBlock)
+              toolResultBlocks.push({
+                type: 'image',
+                source: { type: 'base64', media_type: 'image/png', data: vqaScreenshot },
+              } as unknown as ContentBlock)
+              log(turns, 'vqa-screenshot.txt', { boundsText, captured: true })
+            } catch { /* best-effort */ }
+          }
+        }
+
         currentApiMessages = [
           ...currentApiMessages,
-          {
-            role: 'user',
-            content: toolResults.map((r) => ({
-              type: 'tool_result' as const,
-              tool_use_id: r.tool_use_id,
-              content: r.content,
-            })),
-          },
+          { role: 'user', content: toolResultBlocks },
         ]
 
         setStatus(null)
 
-        // Stop after 3 consecutive all-fail turns
-        if (consecutiveFailTurns >= 3) {
+        // Stop after 2 consecutive high-failure turns
+        if (consecutiveFailTurns >= 2) {
           setChatMessages((prev) => [...prev, {
             role: 'assistant',
             content: 'Stopped — repeated tool failures. Try rephrasing your request.',
           }])
+          log(turns, 'stopped.json', { reason: 'consecutive_failures', consecutiveFailTurns })
           looping = false
           continue
         }
@@ -362,6 +468,12 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
       }
     }
 
+    // Log final state
+    log(turns, 'final-state.json', {
+      totalTurns: turns,
+      elements: snapshotElements(elementActions.getElements()),
+    })
+
     return currentApiMessages
   }
 
@@ -370,11 +482,24 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
     const text = input.trim()
     if (!text || streaming || !session?.access_token) return
 
-    // Build agent config BEFORE clearing input (classifyIntent reads it)
-    const agentConfig = buildAgentConfig()
-
+    // Immediate UX feedback before async classification
     setInput('')
     setStreaming(true)
+    setStatus('Thinking...')
+
+    const abort = new AbortController()
+    abortRef.current = abort
+
+    // Classify intent via LLM (with keyword fallback)
+    let agentConfig: AgentConfig
+    try {
+      agentConfig = await buildAgentConfig(text, session.access_token, abort.signal)
+    } catch {
+      // AbortError or unexpected — fall back gracefully
+      setStreaming(false)
+      setStatus(null)
+      return
+    }
     setStatus(null)
 
     // Capture canvas screenshot if available (before adding message so thumbnail is ready)
@@ -416,9 +541,6 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
       ...apiMessages,
       { role: 'user', content: screenshotBase64 ? userContent : text },
     ]
-
-    const abort = new AbortController()
-    abortRef.current = abort
 
     try {
       const finalMessages = await runAgentLoop(agentConfig, currentApiMessages, abort, screenshotBase64)
@@ -478,12 +600,31 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
         )}
         {chatMessages.map((msg, i) => {
           if (msg.role === 'tool') {
+            const isError = msg.content.startsWith('Failed:')
             return (
-              <div key={i} style={styles.toolChip}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>{msg.content}</span>
+              <div key={i} style={{
+                ...(isError ? styles.toolChipError : styles.toolChip),
+                ...(msg.imageBase64 ? { flexDirection: 'column' as const, alignItems: 'flex-start' as const } : {}),
+              }}>
+                {msg.imageBase64 && (
+                  <img
+                    src={`data:image/png;base64,${msg.imageBase64}`}
+                    alt="Canvas screenshot"
+                    style={styles.toolScreenshotThumb}
+                  />
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {isError ? (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                  <span>{msg.content}</span>
+                </div>
               </div>
             )
           }
@@ -638,6 +779,13 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 6,
     display: 'block',
   },
+  toolScreenshotThumb: {
+    maxWidth: 200,
+    borderRadius: 6,
+    border: '1px solid rgba(79, 70, 229, 0.15)',
+    marginBottom: 4,
+    display: 'block',
+  },
   messageText: {
     fontSize: 14,
     lineHeight: 1.5,
@@ -652,6 +800,18 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '5px 10px',
     background: 'rgba(79, 70, 229, 0.08)',
     color: '#4f46e5',
+    borderRadius: 8,
+    fontSize: 12,
+    fontWeight: 500,
+  },
+  toolChipError: {
+    alignSelf: 'flex-start',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '5px 10px',
+    background: 'rgba(220, 38, 38, 0.08)',
+    color: '#dc2626',
     borderRadius: 8,
     fontSize: 12,
     fontWeight: 500,

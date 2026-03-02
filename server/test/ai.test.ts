@@ -52,6 +52,7 @@ function createMockSupabase(): Promise<{ server: Server; url: string }> {
 
 interface AnthropicMockConfig {
   events: string[]       // raw SSE event strings to send
+  nonStreamingResponse?: Record<string, unknown>  // JSON response for non-streaming requests
   captureBody?: (body: Record<string, unknown>) => void
 }
 
@@ -59,6 +60,20 @@ let anthropicMockConfig: AnthropicMockConfig = { events: [] }
 
 function setAnthropicMock(config: AnthropicMockConfig) {
   anthropicMockConfig = config
+}
+
+/** Build a non-streaming Messages API response with a single text block */
+function nonStreamingTextResponse(text: string): Record<string, unknown> {
+  return {
+    id: 'msg_test',
+    type: 'message',
+    role: 'assistant',
+    content: [{ type: 'text', text }],
+    model: 'claude-haiku-4-5-20251001',
+    stop_reason: 'end_turn',
+    stop_sequence: null,
+    usage: { input_tokens: 30, output_tokens: 3 },
+  }
 }
 
 /** Build a standard text-only SSE event sequence */
@@ -104,10 +119,20 @@ function createMockAnthropic(): Promise<{ server: Server; url: string }> {
       let body = ''
       for await (const chunk of req) body += chunk
 
+      const parsed = JSON.parse(body)
+
       if (anthropicMockConfig.captureBody) {
-        anthropicMockConfig.captureBody(JSON.parse(body))
+        anthropicMockConfig.captureBody(parsed)
       }
 
+      // Non-streaming request (no stream: true in body)
+      if (!parsed.stream && anthropicMockConfig.nonStreamingResponse) {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify(anthropicMockConfig.nonStreamingResponse))
+        return
+      }
+
+      // Streaming request (default)
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -489,5 +514,91 @@ describe('AI message route', () => {
 
     // Should succeed (not 413 Payload Too Large)
     assert.equal(res.status, 200)
+  })
+
+  // ── Classify endpoint tests ──
+
+  it('POST /classify returns 400 when message is missing', async () => {
+    const res = await fetch(url('/api/ai/classify'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({}),
+    })
+    assert.equal(res.status, 400)
+    const body = await res.json() as { error: string }
+    assert.equal(body.error, 'message string is required')
+  })
+
+  it('POST /classify returns 400 when no API key configured', async () => {
+    supabaseMockRoutes = [{
+      method: 'GET',
+      table: 'user_secrets',
+      handler: () => ({ status: 200, data: null }),
+    }]
+
+    const res = await fetch(url('/api/ai/classify'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ message: 'draw a flowchart' }),
+    })
+    assert.equal(res.status, 400)
+    const body = await res.json() as { error: string }
+    assert.ok(body.error.includes('No API key'))
+  })
+
+  it('POST /classify returns correct intent for canvas_edit', async () => {
+    mockKeyExists()
+    setAnthropicMock({
+      events: [],
+      nonStreamingResponse: nonStreamingTextResponse('canvas_edit'),
+    })
+
+    const res = await fetch(url('/api/ai/classify'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ message: 'draw a flowchart' }),
+    })
+    assert.equal(res.status, 200)
+    const body = await res.json() as { intent: string }
+    assert.equal(body.intent, 'canvas_edit')
+  })
+
+  it('POST /classify falls back to chat for garbled model output', async () => {
+    mockKeyExists()
+    setAnthropicMock({
+      events: [],
+      nonStreamingResponse: nonStreamingTextResponse('I think you want to edit the canvas'),
+    })
+
+    const res = await fetch(url('/api/ai/classify'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ message: 'draw a flowchart' }),
+    })
+    assert.equal(res.status, 200)
+    const body = await res.json() as { intent: string }
+    assert.equal(body.intent, 'chat')
+  })
+
+  it('POST /classify sends haiku model and max_tokens: 20', async () => {
+    mockKeyExists()
+
+    let capturedBody: Record<string, unknown> | null = null
+    setAnthropicMock({
+      events: [],
+      nonStreamingResponse: nonStreamingTextResponse('research'),
+      captureBody: (body) => { capturedBody = body },
+    })
+
+    await fetch(url('/api/ai/classify'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ message: 'what is a CRDT?' }),
+    })
+
+    assert.ok(capturedBody, 'should have captured the request body')
+    assert.equal(capturedBody!.model, 'claude-haiku-4-5-20251001')
+    assert.equal(capturedBody!.max_tokens, 20)
+    assert.equal(capturedBody!.stream, undefined, 'should NOT be a streaming request')
   })
 })

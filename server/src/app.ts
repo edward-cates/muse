@@ -7,6 +7,7 @@ import keysRouter from './routes/keys.js'
 import aiRouter from './routes/ai.js'
 import drawingsRouter from './routes/drawings.js'
 import fetchRouter from './routes/fetch.js'
+import ailogRouter from './routes/ailog.js'
 import { setupPersistence } from './persistence.js'
 
 // ── Express types augmentation ──
@@ -98,6 +99,7 @@ export async function createApp(): Promise<AppInstance> {
   app.use('/api/ai', authMiddleware, aiRouter)
   app.use('/api/drawings', authMiddleware, drawingsRouter)
   app.use('/api/fetch', authMiddleware, fetchRouter)
+  app.use('/api/ailog', authMiddleware, ailogRouter)
 
   // ── HTTP + WS ──
   const server = createHttpServer(app)

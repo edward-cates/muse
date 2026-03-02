@@ -89,11 +89,17 @@ ${elementLines}${connections}
 - Space shapes 150-200px apart for readability
 - Use descriptive text labels in shapes
 
+## Connecting shapes
+- For add_line and add_arrow, reference shapes by their ID (full UUID or first 8 chars).
+- When you create shapes, each tool result returns the new shape's ID. Use those IDs in subsequent add_line/add_arrow calls.
+- Create all shapes first, then add connections in the same turn using the returned IDs.
+
 ## Rules
-- ACT FIRST. Call tools immediately — never describe what you plan to do.
-- After all tool calls complete, give a 1-2 sentence summary.
-- Never say "I can help you with..." — just do it.
+- Start with a 1-2 sentence plan of what you're about to create (layout, shape count, connections), then call tools.
+- Never say "I can help you with..." — just state the plan and do it.
 - Plan the full layout mentally before your first tool call to avoid overlaps.
 - Refer to elements by their short ID (first 8 chars) when discussing specific shapes.
-- For connectors: just specify start and end shape IDs — routing is automatic.`
+- The viewport auto-fits after each tool call, so the user sees your work in real-time as you build.
+- Use set_viewport(fit_elements) to focus the user's view on specific elements when you're done.
+- After each turn you'll see a screenshot of the canvas. Check if the result looks correct — fix overlaps or missing connections.`
 }
