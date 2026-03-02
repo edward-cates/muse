@@ -688,22 +688,31 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
     [shapePreview, addShape, addPath, addLine, addArrow, addFrame, onSelectedIdsChange, onShapeCreated, lineStart, screenToWorld, activeTool, activeLineType, gridEnabled, elements],
   )
 
-  // Imperative wheel listener with { passive: false } to prevent browser pinch-to-zoom
+  // Wheel → pan, pinch (ctrlKey) → zoom
   useEffect(() => {
     const el = canvasRef.current
     if (!el) return
     const handler = (e: WheelEvent) => {
       e.preventDefault()
-      const s = scaleRef.current
-      const factor = e.deltaY > 0 ? 0.92 : 1.08
-      const newScale = Math.min(Math.max(s * factor, 0.1), 10)
-      const cx = e.clientX
-      const cy = e.clientY
-      setOffset((prev) => ({
-        x: cx - (cx - prev.x) * (newScale / s),
-        y: cy - (cy - prev.y) * (newScale / s),
-      }))
-      setScale(newScale)
+      if (e.ctrlKey || e.metaKey) {
+        // Pinch-to-zoom (trackpad) or Ctrl+scroll (mouse wheel)
+        const s = scaleRef.current
+        const factor = e.deltaY > 0 ? 0.92 : 1.08
+        const newScale = Math.min(Math.max(s * factor, 0.1), 10)
+        const cx = e.clientX
+        const cy = e.clientY
+        setOffset((prev) => ({
+          x: cx - (cx - prev.x) * (newScale / s),
+          y: cy - (cy - prev.y) * (newScale / s),
+        }))
+        setScale(newScale)
+      } else {
+        // Regular scroll → pan
+        setOffset((prev) => ({
+          x: prev.x - e.deltaX,
+          y: prev.y - e.deltaY,
+        }))
+      }
     }
     el.addEventListener('wheel', handler, { passive: false })
     return () => el.removeEventListener('wheel', handler)

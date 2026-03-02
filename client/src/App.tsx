@@ -82,12 +82,17 @@ export function App({ drawingId }: { drawingId: string }) {
       }
 
       // Don't intercept keys when typing in a textarea/input (except undo/redo above)
-      const tag = (e.target as HTMLElement).tagName
+      // Allow meta shortcuts (copy/paste/etc.) through for non-text inputs like color pickers
+      const target = e.target as HTMLElement
+      const tag = target.tagName
       if (tag === 'TEXTAREA' || tag === 'INPUT') {
         if (e.key === 'Escape') {
-          (e.target as HTMLElement).blur()
+          target.blur()
+          return
         }
-        return
+        const inputType = (target as HTMLInputElement).type
+        const isTextInput = tag === 'TEXTAREA' || inputType === 'text' || inputType === 'search' || inputType === 'url' || inputType === 'number'
+        if (isTextInput || !meta) return
       }
 
       // Copy

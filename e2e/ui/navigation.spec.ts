@@ -73,7 +73,7 @@ test.describe('Zoom controls', () => {
   })
 
   test('zoom level updates on scroll wheel', async ({ page }) => {
-    await canvas.canvas.dispatchEvent('wheel', { deltaY: -100, clientX: 400, clientY: 300 })
+    await canvas.canvas.dispatchEvent('wheel', { deltaY: -100, clientX: 400, clientY: 300, ctrlKey: true })
 
     const indicator = page.locator('[data-testid="zoom-level"]')
     const text = await indicator.textContent()
@@ -82,7 +82,7 @@ test.describe('Zoom controls', () => {
 
   test('Cmd+0 resets zoom to 100%', async ({ page }) => {
     // Zoom in first
-    await canvas.canvas.dispatchEvent('wheel', { deltaY: -200, clientX: 400, clientY: 300 })
+    await canvas.canvas.dispatchEvent('wheel', { deltaY: -200, clientX: 400, clientY: 300, ctrlKey: true })
     await page.keyboard.press('Meta+0')
 
     const indicator = page.locator('[data-testid="zoom-level"]')
@@ -144,7 +144,7 @@ test.describe('Zoom controls', () => {
   test('zoom has minimum limit', async ({ page }) => {
     // Zoom out many times
     for (let i = 0; i < 30; i++) {
-      await canvas.canvas.dispatchEvent('wheel', { deltaY: 200, clientX: 400, clientY: 300 })
+      await canvas.canvas.dispatchEvent('wheel', { deltaY: 200, clientX: 400, clientY: 300, ctrlKey: true })
     }
 
     const transform = await canvas.getWorldTransform()
@@ -154,7 +154,7 @@ test.describe('Zoom controls', () => {
 
   test('zoom has maximum limit', async ({ page }) => {
     for (let i = 0; i < 50; i++) {
-      await canvas.canvas.dispatchEvent('wheel', { deltaY: -200, clientX: 400, clientY: 300 })
+      await canvas.canvas.dispatchEvent('wheel', { deltaY: -200, clientX: 400, clientY: 300, ctrlKey: true })
     }
 
     const transform = await canvas.getWorldTransform()
