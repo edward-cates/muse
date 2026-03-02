@@ -93,6 +93,206 @@ test.describe('Text tool', () => {
   })
 })
 
+test.describe('Text element fill and stroke', () => {
+  let canvas: CanvasPage
+
+  test.beforeEach(async ({ page }) => {
+    canvas = new CanvasPage(page)
+    await canvas.goto()
+  })
+
+  test.fixme('stroke color controls the text color', async ({ page }) => {
+    await page.keyboard.press('t')
+    await page.mouse.click(300, 300)
+    await page.keyboard.type('Red text')
+    await page.mouse.click(600, 50) // deselect / stop editing
+
+    await canvas.selectTool('select')
+    await page.locator('[data-testid="text-element"]').click()
+
+    // Change stroke to red — this should change the text color
+    const strokeInput = page.locator('[data-testid="prop-stroke"] input[type="color"]')
+    await strokeInput.fill('#ff0000')
+
+    // Deselect to avoid selected-state style overrides, then check
+    await page.mouse.click(600, 50)
+    const textarea = page.locator('[data-testid="text-element"] textarea')
+    await expect(textarea).toHaveCSS('color', 'rgb(255, 0, 0)')
+  })
+
+  test.fixme('fill color controls the text background', async ({ page }) => {
+    await page.keyboard.press('t')
+    await page.mouse.click(300, 300)
+    await page.keyboard.type('Yellow bg')
+    await page.mouse.click(600, 50) // deselect / stop editing
+
+    await canvas.selectTool('select')
+    await page.locator('[data-testid="text-element"]').click()
+
+    // Change fill to yellow — this should set the background color
+    const fillInput = page.locator('[data-testid="prop-fill"] input[type="color"]')
+    await fillInput.fill('#ffff00')
+
+    await page.mouse.click(600, 50)
+    const el = page.locator('[data-testid="text-element"]')
+    await expect(el).toHaveCSS('background-color', 'rgb(255, 255, 0)')
+  })
+
+  test.fixme('default text element has no background', async ({ page }) => {
+    await page.keyboard.press('t')
+    await page.mouse.click(300, 300)
+    await page.keyboard.type('No bg')
+    await page.mouse.click(600, 50)
+
+    // Default fill is transparent/none — background should be transparent
+    const el = page.locator('[data-testid="text-element"]')
+    const bgColor = await el.evaluate((e) => getComputedStyle(e).backgroundColor)
+    // Should be transparent (rgba(0,0,0,0)) or no background
+    expect(bgColor).toMatch(/rgba\(0,\s*0,\s*0,\s*0\)|transparent/)
+  })
+})
+
+test.describe('Text element resize', () => {
+  let canvas: CanvasPage
+
+  test.beforeEach(async ({ page }) => {
+    canvas = new CanvasPage(page)
+    await canvas.goto()
+  })
+
+  test('selected text element shows 8 resize handles', async ({ page }) => {
+    await page.keyboard.press('t')
+    await page.mouse.click(300, 300)
+    await page.keyboard.type('Resize me')
+    await page.mouse.click(600, 50) // deselect / stop editing
+
+    await canvas.selectTool('select')
+    await page.locator('[data-testid="text-element"]').click()
+
+    await expect(page.locator('[data-testid="text-element"] .resize-handle')).toHaveCount(8)
+  })
+
+  test('dragging SE resize handle changes text element size', async ({ page }) => {
+    await page.keyboard.press('t')
+    await page.mouse.click(300, 300)
+    await page.keyboard.type('Resize me')
+    await page.mouse.click(600, 50) // deselect / stop editing
+
+    await canvas.selectTool('select')
+    const el = page.locator('[data-testid="text-element"]')
+    await el.click()
+    const boxBefore = await el.boundingBox()
+
+    const handle = page.locator('[data-testid="text-element"] [data-handle="se"]')
+    const handleBox = await handle.boundingBox()
+    await page.mouse.move(handleBox!.x + 4, handleBox!.y + 4)
+    await page.mouse.down()
+    await page.mouse.move(handleBox!.x + 104, handleBox!.y + 54, { steps: 5 })
+    await page.mouse.up()
+
+    const boxAfter = await el.boundingBox()
+    expect(boxAfter!.width).toBeGreaterThan(boxBefore!.width)
+    expect(boxAfter!.height).toBeGreaterThan(boxBefore!.height)
+  })
+
+  test.fixme('text reflows when text element is resized narrower', async ({ page }) => {
+    await page.keyboard.press('t')
+    await page.mouse.click(300, 300)
+    await page.keyboard.type('This is a long sentence that should reflow when the box is narrower')
+    await page.mouse.click(600, 50)
+
+    await canvas.selectTool('select')
+    const el = page.locator('[data-testid="text-element"]')
+    await el.click()
+    const textarea = el.locator('textarea')
+    const heightBefore = (await textarea.boundingBox())!.height
+
+    // Drag the E (east) handle inward to make it narrower
+    const handle = page.locator('[data-testid="text-element"] [data-handle="e"]')
+    const handleBox = await handle.boundingBox()
+    await page.mouse.move(handleBox!.x + 4, handleBox!.y + 4)
+    await page.mouse.down()
+    await page.mouse.move(handleBox!.x - 80, handleBox!.y + 4, { steps: 5 })
+    await page.mouse.up()
+
+    // Text should reflow taller when the element is narrower
+    const heightAfter = (await textarea.boundingBox())!.height
+    expect(heightAfter).toBeGreaterThan(heightBefore)
+  })
+})
+
+test.describe('Text element vertical alignment', () => {
+  let canvas: CanvasPage
+
+  test.beforeEach(async ({ page }) => {
+    canvas = new CanvasPage(page)
+    await canvas.goto()
+  })
+
+  test('vertical alignment buttons appear for selected text element', async ({ page }) => {
+    await page.keyboard.press('t')
+    await page.mouse.click(300, 300)
+    await page.keyboard.type('Align me')
+    await page.mouse.click(600, 50)
+
+    await canvas.selectTool('select')
+    await page.locator('[data-testid="text-element"]').click()
+
+    await expect(page.locator('.property-panel [data-testid="valign-top"]')).toBeVisible()
+    await expect(page.locator('.property-panel [data-testid="valign-middle"]')).toBeVisible()
+    await expect(page.locator('.property-panel [data-testid="valign-bottom"]')).toBeVisible()
+  })
+
+  test('vertical alignment visually moves text within text element', async ({ page }) => {
+    await page.keyboard.press('t')
+    await page.mouse.click(300, 300)
+    await page.keyboard.type('Hello')
+    await page.mouse.click(600, 50)
+
+    await canvas.selectTool('select')
+    const el = page.locator('[data-testid="text-element"]')
+    await el.click()
+
+    // Make the text element tall enough that vertical alignment is visible
+    // by dragging the S (south) handle down
+    const handle = page.locator('[data-testid="text-element"] [data-handle="s"]')
+    const handleBox = await handle.boundingBox()
+    await page.mouse.move(handleBox!.x + 4, handleBox!.y + 4)
+    await page.mouse.down()
+    await page.mouse.move(handleBox!.x + 4, handleBox!.y + 150, { steps: 5 })
+    await page.mouse.up()
+
+    // Re-select after resize
+    await el.click()
+    const textarea = el.locator('textarea')
+
+    // Set to top alignment
+    await page.locator('.property-panel [data-testid="valign-top"]').click()
+    const topBox = await textarea.boundingBox()
+
+    // Set to bottom alignment
+    await page.locator('.property-panel [data-testid="valign-bottom"]').click()
+    const bottomBox = await textarea.boundingBox()
+
+    // Top alignment should position textarea higher than bottom
+    expect(topBox!.y).toBeLessThan(bottomBox!.y)
+  })
+
+  test('default vertical alignment for text element is top', async ({ page }) => {
+    await page.keyboard.press('t')
+    await page.mouse.click(300, 300)
+    await page.keyboard.type('Top aligned')
+    await page.mouse.click(600, 50)
+
+    await canvas.selectTool('select')
+    await page.locator('[data-testid="text-element"]').click()
+
+    // The 'top' button should be active by default for text elements
+    const topBtn = page.locator('.property-panel [data-testid="valign-top"]')
+    await expect(topBtn).toHaveClass(/property-panel__btn--active/)
+  })
+})
+
 test.describe('Text formatting', () => {
   let canvas: CanvasPage
 

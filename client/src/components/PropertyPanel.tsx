@@ -142,6 +142,7 @@ export function PropertyPanel({ elements, onUpdate, setLastUsedStyle, recentColo
       setFontSize(element.fontSize)
       setFontFamily(element.fontFamily)
       setTextAlign(element.textAlign)
+      setVerticalAlign(element.verticalAlign ?? 'top')
       setOpacity(element.opacity ?? 100)
       setPosX(Math.round(element.x))
       setPosY(Math.round(element.y))
