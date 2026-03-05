@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import * as Y from 'yjs'
 import { useCollab } from '../collab/CollabContext'
-import type { CanvasElement, ShapeType, ShapeElement, PathElement, LineElement, LineType, WebCardElement } from '../types'
+import type { CanvasElement, ShapeType, ShapeElement, PathElement, LineElement, LineType, WebCardElement, DocumentCardElement } from '../types'
 
 type YMapVal = string | number | number[]
 
@@ -103,6 +103,21 @@ export function readElement(m: Y.Map<YMapVal>): CanvasElement {
       faviconUrl: (m.get('faviconUrl') as string) || '',
       content: (m.get('content') as string) || '',
       sourceType: ((m.get('sourceType') as string) || 'manual') as 'search' | 'url' | 'manual',
+      opacity: (m.get('opacity') as number) ?? 100,
+    }
+  }
+  if (type === 'document_card') {
+    return {
+      id: m.get('id') as string,
+      type: 'document_card',
+      x: m.get('x') as number,
+      y: m.get('y') as number,
+      width: (m.get('width') as number) || 280,
+      height: (m.get('height') as number) || 180,
+      documentId: (m.get('documentId') as string) || '',
+      documentType: (m.get('documentType') as string) || 'canvas',
+      title: (m.get('title') as string) || 'Untitled',
+      contentVersion: (m.get('contentVersion') as number) || 0,
       opacity: (m.get('opacity') as number) ?? 100,
     }
   }
@@ -338,6 +353,26 @@ export function useElements() {
     [yElements],
   )
 
+  const addDocumentCard = useCallback(
+    (x: number, y: number, w: number, h: number, documentId: string, documentType: string, title: string): string => {
+      const id = crypto.randomUUID()
+      const yEl = new Y.Map<YMapVal>()
+      yEl.set('id', id)
+      yEl.set('type', 'document_card')
+      yEl.set('x', x)
+      yEl.set('y', y)
+      yEl.set('width', w)
+      yEl.set('height', h)
+      yEl.set('documentId', documentId)
+      yEl.set('documentType', documentType)
+      yEl.set('title', title)
+      yEl.set('contentVersion', 0)
+      yElements.push([yEl])
+      return id
+    },
+    [yElements],
+  )
+
   const updateElement = useCallback(
     (id: string, updates: Record<string, unknown>) => {
       yElements.forEach((yEl) => {
@@ -457,7 +492,7 @@ export function useElements() {
   }, [])
 
   return {
-    elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame, addWebCard,
+    elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame, addWebCard, addDocumentCard,
     updateElement, deleteElement, undo, redo, stopCapturing,
     reorderElement, groupElements, ungroupElements,
     setLastUsedStyle, doc, yElements,

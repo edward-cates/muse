@@ -15,7 +15,7 @@ async function renameDrawing(page: Page, title: string) {
   // Wait for PATCH response so we know the rename was sent
   const patchDone = page.waitForResponse(
     (resp) =>
-      resp.url().includes('/api/drawings/') &&
+      resp.url().includes('/api/documents/') &&
       resp.request().method() === 'PATCH',
   )
   await page.locator('.drawing-title__display').click()

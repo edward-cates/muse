@@ -185,6 +185,37 @@ export const CANVAS_TOOLS: ToolDefinition[] = [
   },
 ]
 
+export const DOCUMENT_TOOLS: ToolDefinition[] = [
+  {
+    name: 'create_document',
+    description: 'Create an HTML artifact document and place a card on the canvas. The document can be edited by clicking into it. Returns { documentId, cardElementId }.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Document title' },
+        html: { type: 'string', description: 'Initial HTML content (self-contained with inline styles/scripts)' },
+        x: { type: 'number', description: 'X position for the card on canvas (default 100)' },
+        y: { type: 'number', description: 'Y position for the card on canvas (default 100)' },
+        width: { type: 'number', description: 'Card width (default 280)' },
+        height: { type: 'number', description: 'Card height (default 180)' },
+      },
+      required: ['title', 'html'],
+    },
+  },
+  {
+    name: 'update_document_content',
+    description: 'Update the HTML content of an existing document. The document card on the canvas will refresh automatically.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        document_id: { type: 'string', description: 'The document ID to update' },
+        html: { type: 'string', description: 'New HTML content (replaces existing)' },
+      },
+      required: ['document_id', 'html'],
+    },
+  },
+]
+
 export const RESEARCH_TOOLS: ToolDefinition[] = [
   {
     name: 'add_web_card',

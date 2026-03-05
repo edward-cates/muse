@@ -14,11 +14,15 @@ export interface ElementActions {
   addArrow: (startShapeId: string, endShapeId: string, startX: number, startY: number, endX: number, endY: number, lineType?: LineType) => string
   addText: (x: number, y: number) => string
   addWebCard?: (x: number, y: number, w: number, h: number, url: string, title: string, snippet: string) => string
+  addDocumentCard?: (x: number, y: number, w: number, h: number, documentId: string, documentType: string, title: string) => string
   updateElement: (id: string, updates: Record<string, unknown>) => void
   deleteElement: (id: string) => void
   getElements: () => CanvasElement[]
   fitToContent?: () => void
   fitToElements?: (ids: string[]) => void
+  // Document API functions (require auth)
+  createDocument?: (opts: { title?: string; type?: string; parent_id?: string }) => Promise<{ id: string; type: string; content_version: number }>
+  updateDocumentContent?: (documentId: string, content: string) => Promise<number>
 }
 
 export interface FetchUrlFn {
@@ -293,6 +297,34 @@ export async function executeToolCall(
         const { url } = call.input as { url: string }
         const result = await fetchUrl(url)
         return { tool_use_id: call.id, content: JSON.stringify(result) }
+      }
+
+      case 'create_document': {
+        if (!actions.createDocument || !actions.updateDocumentContent || !actions.addDocumentCard) {
+          return { tool_use_id: call.id, content: JSON.stringify({ error: 'Document creation not available' }) }
+        }
+        const { title, html, x = 100, y = 100, width = 280, height = 180 } = call.input as {
+          title: string; html: string; x?: number; y?: number; width?: number; height?: number
+        }
+        const doc = await actions.createDocument({ title, type: 'html_artifact' })
+        await actions.updateDocumentContent(doc.id, html)
+        const cardId = actions.addDocumentCard(x, y, width, height, doc.id, 'html_artifact', title)
+        return { tool_use_id: call.id, content: JSON.stringify({ documentId: doc.id, cardElementId: cardId, success: true, message: `Created HTML artifact "${title}"` }) }
+      }
+
+      case 'update_document_content': {
+        if (!actions.updateDocumentContent) {
+          return { tool_use_id: call.id, content: JSON.stringify({ error: 'Document update not available' }) }
+        }
+        const { document_id, html } = call.input as { document_id: string; html: string }
+        const newVersion = await actions.updateDocumentContent(document_id, html)
+        // Update the contentVersion on any matching canvas card
+        for (const el of elements) {
+          if (el.type === 'document_card' && (el as { documentId: string }).documentId === document_id) {
+            actions.updateElement(el.id, { contentVersion: newVersion })
+          }
+        }
+        return { tool_use_id: call.id, content: JSON.stringify({ success: true, content_version: newVersion }) }
       }
 
       default:

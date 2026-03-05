@@ -6,14 +6,15 @@ import { TextRenderer } from './TextRenderer'
 import { ImageRenderer } from './ImageRenderer'
 import { FrameRenderer } from './FrameRenderer'
 import { WebCardRenderer } from './WebCardRenderer'
+import { DocumentCardRenderer } from './DocumentCardRenderer'
 import { PathLayer } from './PathLayer'
 import { LineLayer, edgeIntersection } from './LineLayer'
 import { Cursors } from './Cursors'
 import { PropertyPanel } from './PropertyPanel'
 import { AlignmentToolbar } from './AlignmentToolbar'
 import { Minimap } from './Minimap'
-import { isShape, isPath, isLine, isText, isImage, isFrame, isWebCard } from '../types'
-import type { Tool, ShapeType, CanvasElement, LineType, ShapeElement, PathElement, LineElement, TextElement, ImageElement, FrameElement, WebCardElement } from '../types'
+import { isShape, isPath, isLine, isText, isImage, isFrame, isWebCard, isDocumentCard } from '../types'
+import type { Tool, ShapeType, CanvasElement, LineType, ShapeElement, PathElement, LineElement, TextElement, ImageElement, FrameElement, WebCardElement, DocumentCardElement } from '../types'
 
 interface Props {
   activeTool: Tool
@@ -167,6 +168,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
   const images = elements.filter(isImage)
   const frames = elements.filter(isFrame)
   const webCards = elements.filter(isWebCard)
+  const documentCards = elements.filter(isDocumentCard)
   shapesRef.current = shapes
   pathsRef.current = paths
   linesRef.current = lines
@@ -573,6 +575,14 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
             if (maxX > rect.x && minX < rect.x + rect.w &&
                 maxY > rect.y && minY < rect.y + rect.h) {
               ids.push(p.id)
+            }
+          }
+          // Also include web cards and document cards
+          for (const el of elements) {
+            if ((isWebCard(el) || isDocumentCard(el)) &&
+                el.x + el.width > rect.x && el.x < rect.x + rect.w &&
+                el.y + el.height > rect.y && el.y < rect.y + rect.h) {
+              ids.push(el.id)
             }
           }
           // Also include free-floating lines
@@ -1232,6 +1242,17 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
             key={wc.id}
             element={wc}
             isSelected={selectedIds.includes(wc.id)}
+            onSelect={handleSelect}
+            onUpdate={updateElement}
+            scale={scale}
+            activeTool={activeTool}
+          />
+        ))}
+        {documentCards.map((dc) => (
+          <DocumentCardRenderer
+            key={dc.id}
+            element={dc}
+            isSelected={selectedIds.includes(dc.id)}
             onSelect={handleSelect}
             onUpdate={updateElement}
             scale={scale}

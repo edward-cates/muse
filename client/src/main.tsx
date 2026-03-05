@@ -13,28 +13,15 @@ async function boot() {
       </StrictMode>,
     )
   } else {
-    const { App } = await import('./App')
     const { AuthProvider, useAuth } = await import('./auth/AuthContext')
     const { LoginPage } = await import('./auth/LoginPage')
-    const { CollabProvider } = await import('./collab/CollabContext')
-    const { useDrawingId } = await import('./hooks/useDrawingId')
-    const { useDrawingRegistration } = await import('./hooks/useDrawingRegistration')
+    const { DocumentShell } = await import('./DocumentShell')
 
     function Root() {
       const { session, loading } = useAuth()
       if (loading) return null
       if (!session) return <LoginPage />
-      return <AuthenticatedApp />
-    }
-
-    function AuthenticatedApp() {
-      const drawingId = useDrawingId()
-      useDrawingRegistration(drawingId)
-      return (
-        <CollabProvider roomName={`muse-${drawingId}`}>
-          <App drawingId={drawingId} />
-        </CollabProvider>
-      )
+      return <DocumentShell />
     }
 
     root.render(

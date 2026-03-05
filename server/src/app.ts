@@ -5,7 +5,7 @@ import cors from 'cors'
 import * as jose from 'jose'
 import keysRouter from './routes/keys.js'
 import aiRouter from './routes/ai.js'
-import drawingsRouter from './routes/drawings.js'
+import documentsRouter from './routes/documents.js'
 import fetchRouter from './routes/fetch.js'
 import ailogRouter from './routes/ailog.js'
 import { setupPersistence } from './persistence.js'
@@ -97,7 +97,8 @@ export async function createApp(): Promise<AppInstance> {
 
   app.use('/api/keys', authMiddleware, keysRouter)
   app.use('/api/ai', authMiddleware, aiRouter)
-  app.use('/api/drawings', authMiddleware, drawingsRouter)
+  app.use('/api/documents', authMiddleware, documentsRouter)
+  app.use('/api/drawings', authMiddleware, documentsRouter) // backward compat alias
   app.use('/api/fetch', authMiddleware, fetchRouter)
   app.use('/api/ailog', authMiddleware, ailogRouter)
 

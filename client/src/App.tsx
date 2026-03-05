@@ -4,9 +4,10 @@ import { Toolbar } from './components/Toolbar'
 import { StatusBar } from './components/StatusBar'
 import { SettingsPanel } from './components/SettingsPanel'
 import { AiPanel } from './components/AiPanel'
-import { DrawingsList } from './components/DrawingsList'
-import { DrawingTitle } from './components/DrawingTitle'
+import { DocumentsList } from './components/DocumentsList'
+import { DocumentTitle } from './components/DocumentTitle'
 import { useElements, readElement } from './hooks/useElements'
+import { useDocumentApi } from './hooks/useDocument'
 import type { Tool, LineType, CanvasElement } from './types'
 import { isShape, isLine, isText } from './types'
 
@@ -29,11 +30,13 @@ export function App({ drawingId }: { drawingId: string }) {
   const styleClipboardRef = useRef<Record<string, unknown> | null>(null)
 
   const {
-    elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame, addWebCard,
+    elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame, addWebCard, addDocumentCard,
     updateElement, deleteElement, undo, redo, stopCapturing,
     reorderElement, groupElements, ungroupElements,
     setLastUsedStyle, doc, yElements,
   } = useElements()
+
+  const { createDocument, updateContent: updateDocumentContent } = useDocumentApi()
 
   const switchToSelect = useCallback(() => setActiveTool('select'), [])
 
@@ -444,15 +447,20 @@ export function App({ drawingId }: { drawingId: string }) {
         onClose={() => setAiOpen(false)}
         elements={elements}
         elementActions={{
-          addShape, addLine, addArrow, addText, addWebCard,
+          addShape, addLine, addArrow, addText, addWebCard, addDocumentCard,
           updateElement, deleteElement,
           getElements: () => yElements.toArray().map(readElement),
           fitToContent: () => canvasRef.current?.fitToContent(),
           fitToElements: (ids: string[]) => canvasRef.current?.fitToElements(ids),
+          createDocument: async (opts) => {
+            const doc = await createDocument(opts)
+            return { id: doc.id, type: doc.type, content_version: doc.content_version }
+          },
+          updateDocumentContent,
         }}
       />
-      <DrawingTitle drawingId={drawingId} />
-      <DrawingsList currentDrawingId={drawingId} />
+      <DocumentTitle documentId={drawingId} />
+      <DocumentsList currentDocumentId={drawingId} />
     </div>
   )
 }

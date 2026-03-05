@@ -35,7 +35,7 @@ export function setupPersistence() {
         const state = Y.encodeStateAsUpdate(ydoc)
         if (state.length <= EMPTY_STATE_SIZE) return
         await getSupabase()
-          .from('drawings')
+          .from('documents')
           .update({ content: Buffer.from(state).toString('base64') })
           .eq('id', drawingId(docName))
       }, 500),
@@ -46,17 +46,26 @@ export function setupPersistence() {
     provider: null,
     bindState: async (docName: string, ydoc: Doc) => {
       const { data } = await getSupabase()
-        .from('drawings')
-        .select('content')
+        .from('documents')
+        .select('content, type')
         .eq('id', drawingId(docName))
         .maybeSingle()
 
-      if (data?.content) {
-        const bytes = Buffer.from(data.content, 'base64')
-        Y.applyUpdate(ydoc, new Uint8Array(bytes))
+      // Only load Yjs state for canvas documents. HTML artifacts store
+      // raw HTML in content, not Yjs binary, so skip them.
+      if (data?.content && data.type === 'canvas') {
+        try {
+          const bytes = Buffer.from(data.content, 'base64')
+          Y.applyUpdate(ydoc, new Uint8Array(bytes))
+        } catch {
+          // Content is corrupt or not valid Yjs data — skip
+        }
       }
 
-      ydoc.on('update', () => persistDoc(docName, ydoc))
+      // Only persist Yjs updates for canvas documents
+      if (!data || data.type === 'canvas') {
+        ydoc.on('update', () => persistDoc(docName, ydoc))
+      }
     },
     writeState: async (docName: string, ydoc: Doc) => {
       const existing = writeTimers.get(docName)
@@ -66,7 +75,7 @@ export function setupPersistence() {
       const state = Y.encodeStateAsUpdate(ydoc)
       if (state.length <= EMPTY_STATE_SIZE) return
       await getSupabase()
-        .from('drawings')
+        .from('documents')
         .update({ content: Buffer.from(state).toString('base64') })
         .eq('id', drawingId(docName))
     },

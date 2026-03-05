@@ -84,8 +84,8 @@ describe('Yjs Supabase persistence', () => {
 
     setMockRoutes([{
       method: 'GET',
-      table: 'drawings',
-      handler: () => ({ status: 200, data: { content: base64 } }),
+      table: 'documents',
+      handler: () => ({ status: 200, data: { content: base64, type: 'canvas' } }),
     }])
 
     const { setupPersistence } = await import('../src/persistence.js')
@@ -108,12 +108,12 @@ describe('Yjs Supabase persistence', () => {
     setMockRoutes([
       {
         method: 'GET',
-        table: 'drawings',
-        handler: () => ({ status: 200, data: { content: null } }),
+        table: 'documents',
+        handler: () => ({ status: 200, data: { content: null, type: 'canvas' } }),
       },
       {
         method: 'PATCH',
-        table: 'drawings',
+        table: 'documents',
         handler: (_req, body) => {
           patchCount++
           capturedBody = body
@@ -155,7 +155,7 @@ describe('Yjs Supabase persistence', () => {
 
     setMockRoutes([{
       method: 'PATCH',
-      table: 'drawings',
+      table: 'documents',
       handler: (req, body) => {
         patchCount++
         capturedBody = body
@@ -189,12 +189,12 @@ describe('Yjs Supabase persistence', () => {
     setMockRoutes([
       {
         method: 'GET',
-        table: 'drawings',
-        handler: () => ({ status: 200, data: { content: null } }),
+        table: 'documents',
+        handler: () => ({ status: 200, data: { content: null, type: 'canvas' } }),
       },
       {
         method: 'PATCH',
-        table: 'drawings',
+        table: 'documents',
         handler: () => {
           patchCount++
           return { status: 200, data: [] }
@@ -226,8 +226,8 @@ describe('Yjs Supabase persistence', () => {
   it('bindState with no content — doc stays empty', async () => {
     setMockRoutes([{
       method: 'GET',
-      table: 'drawings',
-      handler: () => ({ status: 200, data: { content: null } }),
+      table: 'documents',
+      handler: () => ({ status: 200, data: { content: null, type: 'canvas' } }),
     }])
 
     const { setupPersistence } = await import('../src/persistence.js')
@@ -242,7 +242,7 @@ describe('Yjs Supabase persistence', () => {
   it('bindState with no drawing row — no error', async () => {
     setMockRoutes([{
       method: 'GET',
-      table: 'drawings',
+      table: 'documents',
       handler: () => ({ status: 406, data: { code: 'PGRST116', message: 'not found' } }),
     }])
 

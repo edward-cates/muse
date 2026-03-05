@@ -1,5 +1,5 @@
 import type { CanvasElement } from '../types'
-import { isShape, isLine, isText, isImage, isFrame, isWebCard } from '../types'
+import { isShape, isLine, isText, isImage, isFrame, isWebCard, isDocumentCard } from '../types'
 
 function describeElement(el: CanvasElement): string {
   if (isShape(el)) {
@@ -24,6 +24,9 @@ function describeElement(el: CanvasElement): string {
   }
   if (isWebCard(el)) {
     return `WebCard<${el.id.slice(0, 8)}> "${el.title}" at (${el.x},${el.y}) ${el.width}×${el.height} url=${el.url}`
+  }
+  if (isDocumentCard(el)) {
+    return `DocCard<${el.id.slice(0, 8)}> "${el.title}" (${el.documentType}) at (${el.x},${el.y}) ${el.width}×${el.height} docId=${el.documentId}`
   }
   return `Unknown<${el.id.slice(0, 8)}>`
 }
@@ -93,6 +96,12 @@ ${elementLines}${connections}
 - For add_line and add_arrow, reference shapes by their ID (full UUID or first 8 chars).
 - When you create shapes, each tool result returns the new shape's ID. Use those IDs in subsequent add_line/add_arrow calls.
 - Create all shapes first, then add connections in the same turn using the returned IDs.
+
+## HTML Artifacts
+- Use create_document to create interactive HTML artifacts (dashboards, widgets, mini-apps) and place them as cards on the canvas.
+- Document cards can be double-clicked to open in a full-page editor.
+- Use update_document_content to modify existing artifacts by their document ID (shown in DocCard elements).
+- HTML must be self-contained (inline <style> and <script>).
 
 ## Rules
 - Start with a 1-2 sentence plan of what you're about to create (layout, shape count, connections), then call tools.

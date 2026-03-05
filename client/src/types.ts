@@ -127,7 +127,21 @@ export interface WebCardElement {
   opacity: number
 }
 
-export type CanvasElement = ShapeElement | PathElement | LineElement | TextElement | ImageElement | FrameElement | WebCardElement
+export interface DocumentCardElement {
+  id: string
+  type: 'document_card'
+  x: number
+  y: number
+  width: number
+  height: number
+  documentId: string
+  documentType: string   // 'canvas' | 'html_artifact'
+  title: string          // cached for display
+  contentVersion: number // re-fetch preview when this changes
+  opacity: number
+}
+
+export type CanvasElement = ShapeElement | PathElement | LineElement | TextElement | ImageElement | FrameElement | WebCardElement | DocumentCardElement
 
 export function isShape(el: CanvasElement): el is ShapeElement {
   const shapeTypes: string[] = ['rectangle', 'ellipse', 'diamond', 'triangle', 'hexagon', 'star', 'cloud']
@@ -156,4 +170,8 @@ export function isFrame(el: CanvasElement): el is FrameElement {
 
 export function isWebCard(el: CanvasElement): el is WebCardElement {
   return el.type === 'webcard'
+}
+
+export function isDocumentCard(el: CanvasElement): el is DocumentCardElement {
+  return el.type === 'document_card'
 }
