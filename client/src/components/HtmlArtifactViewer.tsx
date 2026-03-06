@@ -307,6 +307,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   titleContainer: {
     flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
   },
   aiBtn: {
     display: 'flex',
