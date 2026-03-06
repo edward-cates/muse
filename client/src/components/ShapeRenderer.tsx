@@ -366,8 +366,8 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
           defaultValue={shape.text}
           placeholder={isEditing ? 'Type here...' : ''}
           style={{
-            fontFamily: shape.fontFamily || 'sans-serif',
-            fontSize: shape.fontSize ? `${shape.fontSize}px` : '14px',
+            fontFamily: shape.fontFamily || undefined,
+            fontSize: shape.fontSize ? `${shape.fontSize}px` : undefined,
             textAlign: shape.textAlign || 'center',
           }}
           onChange={(e) => { onUpdate(shape.id, { text: e.target.value }); autoResize() }}
