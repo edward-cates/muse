@@ -235,9 +235,9 @@ describe('Decompose route', () => {
         id: 'msg_test',
         type: 'message',
         role: 'assistant',
-        content: [{ type: 'text', text: JSON.stringify(mockTopics) }],
+        content: [{ type: 'tool_use', id: 'toolu_test', name: 'report_topics', input: { topics: mockTopics } }],
         model: 'claude-haiku-4-5-20251001',
-        stop_reason: 'end_turn',
+        stop_reason: 'tool_use',
         stop_sequence: null,
         usage: { input_tokens: 100, output_tokens: 50 },
       },
@@ -262,7 +262,7 @@ describe('Decompose route', () => {
     assert.ok(Array.isArray(topic.lineRanges))
   })
 
-  it('returns 500 when Anthropic returns invalid JSON', async () => {
+  it('returns 500 when Anthropic returns no tool call', async () => {
     mockKeyAndDocOps()
 
     anthropicMockHandler = () => ({
@@ -271,7 +271,7 @@ describe('Decompose route', () => {
         id: 'msg_test',
         type: 'message',
         role: 'assistant',
-        content: [{ type: 'text', text: 'This is not valid JSON at all' }],
+        content: [{ type: 'text', text: 'I could not decompose this text.' }],
         model: 'claude-haiku-4-5-20251001',
         stop_reason: 'end_turn',
         stop_sequence: null,
@@ -286,8 +286,7 @@ describe('Decompose route', () => {
     })
     assert.equal(res.status, 500)
 
-    const body = await res.json() as { error: string; raw?: string }
-    assert.ok(body.error.includes('parse') || body.error.includes('JSON') || body.error.includes('Failed'))
-    assert.ok(body.raw, 'should include raw response in error')
+    const body = await res.json() as { error: string }
+    assert.ok(body.error.includes('tool call'))
   })
 })
