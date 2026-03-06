@@ -592,13 +592,13 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
           <h2 style={styles.title}>AI</h2>
         </div>
         <div style={styles.headerActions}>
-          <button className="statusbar__btn" onClick={onToggleMinimap} title="Minimap">
+          <button className="statusbar__btn" data-testid="toggle-minimap" onClick={onToggleMinimap} title="Minimap">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="18" height="18" rx="2" />
               <rect x="7" y="7" width="10" height="10" rx="1" />
             </svg>
           </button>
-          <button className="statusbar__btn" onClick={onToggleDarkMode} title="Dark Mode">
+          <button className="statusbar__btn" data-testid="toggle-dark-mode" onClick={onToggleDarkMode} title="Dark Mode">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
             </svg>

@@ -222,6 +222,7 @@ const s: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'flex-start',
     gap: 8,
+    pointerEvents: 'none',
   },
 
   // Panel
@@ -357,6 +358,7 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 6,
     padding: '8px 14px',
+    pointerEvents: 'auto',
     background: 'var(--surface)',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
