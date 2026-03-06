@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type FormEvent } from 'react'
+import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../auth/AuthContext'
 import { useConnection } from '../hooks/useConnection'
@@ -85,16 +85,37 @@ interface Props {
   onToggleDarkMode: () => void
 }
 
+// Module-level persistent state — survives component remounts during navigation
+let _persistedChat: ChatMessage[] = []
+let _persistedApi: ApiMessage[] = []
+
 export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMinimap, onToggleDarkMode }: Props) {
   const { session } = useAuth()
   const connectionStatus = useConnection()
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
-  const [apiMessages, setApiMessages] = useState<ApiMessage[]>([])
+  const [chatMessages, _setChatMessages] = useState<ChatMessage[]>(_persistedChat)
+  const [apiMessages, _setApiMessages] = useState<ApiMessage[]>(_persistedApi)
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Wrap setState to persist across remounts
+  const setChatMessages = useCallback((action: React.SetStateAction<ChatMessage[]>) => {
+    _setChatMessages(prev => {
+      const next = typeof action === 'function' ? action(prev) : action
+      _persistedChat = next
+      return next
+    })
+  }, [])
+
+  const setApiMessages = useCallback((action: React.SetStateAction<ApiMessage[]>) => {
+    _setApiMessages(prev => {
+      const next = typeof action === 'function' ? action(prev) : action
+      _persistedApi = next
+      return next
+    })
+  }, [])
 
   // Auto-scroll on new messages
   useEffect(() => {

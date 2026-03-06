@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import * as Y from 'yjs'
 import { App } from '../App'
 import { CollabContext } from '../collab/CollabContext'
@@ -43,6 +43,11 @@ function createLocalCollab(): CollabInstance {
   return { doc, wsProvider: wsProvider as any, awareness: awareness as any }
 }
 
+function getIdFromHash(): string | null {
+  const match = window.location.hash.match(/^#\/d\/(.+)$/)
+  return match ? match[1] : null
+}
+
 const mockAuth = {
   session: { access_token: 'e2e-test-token' } as any,
   user: { id: 'e2e-user', email: 'test@e2e.local' } as any,
@@ -58,7 +63,21 @@ declare global {
 }
 
 export function TestRoot() {
-  const [instance] = useState(createLocalCollab)
+  const [drawingId, setDrawingId] = useState(() => getIdFromHash() || 'e2e-test')
+  const [instance, setInstance] = useState(createLocalCollab)
+
+  // Support hash-based navigation (mirrors DocumentShell in production)
+  useEffect(() => {
+    const handler = () => {
+      const newId = getIdFromHash()
+      if (newId && newId !== drawingId) {
+        setDrawingId(newId)
+        setInstance(createLocalCollab())
+      }
+    }
+    window.addEventListener('hashchange', handler)
+    return () => window.removeEventListener('hashchange', handler)
+  }, [drawingId])
 
   // Expose doc + Y module for e2e tests to create elements programmatically
   window.__testDoc = instance.doc
@@ -67,7 +86,7 @@ export function TestRoot() {
   return (
     <AuthContext.Provider value={mockAuth}>
       <CollabContext.Provider value={instance}>
-        <App drawingId="e2e-test" />
+        <App drawingId={drawingId} key={drawingId} />
       </CollabContext.Provider>
     </AuthContext.Provider>
   )

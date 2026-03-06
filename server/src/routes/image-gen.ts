@@ -62,7 +62,7 @@ router.post('/', async (req, res) => {
         n: 1,
         size,
         quality,
-        response_format: 'url',
+        response_format: 'b64_json',
       }),
     })
 
@@ -77,11 +77,11 @@ router.post('/', async (req, res) => {
       return
     }
 
-    const data = (await response.json()) as { data: Array<{ url: string; revised_prompt?: string }> }
+    const data = (await response.json()) as { data: Array<{ b64_json: string; revised_prompt?: string }> }
     const image = data.data[0]
 
     res.json({
-      url: image.url,
+      url: `data:image/png;base64,${image.b64_json}`,
       revised_prompt: image.revised_prompt,
     })
   } catch (err: unknown) {

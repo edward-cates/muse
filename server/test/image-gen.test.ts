@@ -202,12 +202,12 @@ describe('Image generation route', () => {
     assert.ok(body.error.includes('No OpenAI API key'))
   })
 
-  it('returns generated image URL on success', async () => {
+  it('returns generated image as data URL on success', async () => {
     mockOpenAIKeyExists()
     setOpenAIMock({
       response: {
         data: [{
-          url: 'https://oaidalleapiprodscus.blob.core.windows.net/test-image.png',
+          b64_json: 'iVBORw0KGgoAAAANSUhEUg==',
           revised_prompt: 'A cute orange tabby cat sitting on a windowsill',
         }],
       },
@@ -220,7 +220,8 @@ describe('Image generation route', () => {
     })
     assert.equal(res.status, 200)
     const body = await res.json() as { url: string; revised_prompt: string }
-    assert.equal(body.url, 'https://oaidalleapiprodscus.blob.core.windows.net/test-image.png')
+    assert.ok(body.url.startsWith('data:image/png;base64,'), 'should return a data URL')
+    assert.equal(body.url, 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==')
     assert.equal(body.revised_prompt, 'A cute orange tabby cat sitting on a windowsill')
   })
 
@@ -229,7 +230,7 @@ describe('Image generation route', () => {
 
     let capturedBody: Record<string, unknown> | null = null
     setOpenAIMock({
-      response: { data: [{ url: 'https://example.com/img.png' }] },
+      response: { data: [{ b64_json: 'AAAA' }] },
       captureBody: (body) => { capturedBody = body },
     })
 
@@ -245,7 +246,7 @@ describe('Image generation route', () => {
     assert.equal(capturedBody!.size, '1792x1024')
     assert.equal(capturedBody!.quality, 'hd')
     assert.equal(capturedBody!.n, 1)
-    assert.equal(capturedBody!.response_format, 'url')
+    assert.equal(capturedBody!.response_format, 'b64_json')
   })
 
   it('uses default size and quality when not specified', async () => {
@@ -253,7 +254,7 @@ describe('Image generation route', () => {
 
     let capturedBody: Record<string, unknown> | null = null
     setOpenAIMock({
-      response: { data: [{ url: 'https://example.com/img.png' }] },
+      response: { data: [{ b64_json: 'AAAA' }] },
       captureBody: (body) => { capturedBody = body },
     })
 
