@@ -1,5 +1,8 @@
-import type { ConnectableElement, LineElement, ArrowheadStyle } from '../types'
+import type { ShapeElement, LineElement, ArrowheadStyle, TextElement } from '../types'
 import { buildPath } from '../lib/pathBuilders'
+
+/** Any element that can be a connector endpoint (has spatial bounds). */
+export type ConnectableElement = ShapeElement | TextElement
 
 interface Props {
   shapes: ConnectableElement[]
