@@ -88,11 +88,12 @@ export function App({ drawingId }: { drawingId: string }) {
       // Allow meta shortcuts (copy/paste/etc.) through for non-text inputs like color pickers
       const target = e.target as HTMLElement
       const tag = target.tagName
-      if (tag === 'TEXTAREA' || tag === 'INPUT') {
+      if (tag === 'TEXTAREA' || tag === 'INPUT' || target.isContentEditable) {
         if (e.key === 'Escape') {
           target.blur()
           return
         }
+        if (target.isContentEditable) return
         const inputType = (target as HTMLInputElement).type
         const isTextInput = tag === 'TEXTAREA' || inputType === 'text' || inputType === 'search' || inputType === 'url' || inputType === 'number'
         if (isTextInput || !meta) return

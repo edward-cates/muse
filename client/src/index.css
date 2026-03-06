@@ -853,11 +853,6 @@ body {
 }
 
 .text-element__content {
-  display: block;
-  background: none;
-  border: none;
-  resize: none;
-  outline: none;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-size: 20px;
   font-weight: 400;
@@ -866,13 +861,18 @@ body {
   color: var(--text);
   padding: 0;
   margin: 0;
+  border: none;
+  outline: none;
+  background: none;
   pointer-events: none;
   cursor: inherit;
-  overflow: hidden;
-  white-space: pre;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-width: 1px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  caret-color: currentColor;
 }
 
 .text-element__content--editing {
@@ -880,27 +880,14 @@ body {
   cursor: text;
 }
 
-.text-element__content::placeholder {
-  color: rgba(0, 0, 0, 0.2);
+.text-element__content:empty[data-placeholder]::before {
+  content: attr(data-placeholder);
+  color: rgba(0, 0, 0, 0.25);
+  pointer-events: none;
 }
 
 .text-element__content:focus {
   outline: none;
-}
-
-/* Hidden sizer for auto-measuring text dimensions */
-.text-element__sizer {
-  position: absolute;
-  visibility: hidden;
-  height: auto;
-  width: auto;
-  white-space: pre;
-  line-height: 1.45;
-  letter-spacing: -0.01em;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  padding: 0;
-  margin: 0;
-  pointer-events: none;
 }
 
 /* ── Image Element ── */

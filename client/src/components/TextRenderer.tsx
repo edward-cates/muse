@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect, type MouseEvent } from 'react'
+import { useRef, useState, useCallback, useEffect, memo, type MouseEvent, type KeyboardEvent } from 'react'
 import type { TextElement, Tool } from '../types'
 
 interface Props {
@@ -29,43 +29,187 @@ const HANDLES: { dir: HandleDir; x: number; y: number; cursor: string }[] = [
 
 const MIN_SIZE = 4
 
+/**
+ * Inner contentEditable wrapper — memoized to prevent React from
+ * reconciling (and thus wiping) the DOM text while the user types.
+ */
+interface EditableDivProps {
+  isEditing: boolean
+  initialText: string
+  fontSize?: number
+  fontFamily?: string
+  textAlign?: 'left' | 'center' | 'right'
+  color?: string
+  autoWidth: boolean
+  onTextChange: (text: string) => void
+  onBlur: () => void
+  onMouseDown: (e: MouseEvent) => void
+  divRef: React.RefObject<HTMLDivElement | null>
+  onSizeChange: (w: number, h: number) => void
+}
+
+const EditableDiv = memo(function EditableDiv({
+  isEditing, initialText, fontSize, fontFamily, textAlign, color,
+  autoWidth, onTextChange, onBlur, onMouseDown, divRef, onSizeChange,
+}: EditableDivProps) {
+  // Measure after input
+  const measure = useCallback(() => {
+    const el = divRef.current
+    if (!el) return
+    onSizeChange(el.scrollWidth, el.scrollHeight)
+  }, [divRef, onSizeChange])
+
+  const handleInput = useCallback(() => {
+    const el = divRef.current
+    if (!el) return
+    // innerText preserves line breaks from <br>, strip trailing newline
+    const text = el.innerText.replace(/\n$/, '')
+    onTextChange(text)
+    measure()
+  }, [divRef, onTextChange, measure])
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      divRef.current?.blur()
+    }
+  }, [divRef])
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    e.preventDefault()
+    const text = e.clipboardData.getData('text/plain')
+    document.execCommand('insertText', false, text)
+  }, [])
+
+  // Focus when editing starts
+  useEffect(() => {
+    if (isEditing && divRef.current) {
+      const el = divRef.current
+      requestAnimationFrame(() => {
+        el.focus()
+        const sel = window.getSelection()
+        if (sel && el.childNodes.length > 0) {
+          sel.selectAllChildren(el)
+          sel.collapseToEnd()
+        }
+        measure()
+      })
+    }
+  }, [isEditing, divRef, measure])
+
+  // Set content on mount
+  useEffect(() => {
+    if (divRef.current && !isEditing) {
+      divRef.current.textContent = initialText
+      measure()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // mount only
+
+  return (
+    <div
+      ref={divRef}
+      role="textbox"
+      data-testid="text-content"
+      className={`text-element__content ${isEditing ? 'text-element__content--editing' : ''}`}
+      contentEditable={isEditing}
+      suppressContentEditableWarning
+      spellCheck={false}
+      autoCorrect="off"
+      data-placeholder="Type..."
+      style={{
+        fontSize,
+        fontFamily,
+        textAlign,
+        color: color === 'transparent' ? undefined : color,
+        pointerEvents: isEditing ? 'auto' : 'none',
+        cursor: isEditing ? 'text' : 'inherit',
+        width: autoWidth ? 'auto' : '100%',
+      }}
+      onInput={handleInput}
+      onKeyDown={handleKeyDown}
+      onBlur={onBlur}
+      onPaste={handlePaste}
+      onMouseDown={onMouseDown}
+    />
+  )
+// Only re-render when isEditing or visual styles change — NOT on every text update
+}, (prev, next) =>
+  prev.isEditing === next.isEditing &&
+  prev.fontSize === next.fontSize &&
+  prev.fontFamily === next.fontFamily &&
+  prev.textAlign === next.textAlign &&
+  prev.color === next.color &&
+  prev.autoWidth === next.autoWidth
+)
+
 export function TextRenderer({ element, isSelected, isEditing, onSelect, onUpdate, onStartEdit, onStopEdit, onDelete, scale, activeTool }: Props) {
-  const textRef = useRef<HTMLTextAreaElement>(null)
-  const sizerRef = useRef<HTMLDivElement>(null)
+  const textRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const dragStart = useRef({ x: 0, y: 0 })
   const elStart = useRef({ x: 0, y: 0 })
-  const [measured, setMeasured] = useState({ w: 20, h: 20 })
+  const [measured, setMeasured] = useState({ w: MIN_SIZE, h: MIN_SIZE })
+  const textValueRef = useRef(element.text || '')
+  const wasEditingRef = useRef(false)
 
   const showHandles = isSelected && activeTool === 'select'
   const autoSize = element.width === 0 || element.height === 0
 
-  // Measure content via hidden sizer div and sync textarea
-  const syncSize = useCallback(() => {
-    const sizer = sizerRef.current
-    const ta = textRef.current
-    if (!sizer || !ta) return
+  // Track text changes from the editable div
+  const handleTextChange = useCallback((text: string) => {
+    textValueRef.current = text
+    onUpdate(element.id, { text })
+  }, [element.id, onUpdate])
 
-    const text = ta.value || (isEditing ? ' ' : '\u200b')
-    // Use innerHTML to handle newlines
-    sizer.innerHTML = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>') + (text.endsWith('\n') ? '<br>' : '')
+  // Track size changes from the editable div
+  const handleSizeChange = useCallback((w: number, h: number) => {
+    setMeasured({ w: Math.max(MIN_SIZE, w), h: Math.max(MIN_SIZE, h) })
+  }, [])
 
-    if (autoSize) {
-      const w = Math.max(MIN_SIZE, Math.ceil(sizer.scrollWidth) + 2)
-      const h = Math.max(MIN_SIZE, Math.ceil(sizer.scrollHeight))
-      setMeasured({ w, h })
-      ta.style.width = `${w}px`
-      ta.style.height = `${h}px`
-    } else {
-      ta.style.width = '100%'
-      ta.style.height = '0'
-      ta.style.height = `${ta.scrollHeight}px`
+  // Detect editing→not-editing transition: clean up empty elements
+  useEffect(() => {
+    if (wasEditingRef.current && !isEditing) {
+      // Editing just stopped — check if empty
+      const text = textValueRef.current
+      if (!text || text.trim() === '') {
+        onDelete(element.id)
+      }
     }
-  }, [autoSize, isEditing])
+    wasEditingRef.current = isEditing
+  }, [isEditing, element.id, onDelete])
+
+  // Sync content from external updates (Yjs collab) when not editing
+  useEffect(() => {
+    if (!isEditing && textRef.current) {
+      textRef.current.textContent = element.text || ''
+      textValueRef.current = element.text || ''
+      // Re-measure
+      const el = textRef.current
+      setMeasured({ w: Math.max(MIN_SIZE, el.scrollWidth), h: Math.max(MIN_SIZE, el.scrollHeight) })
+    }
+  }, [element.text, isEditing])
+
+  // Re-measure on font/size changes
+  useEffect(() => {
+    if (textRef.current) {
+      const el = textRef.current
+      requestAnimationFrame(() => {
+        setMeasured({ w: Math.max(MIN_SIZE, el.scrollWidth), h: Math.max(MIN_SIZE, el.scrollHeight) })
+      })
+    }
+  }, [element.fontSize, element.fontFamily, element.width])
+
+  const handleBlur = useCallback(() => {
+    onStopEdit()
+  }, [onStopEdit])
+
+  const handleEditableMouseDown = useCallback((e: MouseEvent) => {
+    if (isEditing) e.stopPropagation()
+  }, [isEditing])
 
   const handleMouseDown = useCallback(
     (e: MouseEvent) => {
-      if (isEditing && (e.target as HTMLElement).tagName === 'TEXTAREA') return
+      if (isEditing && textRef.current?.contains(e.target as Node)) return
       if (activeTool === 'hand') {
         e.stopPropagation()
         onSelect(element.id, e.shiftKey)
@@ -150,31 +294,6 @@ export function TextRenderer({ element, isSelected, isEditing, onSelect, onUpdat
     [element.id, element.x, element.y, element.width, element.height, scale, onUpdate, autoSize, measured],
   )
 
-  useEffect(() => {
-    if (isEditing && textRef.current) {
-      requestAnimationFrame(() => {
-        if (textRef.current) {
-          textRef.current.focus()
-          syncSize()
-        }
-      })
-    }
-  }, [isEditing, syncSize])
-
-  useEffect(() => {
-    syncSize()
-  }, [element.text, element.fontSize, element.fontFamily, element.width, syncSize])
-
-  const handleBlur = useCallback(() => {
-    setTimeout(() => {
-      if (textRef.current && document.activeElement === textRef.current) return
-      onStopEdit()
-      if (!element.text || element.text.trim() === '') {
-        onDelete(element.id)
-      }
-    }, 0)
-  }, [element.id, element.text, onDelete, onStopEdit])
-
   const displayW = autoSize ? measured.w : element.width
   const displayH = autoSize ? measured.h : element.height
 
@@ -184,28 +303,20 @@ export function TextRenderer({ element, isSelected, isEditing, onSelect, onUpdat
     bottom: 'flex-end',
   }
 
-  const textarea = (
-    <textarea
-      ref={textRef}
-      className={`text-element__content ${isEditing ? 'text-element__content--editing' : ''}`}
-      defaultValue={element.text}
-      placeholder={isEditing ? 'Type...' : ''}
-      spellCheck={false}
-      autoComplete="off"
-      rows={1}
-      style={{
-        fontSize: element.fontSize,
-        fontFamily: element.fontFamily,
-        textAlign: element.textAlign,
-        color: element.stroke === 'transparent' ? undefined : element.stroke,
-        pointerEvents: isEditing ? 'auto' : 'none',
-        cursor: isEditing ? 'text' : 'inherit',
-      }}
-      onChange={(e) => { onUpdate(element.id, { text: e.target.value }); syncSize() }}
+  const contentDiv = (
+    <EditableDiv
+      divRef={textRef}
+      isEditing={isEditing}
+      initialText={element.text || ''}
+      fontSize={element.fontSize}
+      fontFamily={element.fontFamily}
+      textAlign={element.textAlign}
+      color={element.stroke}
+      autoWidth={autoSize}
+      onTextChange={handleTextChange}
       onBlur={handleBlur}
-      onMouseDown={(e) => {
-        if (isEditing) e.stopPropagation()
-      }}
+      onMouseDown={handleEditableMouseDown}
+      onSizeChange={handleSizeChange}
     />
   )
 
@@ -225,22 +336,12 @@ export function TextRenderer({ element, isSelected, isEditing, onSelect, onUpdat
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
     >
-      {/* Hidden sizer mirrors textarea content for width/height measurement */}
-      <div
-        ref={sizerRef}
-        aria-hidden
-        className="text-element__sizer"
-        style={{
-          fontSize: element.fontSize,
-          fontFamily: element.fontFamily,
-        }}
-      />
-      {autoSize ? textarea : (
+      {autoSize ? contentDiv : (
         <div
           className="text-element__text-container"
           style={{ justifyContent: vAlignMap[element.verticalAlign || 'top'] || 'flex-start' }}
         >
-          {textarea}
+          {contentDiv}
         </div>
       )}
       {showHandles && HANDLES.map(({ dir, x, y, cursor }) => (
