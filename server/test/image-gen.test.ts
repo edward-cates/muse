@@ -265,7 +265,7 @@ describe('Image generation route', () => {
 
     assert.ok(capturedBody)
     assert.equal(capturedBody!.size, '1024x1024')
-    assert.equal(capturedBody!.quality, 'auto')
+    assert.equal(capturedBody!.quality, 'standard')
   })
 
   it('returns 502 when OpenAI API returns an error', async () => {
