@@ -27,6 +27,8 @@ export interface ElementActions {
   updateDocumentContent?: (documentId: string, content: string) => Promise<number>
   // Write elements to a remote canvas document (for research sub-canvases)
   addRemoteElements?: (documentId: string, elements: Array<Record<string, string | number | number[]>>) => Promise<{ ids: string[]; count: number }>
+  // Update an element in a remote canvas document
+  updateRemoteElement?: (documentId: string, elementId: string, updates: Record<string, string | number | number[]>) => Promise<void>
 }
 
 export interface FetchUrlFn {
@@ -122,11 +124,7 @@ export async function executeToolCall(
       }
 
       case 'update_element': {
-        const { id, ...updates } = call.input as { id: string; [key: string]: unknown }
-        const resolved = resolveShape(elements, id) || findElement(elements, id)
-        if (!resolved) {
-          return { tool_use_id: call.id, content: JSON.stringify({ error: `Element "${id}" not found. Available IDs: ${elements.map(e => e.id.slice(0, 8)).join(', ')}` }) }
-        }
+        const { id, target_document_id, ...updates } = call.input as { id: string; target_document_id?: string; [key: string]: unknown }
         const warnings: string[] = []
         if (updates.fill !== undefined) {
           const v = validateHexColor(updates.fill as string)
@@ -137,6 +135,20 @@ export async function executeToolCall(
           const v = validateHexColor(updates.stroke as string)
           updates.stroke = v.normalized
           if (v.warning) warnings.push(v.warning)
+        }
+
+        // If targeting a child canvas, update remotely via server API
+        if (target_document_id && actions.updateRemoteElement) {
+          await actions.updateRemoteElement(target_document_id, id, updates as Record<string, string | number | number[]>)
+          const result = warnings.length > 0
+            ? { success: true, target_document_id, warnings }
+            : { success: true, target_document_id }
+          return { tool_use_id: call.id, content: JSON.stringify(result) }
+        }
+
+        const resolved = resolveShape(elements, id) || findElement(elements, id)
+        if (!resolved) {
+          return { tool_use_id: call.id, content: JSON.stringify({ error: `Element "${id}" not found. Available IDs: ${elements.map(e => e.id.slice(0, 8)).join(', ')}` }) }
         }
         actions.updateElement(resolved.id, updates)
         const result = warnings.length > 0

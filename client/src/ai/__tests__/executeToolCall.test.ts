@@ -202,6 +202,36 @@ describe('executeToolCall', () => {
       )
       assert.equal(store.find('shape-1')!.text, 'Updated')
     })
+
+    it('routes to updateRemoteElement when target_document_id is set', async () => {
+      const store = createStore([shape({ id: 'shape-1' })])
+      const remoteUpdates: Array<{ docId: string; elementId: string; updates: Record<string, unknown> }> = []
+      store.actions.updateRemoteElement = async (docId, elementId, updates) => {
+        remoteUpdates.push({ docId, elementId, updates })
+      }
+      const data = parse(await executeToolCall(
+        call('update_element', { id: 'remote-elem-1', title: 'Research Summary', description: 'Key findings', target_document_id: 'child-doc-456' }),
+        store.actions,
+      ))
+      assert.ok(data.success)
+      assert.equal(data.target_document_id, 'child-doc-456')
+      // Should have called updateRemoteElement, NOT local updateElement
+      assert.equal(remoteUpdates.length, 1)
+      assert.equal(remoteUpdates[0].docId, 'child-doc-456')
+      assert.equal(remoteUpdates[0].elementId, 'remote-elem-1')
+      assert.equal(remoteUpdates[0].updates.title, 'Research Summary')
+      assert.equal(remoteUpdates[0].updates.description, 'Key findings')
+    })
+
+    it('falls back to local update when no target_document_id', async () => {
+      const store = createStore([shape({ id: 'shape-1' })])
+      store.actions.updateRemoteElement = async () => { throw new Error('should not be called') }
+      await executeToolCall(
+        call('update_element', { id: 'shape-1', text: 'Local Update' }),
+        store.actions,
+      )
+      assert.equal(store.find('shape-1')!.text, 'Local Update')
+    })
   })
 
   describe('delete_element', () => {

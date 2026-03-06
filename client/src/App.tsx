@@ -606,6 +606,14 @@ export function App({ drawingId }: { drawingId: string }) {
             if (!res.ok) throw new Error('Failed to add remote elements')
             return res.json()
           },
+          updateRemoteElement: async (documentId, elementId, updates) => {
+            const res = await fetch(`/api/documents/${documentId}/elements`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
+              body: JSON.stringify({ elementId, updates }),
+            })
+            if (!res.ok) throw new Error('Failed to update remote element')
+          },
         }}
       />
       {sourcePanel && (

@@ -48,7 +48,7 @@ export const CANVAS_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'update_element',
-    description: 'Update properties of an existing canvas element by ID.',
+    description: 'Update properties of an existing canvas element by ID. Use target_document_id to update elements in a child canvas (e.g. research sub-canvas).',
     input_schema: {
       type: 'object',
       properties: {
@@ -61,6 +61,9 @@ export const CANVAS_TOOLS: ToolDefinition[] = [
         fill: { type: 'string', description: 'New fill color (hex)' },
         stroke: { type: 'string', description: 'New stroke color (hex)' },
         strokeWidth: { type: 'number', description: 'New stroke width' },
+        title: { type: 'string', description: 'New title (for document cards, web cards)' },
+        description: { type: 'string', description: 'New description text (for document cards)' },
+        target_document_id: { type: 'string', description: 'If provided, update the element in this child canvas instead of the current canvas' },
       },
       required: ['id'],
     },

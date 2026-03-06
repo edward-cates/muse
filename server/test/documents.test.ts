@@ -589,6 +589,106 @@ describe('Documents API', () => {
     assert.equal(res.status, 404)
   })
 
+  // ── PATCH /api/documents/:id/elements ──
+
+  it('PATCH /api/documents/:id/elements updates an element in a canvas Yjs doc', async () => {
+    // First create a doc with an element via POST, then update it via PATCH
+    let savedContent = ''
+
+    setMockRoutes([{
+      method: 'GET',
+      table: 'documents',
+      handler: () => ({
+        status: 200,
+        data: { content: null, type: 'canvas' },
+      }),
+    }, {
+      method: 'PATCH',
+      table: 'documents',
+      handler: (_req, body) => {
+        savedContent = JSON.parse(body).content
+        return { status: 200, data: [] }
+      },
+    }])
+
+    // Step 1: Add an element
+    const addRes = await fetch(url('/api/documents/abc-123/elements'), {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        elements: [{ id: 'elem-1', type: 'webcard', x: 100, y: 100, title: 'Original' }],
+      }),
+    })
+    assert.equal(addRes.status, 200)
+    const addBody = await addRes.json() as { ids: string[] }
+    assert.equal(addBody.ids[0], 'elem-1')
+
+    // Step 2: Now update the element — mock returns the saved content from step 1
+    setMockRoutes([{
+      method: 'GET',
+      table: 'documents',
+      handler: () => ({
+        status: 200,
+        data: { content: savedContent, type: 'canvas' },
+      }),
+    }, {
+      method: 'PATCH',
+      table: 'documents',
+      handler: (_req, body) => {
+        savedContent = JSON.parse(body).content
+        return { status: 200, data: [] }
+      },
+    }])
+
+    const patchRes = await fetch(url('/api/documents/abc-123/elements'), {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ elementId: 'elem-1', updates: { title: 'Updated Title', description: 'New summary' } }),
+    })
+    assert.equal(patchRes.status, 200)
+    const patchBody = await patchRes.json() as { success: boolean; elementId: string }
+    assert.equal(patchBody.success, true)
+    assert.equal(patchBody.elementId, 'elem-1')
+  })
+
+  it('PATCH /api/documents/:id/elements returns 404 for nonexistent element', async () => {
+    setMockRoutes([{
+      method: 'GET',
+      table: 'documents',
+      handler: () => ({
+        status: 200,
+        data: { content: null, type: 'canvas' },
+      }),
+    }])
+
+    const res = await fetch(url('/api/documents/abc-123/elements'), {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ elementId: 'nonexistent', updates: { title: 'X' } }),
+    })
+    assert.equal(res.status, 404)
+    const body = await res.json() as { error: string }
+    assert.ok(body.error.includes('nonexistent'))
+  })
+
+  it('PATCH /api/documents/:id/elements rejects missing elementId', async () => {
+    const res = await fetch(url('/api/documents/abc-123/elements'), {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ updates: { title: 'X' } }),
+    })
+    assert.equal(res.status, 400)
+  })
+
+  it('PATCH /api/documents/:id/elements rejects empty updates', async () => {
+    const res = await fetch(url('/api/documents/abc-123/elements'), {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ elementId: 'elem-1', updates: {} }),
+    })
+    assert.equal(res.status, 400)
+  })
+
   // ── Backward compatibility: /api/drawings alias ──
 
   it('/api/drawings alias still works', async () => {

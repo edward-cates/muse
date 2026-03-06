@@ -302,4 +302,91 @@ router.post('/:id/elements', async (req, res) => {
   res.json({ ids, count: elements.length })
 })
 
+// Update an element in a canvas document's Yjs state (used by AI to update elements in any canvas)
+router.patch('/:id/elements', async (req, res) => {
+  const userId = req.userId!
+  const { id } = req.params
+  const { elementId, updates } = req.body as { elementId: string; updates: Record<string, string | number | number[]> }
+
+  if (!elementId || typeof elementId !== 'string') {
+    res.status(400).json({ error: 'elementId is required' })
+    return
+  }
+  if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
+    res.status(400).json({ error: 'updates object is required and must be non-empty' })
+    return
+  }
+
+  const supabase = getSupabase()
+
+  // Verify ownership and type
+  const { data: doc, error: fetchError } = await supabase
+    .from('documents')
+    .select('content, type')
+    .eq('id', id)
+    .eq('owner_id', userId)
+    .maybeSingle()
+
+  if (fetchError) {
+    res.status(500).json({ error: 'Failed to get document' })
+    return
+  }
+  if (!doc) {
+    res.status(404).json({ error: 'Document not found' })
+    return
+  }
+  if (doc.type !== 'canvas') {
+    res.status(400).json({ error: 'Can only update elements in canvas documents' })
+    return
+  }
+
+  // Load existing Yjs state
+  const ydoc = new Y.Doc()
+  if (doc.content) {
+    try {
+      const bytes = Buffer.from(doc.content, 'base64')
+      Y.applyUpdate(ydoc, new Uint8Array(bytes))
+    } catch {
+      // Corrupt state
+    }
+  }
+
+  // Find the element by ID in the Y.Array
+  const yElements = ydoc.getArray('elements')
+  let found = false
+  for (let i = 0; i < yElements.length; i++) {
+    const yEl = yElements.get(i) as ReturnType<typeof Y.Doc.prototype.getMap>
+    if (yEl.get('id') === elementId) {
+      for (const [key, value] of Object.entries(updates)) {
+        yEl.set(key, value)
+      }
+      found = true
+      break
+    }
+  }
+
+  if (!found) {
+    ydoc.destroy()
+    res.status(404).json({ error: `Element "${elementId}" not found in document` })
+    return
+  }
+
+  // Persist back to DB
+  const state = Y.encodeStateAsUpdate(ydoc)
+  const { error: updateError } = await supabase
+    .from('documents')
+    .update({ content: Buffer.from(state).toString('base64'), updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('owner_id', userId)
+
+  ydoc.destroy()
+
+  if (updateError) {
+    res.status(500).json({ error: 'Failed to save element update' })
+    return
+  }
+
+  res.json({ success: true, elementId })
+})
+
 export default router
