@@ -118,6 +118,8 @@ export function readElement(m: Y.Map<YMapVal>): CanvasElement {
       documentType: (m.get('documentType') as string) || 'canvas',
       title: (m.get('title') as string) || 'Untitled',
       description: (m.get('description') as string) || '',
+      topicLabels: (m.get('topicLabels') as string) || '',
+      topicColors: (m.get('topicColors') as string) || '',
       contentVersion: (m.get('contentVersion') as number) || 0,
       opacity: (m.get('opacity') as number) ?? 100,
     }

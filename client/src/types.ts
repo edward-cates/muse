@@ -135,9 +135,11 @@ export interface DocumentCardElement {
   width: number
   height: number
   documentId: string
-  documentType: string   // 'canvas' | 'html_artifact'
+  documentType: string   // 'canvas' | 'html_artifact' | 'research'
   title: string          // cached for display
   description: string    // summary text shown on the card
+  topicLabels: string    // pipe-separated topic titles (e.g. "AI Trends|Data Infra|Hiring")
+  topicColors: string    // pipe-separated hex colors (e.g. "#3b82f6|#22c55e|#a855f7")
   contentVersion: number // re-fetch preview when this changes
   opacity: number
 }

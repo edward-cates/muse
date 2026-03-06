@@ -386,18 +386,26 @@ export async function executeToolCall(
         }
         const result = await decomposeText(text, title)
         const COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#a855f7', '#ef4444', '#64748b', '#06b6d4', '#ec4899']
-        const cardIds: string[] = []
         const CARD_W = 260, CARD_H = 180, GAP = 20, COLS = 3
 
-        // Write decomposition cards to a child canvas remotely
-        if (target_document_id && actions.addRemoteElements) {
+        // Build topic pills data for the source card
+        const topicLabels = result.topics.map(t => t.title).join('|')
+        const topicColors = result.topics.map((t, i) => t.color || COLORS[i % COLORS.length]).join('|')
+
+        // When targeting a remote canvas: create a source sub-canvas with decomposition cards inside,
+        // then place a document card (with topic pills) on the target canvas
+        if (target_document_id && actions.addRemoteElements && actions.createDocument) {
+          // 1. Create a canvas doc for this source's decomposition cards
+          const sourceCanvas = await actions.createDocument({ title: title || 'Untitled Research', type: 'canvas' })
+
+          // 2. Write decomposition cards into the source canvas
           const remoteEls: Array<Record<string, string | number | number[]>> = []
           for (let i = 0; i < result.topics.length; i++) {
             const topic = result.topics[i]
             const col = i % COLS
             const row = Math.floor(i / COLS)
-            const cx = x + col * (CARD_W + GAP)
-            const cy = y + row * (CARD_H + GAP)
+            const cx = 100 + col * (CARD_W + GAP)
+            const cy = 100 + row * (CARD_H + GAP)
             const flatRanges = topic.lineRanges.flatMap(r => [r.start, r.end])
             const color = topic.color || COLORS[i % COLORS.length]
             remoteEls.push({
@@ -406,24 +414,48 @@ export async function executeToolCall(
               color, documentId: result.documentId, expanded: 0, opacity: 100,
             })
           }
-          const remoteResult = await actions.addRemoteElements(target_document_id, remoteEls)
-          cardIds.push(...remoteResult.ids)
-        } else {
-          // Write locally
-          if (!actions.addDecompositionCard) {
-            return { tool_use_id: call.id, content: JSON.stringify({ error: 'Text decomposition not available' }) }
+          await actions.addRemoteElements(sourceCanvas.id, remoteEls)
+
+          // 3. Place a document card on the research canvas linking to the source canvas
+          const cardEl: Record<string, string | number | number[]> = {
+            type: 'document_card', x, y, width: 280, height: 220,
+            documentId: sourceCanvas.id, documentType: 'research',
+            title: title || 'Untitled Research',
+            description: '',
+            topicLabels,
+            topicColors,
+            contentVersion: 0, opacity: 100,
           }
-          for (let i = 0; i < result.topics.length; i++) {
-            const topic = result.topics[i]
-            const col = i % COLS
-            const row = Math.floor(i / COLS)
-            const cx = x + col * (CARD_W + GAP)
-            const cy = y + row * (CARD_H + GAP)
-            const flatRanges = topic.lineRanges.flatMap(r => [r.start, r.end])
-            const color = topic.color || COLORS[i % COLORS.length]
-            const id = actions.addDecompositionCard(cx, cy, CARD_W, CARD_H, topic.title, topic.summary, flatRanges, color, result.documentId)
-            cardIds.push(id)
-          }
+          const cardResult = await actions.addRemoteElements(target_document_id, [cardEl])
+
+          return { tool_use_id: call.id, content: JSON.stringify({
+            success: true,
+            sourceDocumentId: result.documentId,
+            canvasDocumentId: sourceCanvas.id,
+            cardElementId: cardResult.ids[0],
+            topicCount: result.topics.length,
+            topicLabels,
+            topicColors,
+            target_document_id,
+            message: `Decomposed "${title || 'text'}" into ${result.topics.length} topics`,
+          }) }
+        }
+
+        // Local mode: write decomposition cards directly on the current canvas
+        if (!actions.addDecompositionCard) {
+          return { tool_use_id: call.id, content: JSON.stringify({ error: 'Text decomposition not available' }) }
+        }
+        const cardIds: string[] = []
+        for (let i = 0; i < result.topics.length; i++) {
+          const topic = result.topics[i]
+          const col = i % COLS
+          const row = Math.floor(i / COLS)
+          const cx = x + col * (CARD_W + GAP)
+          const cy = y + row * (CARD_H + GAP)
+          const flatRanges = topic.lineRanges.flatMap(r => [r.start, r.end])
+          const color = topic.color || COLORS[i % COLORS.length]
+          const id = actions.addDecompositionCard(cx, cy, CARD_W, CARD_H, topic.title, topic.summary, flatRanges, color, result.documentId)
+          cardIds.push(id)
         }
 
         return { tool_use_id: call.id, content: JSON.stringify({
@@ -431,7 +463,6 @@ export async function executeToolCall(
           documentId: result.documentId,
           topicCount: result.topics.length,
           cardIds,
-          target_document_id,
           message: `Decomposed "${title || 'text'}" into ${result.topics.length} topics`,
         }) }
       }

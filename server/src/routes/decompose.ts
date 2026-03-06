@@ -9,7 +9,13 @@ function getSupabase() {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
-const DECOMPOSE_SYSTEM = `You decompose documents into major topics. Use the report_topics tool to return your analysis. Line numbers are 1-indexed. Be accurate with line ranges — the user will click these to see the original text.`
+const DECOMPOSE_SYSTEM = `You decompose documents into 3-7 major topics. Use the report_topics tool to return your analysis.
+
+Rules:
+- Each topic should cover a SUBSTANTIAL section of the document (5-20 total lines across all ranges for that topic)
+- Do NOT create topics for individual lines — merge related lines into broader themes
+- Line numbers are 1-indexed. Be accurate with line ranges — the user will click these to see the original text.
+- If the document is short (< 30 lines), produce 2-4 topics. If long (> 100 lines), up to 7.`
 
 const DECOMPOSE_TOOL: Anthropic.Tool = {
   name: 'report_topics',

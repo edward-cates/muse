@@ -1085,6 +1085,32 @@ body {
 .document-card__inner--research {
   align-items: flex-start;
 }
+.document-card__topics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  width: 100%;
+  overflow: hidden;
+}
+.document-card__topic {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.document-card__topic-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.document-card__topic-label {
+  font-size: 11px;
+  color: #444;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* HTML artifact variant — browser chrome */
 .document-card--html .document-card__inner {

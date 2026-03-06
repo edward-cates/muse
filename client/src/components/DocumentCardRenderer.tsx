@@ -232,7 +232,19 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
             {typeIcons[element.documentType] || typeIcons.canvas}
           </div>
           <div className="document-card__title">{element.title || 'Untitled'}</div>
-          {element.description ? (
+          {element.topicLabels ? (
+            <div className="document-card__topics">
+              {element.topicLabels.split('|').map((label, i) => {
+                const colors = element.topicColors ? element.topicColors.split('|') : []
+                return (
+                  <div key={i} className="document-card__topic">
+                    <span className="document-card__topic-dot" style={{ background: colors[i] || '#94a3b8' }} />
+                    <span className="document-card__topic-label">{label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          ) : element.description ? (
             <div className="document-card__description">{element.description}</div>
           ) : (
             <div className="document-card__type">{typeLabels[element.documentType] || element.documentType}</div>
