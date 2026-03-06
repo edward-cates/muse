@@ -292,8 +292,9 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
     const padding = 50
     const bw = maxX - minX + padding * 2
     const bh = maxY - minY + padding * 2
-    const vw = window.innerWidth
-    const vh = window.innerHeight
+    const canvasEl = canvasRef.current
+    const vw = canvasEl ? canvasEl.clientWidth : window.innerWidth
+    const vh = canvasEl ? canvasEl.clientHeight : window.innerHeight
     const s = Math.min(vw / bw, vh / bh, 2)
     setScale(s)
     setOffset({

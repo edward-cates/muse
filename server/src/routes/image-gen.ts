@@ -31,7 +31,7 @@ async function decryptOpenAIKey(userId: string): Promise<string> {
 // POST /api/image-gen — generate an image via OpenAI DALL-E
 router.post('/', async (req, res) => {
   const userId = req.userId!
-  const { prompt, size = '1024x1024', quality = 'auto' } = req.body
+  const { prompt, size = '1024x1024', quality = 'standard' } = req.body
 
   if (!prompt || typeof prompt !== 'string') {
     res.status(400).json({ error: 'prompt string is required' })

@@ -45,14 +45,23 @@ export async function captureCanvas(element: HTMLElement): Promise<string> {
   // Wait for React to paint Yjs mutations into the DOM
   await waitForPaint()
 
+  // html2canvas clips children based on their absolute DOM positions,
+  // not their visually-transformed positions. When fitToContent scales
+  // .canvas__world down, shapes may have large left/top values (e.g. 1400px)
+  // that exceed element.clientWidth. We need windowWidth/windowHeight large
+  // enough that html2canvas doesn't discard those elements during rendering.
+  const world = element.querySelector('.canvas__world') as HTMLElement | null
+  const ww = Math.max(element.clientWidth, world?.scrollWidth ?? 0)
+  const wh = Math.max(element.clientHeight, world?.scrollHeight ?? 0)
+
   const canvas = await html2canvas(element, {
     scale: SCALE,
     useCORS: true,
     logging: false,
     width: element.clientWidth,
     height: element.clientHeight,
-    windowWidth: element.clientWidth,
-    windowHeight: element.clientHeight,
+    windowWidth: ww,
+    windowHeight: wh,
   })
   return canvas.toDataURL('image/png').replace('data:image/png;base64,', '')
 }

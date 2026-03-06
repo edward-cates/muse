@@ -15,7 +15,8 @@ const CANVAS_KEYWORDS = [
   'wireframe', 'sketch', 'design', 'build', 'make',
   'tree', 'graph', 'chart', 'dashboard', 'grid',
   'table', 'hierarchy', 'architecture',
-  'generate image', 'image of', 'picture of',
+  'generate image', 'generated image', 'image of', 'picture of',
+  'generate a', 'make an image', 'make a picture', 'dall-e', 'dalle',
 ]
 
 const URL_RE = /https?:\/\/[^\s]+/i

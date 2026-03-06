@@ -217,6 +217,63 @@ test.describe('VQA screenshot pipeline', () => {
     expect(matchRate).toBeGreaterThan(0.85)
   })
 
+  test('fitToContent + screenshot captures all shapes even when content is wider than canvas', async ({ page }) => {
+    // Place shapes spread far apart — wider than the canvas element
+    // This forces fitToContent to zoom out. If fitToContent miscalculates
+    // using window.innerWidth instead of canvas element width, the right
+    // shape will be clipped from the screenshot.
+    await createShape(page, {
+      id: 'left-red', x: 0, y: 200, w: 150, h: 100, fill: '#ff0000',
+    })
+    await createShape(page, {
+      id: 'right-blue', x: 1400, y: 200, w: 150, h: 100, fill: '#0000ff',
+    })
+    await expect(canvas.shapes).toHaveCount(2)
+
+    // Click canvas first to ensure keyboard focus is on the window (not a toolbar button)
+    await page.mouse.click(600, 300)
+    await page.waitForTimeout(50)
+
+    // Trigger fitToContent via Shift+1 (same as what VQA pipeline does before capture)
+    await page.keyboard.press('Shift+1')
+    // Wait for the viewport transform to update
+    await page.waitForTimeout(200)
+
+    const result = await page.evaluate(async () => {
+      const { captureCanvas } = await import('/src/ai/canvasCapture.ts')
+      const canvasEl = document.querySelector<HTMLDivElement>('[data-testid="canvas"]')!
+      const base64 = await captureCanvas(canvasEl)
+
+      return new Promise<{ redPixels: number; bluePixels: number; width: number; height: number }>((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => {
+          const c = document.createElement('canvas')
+          c.width = img.width
+          c.height = img.height
+          const ctx = c.getContext('2d')!
+          ctx.drawImage(img, 0, 0)
+          const data = ctx.getImageData(0, 0, c.width, c.height).data
+
+          let redPixels = 0, bluePixels = 0
+          for (let i = 0; i < data.length; i += 4) {
+            const [r, g, b] = [data[i], data[i + 1], data[i + 2]]
+            if (r > 180 && g < 80 && b < 80) redPixels++
+            if (b > 180 && r < 80 && g < 80) bluePixels++
+          }
+          resolve({ redPixels, bluePixels, width: img.width, height: img.height })
+        }
+        img.onerror = () => reject(new Error('Failed to load'))
+        img.src = `data:image/png;base64,${base64}`
+      })
+    })
+
+    // Both shapes must be visible in the screenshot
+    // If fitToContent used window.innerWidth instead of canvas width,
+    // the blue shape at x=1400 would be clipped off the right edge
+    expect(result.redPixels).toBeGreaterThan(50)
+    expect(result.bluePixels).toBeGreaterThan(50)
+  })
+
   test('screenshot captures the canvas element, not the full page or AI panel', async ({ page }) => {
     await createShape(page, {
       id: 'marker', x: 300, y: 300, w: 100, h: 100, fill: '#ff00ff',
