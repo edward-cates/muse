@@ -47,7 +47,7 @@ export interface CanvasHandle {
   fitToElements: (ids: string[]) => void
 }
 
-const SHAPE_TOOLS: Tool[] = ['rectangle', 'ellipse', 'diamond', 'triangle', 'hexagon', 'star', 'cloud']
+const SHAPE_TOOLS: Tool[] = ['rectangle', 'ellipse', 'diamond']
 const MIN_SHAPE_SIZE = 10
 const GRID_SIZE = 20
 
@@ -316,10 +316,6 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
       }
       case 'diamond': {
         return Math.abs(nx - 0.5) + Math.abs(ny - 0.5) <= 0.5
-      }
-      case 'triangle': {
-        // Point-up triangle: vertices at (0.5,0), (0,1), (1,1)
-        return ny >= 2 * Math.abs(nx - 0.5)
       }
       default:
         return true // rectangle, hexagon, star, cloud — use bounding box
@@ -955,12 +951,6 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
         )}
         {shapePreview.type === 'diamond' && (
           <polygon points={`${shapePreview.w / 2},1 ${shapePreview.w - 1},${shapePreview.h / 2} ${shapePreview.w / 2},${shapePreview.h - 1} 1,${shapePreview.h / 2}`} fill="rgba(232, 237, 252, 0.5)" stroke="#4465e9" strokeWidth={2.5} strokeDasharray="6 3" />
-        )}
-        {shapePreview.type === 'triangle' && (
-          <polygon points={`${shapePreview.w / 2},1 ${shapePreview.w - 1},${shapePreview.h - 1} 1,${shapePreview.h - 1}`} fill="rgba(232, 237, 252, 0.5)" stroke="#4465e9" strokeWidth={2.5} strokeDasharray="6 3" />
-        )}
-        {(shapePreview.type === 'hexagon' || shapePreview.type === 'star' || shapePreview.type === 'cloud') && (
-          <rect x={1} y={1} width={shapePreview.w - 2} height={shapePreview.h - 2} fill="rgba(232, 237, 252, 0.5)" stroke="#4465e9" strokeWidth={2.5} strokeDasharray="6 3" />
         )}
       </svg>
     </div>

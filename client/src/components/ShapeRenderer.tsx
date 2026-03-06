@@ -78,39 +78,6 @@ function shapeSvg(type: ShapeElement['type'], w: number, h: number, fill: string
       const pts = `${w / 2},${sw / 2} ${w - sw / 2},${h / 2} ${w / 2},${h - sw / 2} ${sw / 2},${h / 2}`
       return <polygon points={pts} fill={fill === 'none' ? 'transparent' : fill} stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray} />
     }
-    case 'triangle': {
-      const pts = `${w / 2},${sw / 2} ${w - sw / 2},${h - sw / 2} ${sw / 2},${h - sw / 2}`
-      return <polygon points={pts} fill={fill === 'none' ? 'transparent' : fill} stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray} />
-    }
-    case 'hexagon': {
-      const cx = w / 2, cy = h / 2
-      const rx = (w - sw) / 2, ry = (h - sw) / 2
-      const pts = Array.from({ length: 6 }, (_, i) => {
-        const angle = (Math.PI / 3) * i - Math.PI / 2
-        return `${cx + rx * Math.cos(angle)},${cy + ry * Math.sin(angle)}`
-      }).join(' ')
-      return <polygon points={pts} fill={fill === 'none' ? 'transparent' : fill} stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray} />
-    }
-    case 'star': {
-      const cx = w / 2, cy = h / 2
-      const outerR = Math.min(w, h) / 2 - sw
-      const innerR = outerR * 0.4
-      const pts = Array.from({ length: 10 }, (_, i) => {
-        const angle = (Math.PI / 5) * i - Math.PI / 2
-        const r = i % 2 === 0 ? outerR : innerR
-        return `${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`
-      }).join(' ')
-      return <polygon points={pts} fill={fill === 'none' ? 'transparent' : fill} stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray} />
-    }
-    case 'cloud': {
-      const path = `M ${w * 0.25} ${h * 0.7}
-        C ${w * 0.05} ${h * 0.7}, ${w * 0.05} ${h * 0.4}, ${w * 0.2} ${h * 0.35}
-        C ${w * 0.15} ${h * 0.1}, ${w * 0.45} ${h * 0.05}, ${w * 0.5} ${h * 0.25}
-        C ${w * 0.55} ${h * 0.05}, ${w * 0.85} ${h * 0.1}, ${w * 0.8} ${h * 0.35}
-        C ${w * 0.95} ${h * 0.4}, ${w * 0.95} ${h * 0.7}, ${w * 0.75} ${h * 0.7}
-        Z`
-      return <path d={path} fill={fill === 'none' ? 'transparent' : fill} stroke={stroke} strokeWidth={sw} strokeDasharray={dashArray} />
-    }
   }
 }
 

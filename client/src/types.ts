@@ -1,6 +1,6 @@
-export type Tool = 'select' | 'rectangle' | 'ellipse' | 'diamond' | 'draw' | 'line' | 'arrow' | 'text' | 'hand' | 'eraser' | 'frame' | 'triangle' | 'hexagon' | 'star' | 'cloud'
+export type Tool = 'select' | 'rectangle' | 'ellipse' | 'diamond' | 'draw' | 'line' | 'arrow' | 'text' | 'hand' | 'eraser' | 'frame'
 
-export type ShapeType = 'rectangle' | 'ellipse' | 'diamond' | 'triangle' | 'hexagon' | 'star' | 'cloud'
+export type ShapeType = 'rectangle' | 'ellipse' | 'diamond'
 
 export type LineType = 'straight' | 'elbow' | 'curve'
 
@@ -144,7 +144,7 @@ export interface DocumentCardElement {
 export type CanvasElement = ShapeElement | PathElement | LineElement | TextElement | ImageElement | FrameElement | WebCardElement | DocumentCardElement
 
 export function isShape(el: CanvasElement): el is ShapeElement {
-  const shapeTypes: string[] = ['rectangle', 'ellipse', 'diamond', 'triangle', 'hexagon', 'star', 'cloud']
+  const shapeTypes: string[] = ['rectangle', 'ellipse', 'diamond']
   return shapeTypes.includes(el.type)
 }
 

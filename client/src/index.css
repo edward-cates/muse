@@ -716,44 +716,6 @@ body {
   background: none;
 }
 
-/* ── Shape Picker Flyout ── */
-.shape-picker-flyout {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 8px;
-  background: var(--surface);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 6px;
-  display: flex;
-  gap: 2px;
-  box-shadow: var(--shadow-lg);
-  z-index: 600;
-}
-
-.shape-picker-flyout button {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  border-radius: 8px;
-  cursor: pointer;
-  color: var(--text-muted);
-  transition: background 0.12s, color 0.12s;
-}
-
-.shape-picker-flyout button:hover {
-  background: var(--accent-light);
-  color: var(--text);
-}
-
 /* ── Hand / Eraser / Text Tool Cursors ── */
 .canvas--tool-hand {
   cursor: grab;
