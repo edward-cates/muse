@@ -100,21 +100,19 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
   const abortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Wrap setState to persist across remounts
+  // Wrap setState to persist across remounts.
+  // Update the module-level variable FIRST (always works), then call setState
+  // for re-rendering (silently dropped if component is unmounted in React 18).
   const setChatMessages = useCallback((action: React.SetStateAction<ChatMessage[]>) => {
-    _setChatMessages(prev => {
-      const next = typeof action === 'function' ? action(prev) : action
-      _persistedChat = next
-      return next
-    })
+    const next = typeof action === 'function' ? action(_persistedChat) : action
+    _persistedChat = next
+    _setChatMessages(next)
   }, [])
 
   const setApiMessages = useCallback((action: React.SetStateAction<ApiMessage[]>) => {
-    _setApiMessages(prev => {
-      const next = typeof action === 'function' ? action(prev) : action
-      _persistedApi = next
-      return next
-    })
+    const next = typeof action === 'function' ? action(_persistedApi) : action
+    _persistedApi = next
+    _setApiMessages(next)
   }, [])
 
   // Auto-scroll on new messages
