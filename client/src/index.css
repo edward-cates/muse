@@ -815,9 +815,6 @@ body {
 
 .text-element--selected {
   z-index: 50;
-  outline: 1.5px dashed var(--selection);
-  outline-offset: 3px;
-  border-radius: 2px;
 }
 
 .text-element--dragging {

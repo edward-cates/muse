@@ -141,6 +141,9 @@ export interface DocumentCardElement {
   opacity: number
 }
 
+/** Any element that arrows/connectors can attach to */
+export type ConnectableElement = ShapeElement | TextElement
+
 export type CanvasElement = ShapeElement | PathElement | LineElement | TextElement | ImageElement | FrameElement | WebCardElement | DocumentCardElement
 
 export function isShape(el: CanvasElement): el is ShapeElement {

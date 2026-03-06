@@ -14,7 +14,7 @@ import { PropertyPanel } from './PropertyPanel'
 import { AlignmentToolbar } from './AlignmentToolbar'
 import { Minimap } from './Minimap'
 import { isShape, isPath, isLine, isText, isImage, isFrame, isWebCard, isDocumentCard } from '../types'
-import type { Tool, ShapeType, CanvasElement, LineType, ShapeElement, PathElement, LineElement, TextElement, ImageElement, FrameElement, WebCardElement, DocumentCardElement } from '../types'
+import type { Tool, ShapeType, CanvasElement, LineType, ShapeElement, PathElement, LineElement, TextElement, ImageElement, FrameElement, WebCardElement, DocumentCardElement, ConnectableElement } from '../types'
 
 interface Props {
   activeTool: Tool
@@ -147,6 +147,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
   const lastDrawPoint = useRef({ x: 0, y: 0 })
   const drawingPointsRef = useRef<number[]>([])
   const shapesRef = useRef<ShapeElement[]>([])
+  const textsRef = useRef<TextElement[]>([])
   const pathsRef = useRef<PathElement[]>([])
   const linesRef = useRef<LineElement[]>([])
   const selectedIdsRef = useRef<string[]>(selectedIds)
@@ -170,6 +171,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
   const webCards = elements.filter(isWebCard)
   const documentCards = elements.filter(isDocumentCard)
   shapesRef.current = shapes
+  textsRef.current = texts
   pathsRef.current = paths
   linesRef.current = lines
 
@@ -326,10 +328,16 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
     }
   }
 
-  function hitTestShape(world: { x: number; y: number }): ShapeElement | undefined {
+  function hitTestConnectable(world: { x: number; y: number }): ConnectableElement | undefined {
+    // Check shapes (top to bottom in z-order)
     for (let i = shapesRef.current.length - 1; i >= 0; i--) {
       const s = shapesRef.current[i]
       if (pointInShape(s, world.x, world.y)) return s
+    }
+    // Check text elements (rectangle hit test)
+    for (let i = textsRef.current.length - 1; i >= 0; i--) {
+      const t = textsRef.current[i]
+      if (world.x >= t.x && world.x <= t.x + t.width && world.y >= t.y && world.y <= t.y + t.height) return t
     }
     return undefined
   }
@@ -435,7 +443,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
       }
 
       if (activeTool === 'line') {
-        const hitShape = hitTestShape(world)
+        const hitShape = hitTestConnectable(world)
         if (hitShape) {
           setLineStart({ shapeId: hitShape.id, freeX: world.x, freeY: world.y })
           setLinePreviewEnd({ x: world.x, y: world.y })
@@ -444,7 +452,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
       }
 
       if (activeTool === 'arrow') {
-        const hitShape = hitTestShape(world)
+        const hitShape = hitTestConnectable(world)
         if (hitShape) {
           setLineStart({ shapeId: hitShape.id, freeX: world.x, freeY: world.y })
         } else {
@@ -518,7 +526,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
 
       // Line/Arrow tool hover detection
       if (activeTool === 'line' || activeTool === 'arrow') {
-        const hitShape = hitTestShape(world)
+        const hitShape = hitTestConnectable(world)
         setHoveredShapeId(hitShape ? hitShape.id : null)
         if (lineStart) {
           setLinePreviewEnd({ x: world.x, y: world.y })
@@ -666,7 +674,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
 
       if (lineStart) {
         const world = screenToWorld(e.clientX, e.clientY)
-        const hitShape = hitTestShape(world)
+        const hitShape = hitTestConnectable(world)
 
         if (activeTool === 'line') {
           if (hitShape && hitShape.id !== lineStart.shapeId) {
@@ -874,7 +882,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
         window.removeEventListener('mouseup', handleUp)
 
         const world = screenToWorld(ev.clientX, ev.clientY)
-        const hitShape = hitTestShape(world)
+        const hitShape = hitTestConnectable(world)
 
         if (hitShape) {
           if (endpoint === 'start') {
@@ -966,9 +974,10 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
     </div>
   ) : null
 
-  // Connection highlight on hovered shape (line/arrow tool)
+  // Connection highlight on hovered shape or text (line/arrow tool)
+  const connectables: ConnectableElement[] = [...shapes, ...texts]
   const connectionHighlight = (activeTool === 'line' || activeTool === 'arrow') && hoveredShapeId ? (() => {
-    const s = shapes.find((sh) => sh.id === hoveredShapeId)
+    const s = connectables.find((el) => el.id === hoveredShapeId)
     if (!s) return null
     return (
       <div
@@ -1042,7 +1051,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
           drawingPath={drawingPath}
         />
         <LineLayer
-          shapes={shapes}
+          shapes={connectables}
           lines={lines}
           selectedIds={selectedIds}
           onSelect={handleSelect}

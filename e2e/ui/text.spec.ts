@@ -93,6 +93,78 @@ test.describe('Text tool', () => {
   })
 })
 
+test.describe('Text element arrow connectivity', () => {
+  let canvas: CanvasPage
+
+  test.beforeEach(async ({ page }) => {
+    canvas = new CanvasPage(page)
+    await canvas.goto()
+  })
+
+  test('two text elements can be connected with an arrow that follows when moved', async ({ page }) => {
+    // Create first text element at (200, 200)
+    await page.keyboard.press('t')
+    await page.mouse.click(200, 200)
+    await page.keyboard.type('Box A')
+    await page.mouse.click(600, 50) // blur to commit
+
+    // Create second text element at (500, 200)
+    await page.keyboard.press('t')
+    await page.mouse.click(500, 200)
+    await page.keyboard.type('Box B')
+    await page.mouse.click(600, 50) // blur to commit
+
+    // Get bounding boxes of the two text elements
+    const textEls = page.locator('[data-testid="text-element"]')
+    await expect(textEls).toHaveCount(2)
+    const box1 = await textEls.nth(0).boundingBox()
+    const box2 = await textEls.nth(1).boundingBox()
+
+    // Switch to arrow tool and draw from center of first to center of second
+    await canvas.selectTool('arrow')
+    const start = { x: box1!.x + box1!.width / 2, y: box1!.y + box1!.height / 2 }
+    const end = { x: box2!.x + box2!.width / 2, y: box2!.y + box2!.height / 2 }
+    await page.mouse.move(start.x, start.y)
+    await page.mouse.down()
+    await page.mouse.move(end.x, end.y, { steps: 5 })
+    await page.mouse.up()
+
+    // Assert: one connector should exist
+    await expect(canvas.connectorPaths).toHaveCount(1)
+
+    // Record arrow path before move
+    const pathBefore = await canvas.connectorPaths.first().getAttribute('d')
+
+    // Move the second text element down by 100px — arrow should follow
+    await canvas.selectTool('select')
+    const el2 = textEls.nth(1)
+    const elBox = await el2.boundingBox()
+    await page.mouse.move(elBox!.x + 20, elBox!.y + 10)
+    await page.mouse.down()
+    await page.mouse.move(elBox!.x + 20, elBox!.y + 110, { steps: 5 })
+    await page.mouse.up()
+
+    // The arrow's path `d` attribute should have changed (it follows the text)
+    const pathAfter = await canvas.connectorPaths.first().getAttribute('d')
+    expect(pathAfter).not.toEqual(pathBefore)
+  })
+
+  test('text element shows connection highlight on hover with arrow tool', async ({ page }) => {
+    await page.keyboard.press('t')
+    await page.mouse.click(300, 300)
+    await page.keyboard.type('Hover me')
+    await page.mouse.click(600, 50)
+
+    const textEl = page.locator('[data-testid="text-element"]')
+    const box = await textEl.boundingBox()
+
+    await canvas.selectTool('arrow')
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2)
+
+    await expect(page.locator('.connection-highlight')).toBeVisible()
+  })
+})
+
 test.describe('Text element fill and stroke', () => {
   let canvas: CanvasPage
 

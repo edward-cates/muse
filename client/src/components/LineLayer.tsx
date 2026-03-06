@@ -1,8 +1,8 @@
-import type { ShapeElement, LineElement, ArrowheadStyle } from '../types'
+import type { ConnectableElement, LineElement, ArrowheadStyle } from '../types'
 import { buildPath } from '../lib/pathBuilders'
 
 interface Props {
-  shapes: ShapeElement[]
+  shapes: ConnectableElement[]
   lines: LineElement[]
   selectedIds: string[]
   onSelect: (id: string, shiftKey?: boolean) => void
@@ -17,7 +17,7 @@ interface Props {
 
 /** Compute where a ray from shape center toward `target` exits the shape boundary. */
 export function edgeIntersection(
-  shape: ShapeElement,
+  shape: ConnectableElement,
   target: { x: number; y: number },
 ): { x: number; y: number } {
   const cx = shape.x + shape.width / 2
@@ -55,7 +55,7 @@ export function edgeIntersection(
 
 function resolveLineEndpoints(
   line: LineElement,
-  shapeMap: Map<string, ShapeElement>,
+  shapeMap: Map<string, ConnectableElement>,
 ): { start: { x: number; y: number }; end: { x: number; y: number } } | null {
   const startShape = line.startShapeId ? shapeMap.get(line.startShapeId) : undefined
   const endShape = line.endShapeId ? shapeMap.get(line.endShapeId) : undefined
