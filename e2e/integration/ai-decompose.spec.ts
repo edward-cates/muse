@@ -96,11 +96,13 @@ test.describe('AI research decomposition flow', () => {
     let aiCallCount = 0
     let decomposeCallCount = 0
 
+    // Use 'compose' intent — research now routes to server-side job system.
+    // Compose agent has the same tools and runs client-side for testing.
     await page.route('**/api/ai/classify', route => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ intent: 'research' }),
+        body: JSON.stringify({ intent: 'compose' }),
       })
     })
 

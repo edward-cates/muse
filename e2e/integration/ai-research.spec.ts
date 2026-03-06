@@ -84,11 +84,13 @@ test.describe('AI research with server-side element writes', () => {
     let aiCallCount = 0
     let webCardId = ''
 
+    // Use 'compose' intent — research now routes to server-side job system.
+    // Compose agent has the same tools (add_web_card, etc.) and runs client-side.
     await page.route('**/api/ai/classify', route => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ intent: 'research' }),
+        body: JSON.stringify({ intent: 'compose' }),
       })
     })
 
