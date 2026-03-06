@@ -387,4 +387,177 @@ test.describe('VQA screenshot pipeline', () => {
     const isValidBase64 = /^[A-Za-z0-9+/]+=*$/.test(blocks[2].source.data)
     expect(isValidBase64).toBe(true)
   })
+
+  test('screenshot captures images placed on the canvas', async ({ page }) => {
+    // Create a small red PNG as a data URL (1x1 red pixel, tiled into a visible block)
+    const redPixelDataUrl = await page.evaluate(() => {
+      const c = document.createElement('canvas')
+      c.width = 80
+      c.height = 80
+      const ctx = c.getContext('2d')!
+      ctx.fillStyle = '#ff0000'
+      ctx.fillRect(0, 0, 80, 80)
+      return c.toDataURL('image/png')
+    })
+
+    // Add an image element via Yjs
+    await page.evaluate((src) => {
+      const doc = window.__testDoc!
+      const Y = window.__testY!
+      const elements = doc.getArray('elements')
+      const yEl = new Y.Map()
+      yEl.set('id', 'test-img')
+      yEl.set('type', 'image')
+      yEl.set('x', 200)
+      yEl.set('y', 200)
+      yEl.set('width', 200)
+      yEl.set('height', 200)
+      yEl.set('src', src)
+      elements.push([yEl])
+    }, redPixelDataUrl)
+
+    await expect(page.locator('[data-testid="image-element"]')).toHaveCount(1)
+
+    const result = await page.evaluate(async () => {
+      const { captureCanvas } = await import('/src/ai/canvasCapture.ts')
+      const canvasEl = document.querySelector<HTMLDivElement>('[data-testid="canvas"]')!
+      const base64 = await captureCanvas(canvasEl)
+
+      return new Promise<{ redPixels: number }>((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => {
+          const c = document.createElement('canvas')
+          c.width = img.width
+          c.height = img.height
+          const ctx = c.getContext('2d')!
+          ctx.drawImage(img, 0, 0)
+          const data = ctx.getImageData(0, 0, c.width, c.height).data
+          let redPixels = 0
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i] > 180 && data[i + 1] < 80 && data[i + 2] < 80) redPixels++
+          }
+          resolve({ redPixels })
+        }
+        img.onerror = () => reject(new Error('Failed to load'))
+        img.src = `data:image/png;base64,${base64}`
+      })
+    })
+
+    // The red image should have visible red pixels in the screenshot
+    expect(result.redPixels).toBeGreaterThan(50)
+  })
+
+  test('screenshot renders placeholder for cross-origin images', async ({ page }) => {
+    // Add an image element with a cross-origin URL (will fail to load in test)
+    await page.evaluate(() => {
+      const doc = window.__testDoc!
+      const Y = window.__testY!
+      const elements = doc.getArray('elements')
+      const yEl = new Y.Map()
+      yEl.set('id', 'remote-img')
+      yEl.set('type', 'image')
+      yEl.set('x', 200)
+      yEl.set('y', 200)
+      yEl.set('width', 250)
+      yEl.set('height', 200)
+      yEl.set('src', 'https://example.com/cross-origin-image.png')
+      elements.push([yEl])
+    })
+
+    await expect(page.locator('[data-testid="image-element"]')).toHaveCount(1)
+
+    const result = await page.evaluate(async () => {
+      const { captureCanvas } = await import('/src/ai/canvasCapture.ts')
+      const canvasEl = document.querySelector<HTMLDivElement>('[data-testid="canvas"]')!
+      const base64 = await captureCanvas(canvasEl)
+
+      return new Promise<{ hasNonWhitePixels: boolean }>((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => {
+          const c = document.createElement('canvas')
+          c.width = img.width
+          c.height = img.height
+          const ctx = c.getContext('2d')!
+          ctx.drawImage(img, 0, 0)
+          const data = ctx.getImageData(0, 0, c.width, c.height).data
+          let nonWhite = 0
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] > 128 && (data[i] < 230 || data[i + 1] < 230 || data[i + 2] < 230)) nonWhite++
+          }
+          resolve({ hasNonWhitePixels: nonWhite > 20 })
+        }
+        img.onerror = () => reject(new Error('Failed to load'))
+        img.src = `data:image/png;base64,${base64}`
+      })
+    })
+
+    // The placeholder should render visible content (labeled box, not blank)
+    expect(result.hasNonWhitePixels).toBe(true)
+  })
+
+  test('screenshot renders placeholder for iframe-based HTML wireframes', async ({ page }) => {
+    // Inject an iframe element inside the canvas world (simulates an html_artifact card)
+    await page.evaluate(() => {
+      const world = document.querySelector('.canvas__world')!
+      const card = document.createElement('div')
+      card.className = 'shape document-card document-card--html'
+      card.style.cssText = 'position:absolute;left:200px;top:200px;width:300px;height:250px;'
+
+      const chrome = document.createElement('div')
+      chrome.className = 'document-card__chrome'
+      card.appendChild(chrome)
+
+      const title = document.createElement('div')
+      title.className = 'document-card__title'
+      title.textContent = 'My Wireframe'
+      card.appendChild(title)
+
+      const preview = document.createElement('div')
+      preview.className = 'document-card__preview'
+      preview.style.cssText = 'position:relative;overflow:hidden;width:300px;height:226px;top:24px;'
+
+      const iframe = document.createElement('iframe')
+      iframe.srcdoc = '<html><body style="background:blue"><h1>Hello</h1></body></html>'
+      iframe.setAttribute('sandbox', '')
+      iframe.style.cssText = 'width:800px;height:600px;transform:scale(0.375);transform-origin:top left;border:none;pointer-events:none;'
+      preview.appendChild(iframe)
+      card.appendChild(preview)
+      world.appendChild(card)
+    })
+
+    // Wait for the DOM to settle
+    await page.waitForTimeout(100)
+
+    const result = await page.evaluate(async () => {
+      const { captureCanvas } = await import('/src/ai/canvasCapture.ts')
+      const canvasEl = document.querySelector<HTMLDivElement>('[data-testid="canvas"]')!
+      const base64 = await captureCanvas(canvasEl)
+
+      return new Promise<{ width: number; height: number; hasNonWhitePixels: boolean }>((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => {
+          const c = document.createElement('canvas')
+          c.width = img.width
+          c.height = img.height
+          const ctx = c.getContext('2d')!
+          ctx.drawImage(img, 0, 0)
+          const data = ctx.getImageData(0, 0, c.width, c.height).data
+
+          // Check that the placeholder rendered something (not just white/transparent)
+          let nonWhite = 0
+          for (let i = 0; i < data.length; i += 4) {
+            const [r, g, b, a] = [data[i], data[i + 1], data[i + 2], data[i + 3]]
+            // Count pixels that aren't white/near-white and aren't transparent
+            if (a > 128 && (r < 230 || g < 230 || b < 230)) nonWhite++
+          }
+          resolve({ width: img.width, height: img.height, hasNonWhitePixels: nonWhite > 20 })
+        }
+        img.onerror = () => reject(new Error('Failed to load'))
+        img.src = `data:image/png;base64,${base64}`
+      })
+    })
+
+    // The placeholder should have rendered visible content (not a blank white area)
+    expect(result.hasNonWhitePixels).toBe(true)
+  })
 })

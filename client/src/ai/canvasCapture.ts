@@ -41,6 +41,41 @@ export function computeBounds(elements: CanvasElement[]): { x: number; y: number
   }
 }
 
+/** Build a styled placeholder div for elements html2canvas can't render */
+function makePlaceholder(doc: Document, opts: {
+  width: string; height: string; label: string; sublabel: string; icon: string
+  transform?: string; transformOrigin?: string
+}): HTMLDivElement {
+  const div = doc.createElement('div')
+  div.style.cssText = `
+    width:${opts.width}; height:${opts.height};
+    background:#f0f1f3; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    font-family:system-ui,sans-serif; color:#555; font-size:14px;
+    border:1px solid #ddd; border-radius:4px; overflow:hidden;
+  `
+  div.innerHTML = `
+    ${opts.icon}
+    <div style="font-weight:500;margin-top:4px">${opts.label}</div>
+    <div style="font-size:11px;color:#999;margin-top:2px">${opts.sublabel}</div>
+  `
+  if (opts.transform) {
+    div.style.transform = opts.transform
+    div.style.transformOrigin = opts.transformOrigin || 'top left'
+  }
+  return div
+}
+
+const CODE_ICON = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.5">
+  <polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>
+</svg>`
+
+const IMAGE_ICON = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.5">
+  <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+  <polyline points="21 15 16 10 5 21"></polyline>
+</svg>`
+
 export async function captureCanvas(element: HTMLElement): Promise<string> {
   // Wait for React to paint Yjs mutations into the DOM
   await waitForPaint()
@@ -62,6 +97,33 @@ export async function captureCanvas(element: HTMLElement): Promise<string> {
     height: element.clientHeight,
     windowWidth: ww,
     windowHeight: wh,
+    onclone: (_doc, clonedEl) => {
+      // Replace cross-origin images with labeled placeholders
+      // (html2canvas can't load cross-origin images; data URLs are fine)
+      for (const img of clonedEl.querySelectorAll<HTMLImageElement>('.image-element img')) {
+        if (img.src.startsWith('data:')) continue
+        const parent = img.closest('.image-element') as HTMLElement | null
+        const w = parent?.style.width || `${img.width}px`
+        const h = parent?.style.height || `${img.height}px`
+        const alt = img.alt || 'AI Generated Image'
+        img.replaceWith(makePlaceholder(_doc, {
+          width: w, height: h, label: alt, sublabel: 'Image', icon: IMAGE_ICON,
+        }))
+      }
+
+      // Replace iframes with labeled placeholders (html2canvas can't render iframes)
+      for (const iframe of clonedEl.querySelectorAll<HTMLIFrameElement>('iframe')) {
+        const card = iframe.closest('.document-card')
+        const label = card?.querySelector('.document-card__title')?.textContent || 'Untitled'
+        iframe.replaceWith(makePlaceholder(_doc, {
+          width: iframe.style.width || '100%',
+          height: iframe.parentElement?.style.height || '100%',
+          label, sublabel: 'HTML Wireframe', icon: CODE_ICON,
+          transform: iframe.style.transform,
+          transformOrigin: iframe.style.transformOrigin,
+        }))
+      }
+    },
   })
   return canvas.toDataURL('image/png').replace('data:image/png;base64,', '')
 }
