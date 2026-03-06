@@ -365,6 +365,8 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
           className={`shape__text ${isEditing ? 'shape__text--editing' : ''}`}
           defaultValue={shape.text}
           placeholder={isEditing ? 'Type here...' : ''}
+          spellCheck={false}
+          autoComplete="off"
           style={{
             fontFamily: shape.fontFamily || undefined,
             fontSize: shape.fontSize ? `${shape.fontSize}px` : undefined,
