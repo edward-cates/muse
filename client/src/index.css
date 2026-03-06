@@ -33,12 +33,22 @@ body {
   width: 100vw;
   height: 100vh;
   position: relative;
+  display: flex;
+}
+
+.app__canvas-area {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* ── Canvas ── */
 .canvas {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   overflow: hidden;
   cursor: default;
   touch-action: none;
@@ -255,7 +265,7 @@ body {
 
 /* ── Drawing Title (top-left) ── */
 .drawing-title {
-  position: fixed;
+  position: absolute;
   top: 4px;
   left: 20px;
   z-index: 500;
@@ -342,7 +352,7 @@ body {
 
 /* ── Toolbar (bottom-center pill) ── */
 .toolbar {
-  position: fixed;
+  position: absolute;
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
@@ -438,26 +448,7 @@ body {
   color: var(--accent);
 }
 
-/* ── Status Bar (bottom-right) ── */
-.statusbar {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--surface);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 5px 14px;
-  font-size: 12px;
-  color: var(--text-muted);
-  box-shadow: var(--shadow);
-  z-index: 500;
-}
-
+/* ── Status indicators (reused in AI panel header) ── */
 .statusbar__dot {
   width: 7px;
   height: 7px;
@@ -476,13 +467,6 @@ body {
 
 .statusbar__dot--disconnected {
   background: #f87171;
-}
-
-.statusbar__divider {
-  width: 1px;
-  height: 14px;
-  background: var(--border);
-  margin: 0 4px;
 }
 
 .statusbar__btn {
@@ -511,7 +495,7 @@ body {
 
 /* ── Property Panel (right side) ── */
 .property-panel {
-  position: fixed;
+  position: absolute;
   top: 60px;
   right: 12px;
   background: var(--surface);
