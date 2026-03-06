@@ -13,6 +13,7 @@ export interface ElementActions {
   addLine: (startShapeId: string, endShapeId: string, lineType?: LineType) => string
   addArrow: (startShapeId: string, endShapeId: string, startX: number, startY: number, endX: number, endY: number, lineType?: LineType) => string
   addText: (x: number, y: number) => string
+  addImage?: (x: number, y: number, w: number, h: number, src: string) => string
   addWebCard?: (x: number, y: number, w: number, h: number, url: string, title: string, snippet: string) => string
   addDocumentCard?: (x: number, y: number, w: number, h: number, documentId: string, documentType: string, title: string) => string
   updateElement: (id: string, updates: Record<string, unknown>) => void
@@ -27,6 +28,10 @@ export interface ElementActions {
 
 export interface FetchUrlFn {
   (url: string): Promise<{ title: string; text: string; url: string }>
+}
+
+export interface GenerateImageFn {
+  (prompt: string, size?: string): Promise<{ url: string; revised_prompt?: string }>
 }
 
 function findElement(elements: CanvasElement[], id: string): CanvasElement | undefined {
@@ -55,6 +60,7 @@ export async function executeToolCall(
   call: ToolCall,
   actions: ElementActions,
   fetchUrl?: FetchUrlFn,
+  generateImage?: GenerateImageFn,
 ): Promise<{ tool_use_id: string; content: string }> {
   try {
     const elements = actions.getElements()
@@ -325,6 +331,24 @@ export async function executeToolCall(
           }
         }
         return { tool_use_id: call.id, content: JSON.stringify({ success: true, content_version: newVersion }) }
+      }
+
+      case 'generate_image': {
+        if (!generateImage || !actions.addImage) {
+          return { tool_use_id: call.id, content: JSON.stringify({ error: 'Image generation not available' }) }
+        }
+        const { prompt, x = 100, y = 100, width = 512, height = 512, size } = call.input as {
+          prompt: string; x?: number; y?: number; width?: number; height?: number; size?: string
+        }
+        const result = await generateImage(prompt, size)
+        const id = actions.addImage(x, y, width, height, result.url)
+        return {
+          tool_use_id: call.id,
+          content: JSON.stringify({
+            id, url: result.url, revised_prompt: result.revised_prompt,
+            success: true, message: `Generated image at (${x}, ${y}) ${width}×${height}`,
+          }),
+        }
       }
 
       default:

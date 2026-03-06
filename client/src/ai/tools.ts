@@ -216,6 +216,29 @@ export const DOCUMENT_TOOLS: ToolDefinition[] = [
   },
 ]
 
+export const IMAGE_TOOLS: ToolDefinition[] = [
+  {
+    name: 'generate_image',
+    description: 'Generate an image using DALL-E and place it on the canvas. Returns { id, url, revised_prompt }.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'Text description of the image to generate' },
+        x: { type: 'number', description: 'X position for the image on canvas (default 100)' },
+        y: { type: 'number', description: 'Y position for the image on canvas (default 100)' },
+        width: { type: 'number', description: 'Display width on canvas (default 512)' },
+        height: { type: 'number', description: 'Display height on canvas (default 512)' },
+        size: {
+          type: 'string',
+          enum: ['1024x1024', '1024x1792', '1792x1024'],
+          description: 'Generated image dimensions (default 1024x1024)',
+        },
+      },
+      required: ['prompt'],
+    },
+  },
+]
+
 export const RESEARCH_TOOLS: ToolDefinition[] = [
   {
     name: 'add_web_card',

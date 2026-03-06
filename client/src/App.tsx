@@ -445,7 +445,7 @@ export function App({ drawingId }: { drawingId: string }) {
         onToggleMinimap={() => setMinimapVisible(prev => !prev)}
         onToggleDarkMode={() => setDarkMode(prev => !prev)}
         elementActions={{
-          addShape, addLine, addArrow, addText, addWebCard, addDocumentCard,
+          addShape, addLine, addArrow, addText, addImage, addWebCard, addDocumentCard,
           updateElement, deleteElement,
           getElements: () => yElements.toArray().map(readElement),
           fitToContent: () => canvasRef.current?.fitToContent(),

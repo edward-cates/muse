@@ -278,6 +278,23 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
     return res.json()
   }
 
+  /** Generate an image via server proxy to OpenAI DALL-E */
+  async function generateImageViaServer(prompt: string, size?: string): Promise<{ url: string; revised_prompt?: string }> {
+    const res = await fetch('/api/image-gen', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session!.access_token}`,
+      },
+      body: JSON.stringify({ prompt, size }),
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.error || `Image generation failed (${res.status})`)
+    }
+    return res.json()
+  }
+
   async function runAgentLoop(
     config: AgentConfig,
     initialMessages: ApiMessage[],
@@ -345,7 +362,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         res, abort.signal,
         async (tc) => {
           setStatus(describeToolAction(tc))
-          const result = await executeToolCall(tc, elementActions, fetchUrlViaServer)
+          const result = await executeToolCall(tc, elementActions, fetchUrlViaServer, generateImageViaServer)
 
           const parsed = (() => { try { return JSON.parse(result.content) } catch { return {} } })()
 

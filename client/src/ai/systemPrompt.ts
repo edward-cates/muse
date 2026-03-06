@@ -103,6 +103,12 @@ ${elementLines}${connections}
 - Use update_document_content to modify existing artifacts by their document ID (shown in DocCard elements).
 - HTML must be self-contained (inline <style> and <script>).
 
+## Image generation
+- Use generate_image to create AI-generated images (via DALL-E) and place them on the canvas.
+- Provide a detailed prompt describing the desired image.
+- Default size is 1024x1024. Use 1024x1792 for portrait, 1792x1024 for landscape.
+- The image appears as an Image element on the canvas that can be moved and resized.
+
 ## Rules
 - Start with a 1-2 sentence plan of what you're about to create (layout, shape count, connections), then call tools.
 - Never say "I can help you with..." — just state the plan and do it.
