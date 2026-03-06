@@ -503,6 +503,92 @@ describe('Documents API', () => {
     assert.equal(res.status, 404)
   })
 
+  // ── POST /api/documents/:id/elements ──
+
+  it('POST /api/documents/:id/elements adds elements to a canvas Yjs doc', async () => {
+    let patchBody = ''
+
+    setMockRoutes([{
+      method: 'GET',
+      table: 'documents',
+      handler: () => ({
+        status: 200,
+        data: { content: null, type: 'canvas' },
+      }),
+    }, {
+      method: 'PATCH',
+      table: 'documents',
+      handler: (_req, body) => {
+        patchBody = body
+        return { status: 200, data: [] }
+      },
+    }])
+
+    const res = await fetch(url('/api/documents/abc-123/elements'), {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        elements: [
+          { type: 'webcard', x: 100, y: 100, width: 280, height: 160, url: 'https://example.com', title: 'Test', snippet: 'A test card' },
+        ],
+      }),
+    })
+    assert.equal(res.status, 200)
+    const body = await res.json() as { ids: string[]; count: number }
+    assert.equal(body.count, 1)
+    assert.equal(body.ids.length, 1)
+    assert.ok(body.ids[0], 'Should return a generated ID')
+
+    // Verify the Yjs state was written as base64
+    const parsed = JSON.parse(patchBody)
+    assert.ok(parsed.content, 'Should write base64 Yjs state')
+    assert.ok(parsed.content.length > 10, 'Content should be non-trivial base64')
+  })
+
+  it('POST /api/documents/:id/elements rejects empty elements array', async () => {
+    const res = await fetch(url('/api/documents/abc-123/elements'), {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ elements: [] }),
+    })
+    assert.equal(res.status, 400)
+  })
+
+  it('POST /api/documents/:id/elements rejects non-canvas documents', async () => {
+    setMockRoutes([{
+      method: 'GET',
+      table: 'documents',
+      handler: () => ({
+        status: 200,
+        data: { content: null, type: 'html_artifact' },
+      }),
+    }])
+
+    const res = await fetch(url('/api/documents/abc-123/elements'), {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ elements: [{ type: 'webcard', x: 0, y: 0 }] }),
+    })
+    assert.equal(res.status, 400)
+    const body = await res.json() as { error: string }
+    assert.ok(body.error.includes('canvas'))
+  })
+
+  it('POST /api/documents/:id/elements returns 404 for nonexistent doc', async () => {
+    setMockRoutes([{
+      method: 'GET',
+      table: 'documents',
+      handler: () => ({ status: 200, data: null }),
+    }])
+
+    const res = await fetch(url('/api/documents/nonexistent/elements'), {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ elements: [{ type: 'webcard', x: 0, y: 0 }] }),
+    })
+    assert.equal(res.status, 404)
+  })
+
   // ── Backward compatibility: /api/drawings alias ──
 
   it('/api/drawings alias still works', async () => {

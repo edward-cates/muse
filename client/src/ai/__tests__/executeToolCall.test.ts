@@ -356,6 +356,112 @@ describe('executeToolCall', () => {
     })
   })
 
+  describe('add_web_card with target_document_id', () => {
+    it('routes to addRemoteElements when target_document_id is set', async () => {
+      const store = createStore()
+      const remoteElements: Array<{ docId: string; elements: Array<Record<string, unknown>> }> = []
+      store.actions.addRemoteElements = async (docId, elements) => {
+        remoteElements.push({ docId, elements })
+        return { ids: ['remote-1'], count: 1 }
+      }
+      const data = parse(await executeToolCall(
+        call('add_web_card', {
+          x: 100, y: 200, url: 'https://example.com', title: 'Remote Card', snippet: 'Goes to child canvas',
+          target_document_id: 'child-doc-123',
+        }),
+        store.actions,
+      ))
+      assert.ok(data.success)
+      assert.equal(data.target_document_id, 'child-doc-123')
+      assert.equal(data.id, 'remote-1')
+      // Should NOT have added to local store
+      assert.equal(store.all.length, 0)
+      // Should have called addRemoteElements
+      assert.equal(remoteElements.length, 1)
+      assert.equal(remoteElements[0].docId, 'child-doc-123')
+      assert.equal(remoteElements[0].elements[0].type, 'webcard')
+      assert.equal(remoteElements[0].elements[0].title, 'Remote Card')
+    })
+
+    it('falls back to local addWebCard when no target_document_id', async () => {
+      const store = createStore()
+      store.actions.addRemoteElements = async () => { throw new Error('should not be called') }
+      const data = parse(await executeToolCall(
+        call('add_web_card', { x: 10, y: 20, url: 'https://local.com', title: 'Local', snippet: 'Stays here' }),
+        store.actions,
+      ))
+      assert.ok(data.success)
+      assert.equal(store.all.length, 1)
+      assert.equal(store.all[0].type, 'webcard')
+    })
+  })
+
+  describe('research flow: add_node then add_web_card to child canvas', () => {
+    it('creates a research node then adds cards to it', async () => {
+      const store = createStore()
+      const remoteWrites: Array<{ docId: string; elements: Array<Record<string, unknown>> }> = []
+      let remoteCounter = 0
+      store.actions.addRemoteElements = async (docId, elements) => {
+        remoteWrites.push({ docId, elements })
+        return { ids: elements.map(() => `remote-${remoteCounter++}`), count: elements.length }
+      }
+
+      // Step 1: Create research canvas node
+      const nodeData = parse(await executeToolCall(
+        call('add_node', { title: 'AI Research', x: 100, y: 100 }),
+        store.actions,
+      ))
+      assert.ok(nodeData.success)
+      const researchDocId = nodeData.documentId
+      const cardId = nodeData.cardElementId
+
+      // Step 2: Add web cards to research canvas
+      const card1 = parse(await executeToolCall(
+        call('add_web_card', {
+          x: 100, y: 100, url: 'https://source1.com', title: 'Source 1', snippet: 'First source',
+          target_document_id: researchDocId,
+        }),
+        store.actions,
+      ))
+      assert.ok(card1.success)
+      assert.equal(card1.target_document_id, researchDocId)
+
+      const card2 = parse(await executeToolCall(
+        call('add_web_card', {
+          x: 420, y: 100, url: 'https://source2.com', title: 'Source 2', snippet: 'Second source',
+          target_document_id: researchDocId,
+        }),
+        store.actions,
+      ))
+      assert.ok(card2.success)
+
+      // Step 3: Finalize — update the research card with title and description
+      const finalizeData = parse(await executeToolCall(
+        call('update_element', {
+          id: cardId,
+          title: 'AI Trends 2026',
+          description: 'Key findings: AI adoption accelerating, focus on safety.',
+        }),
+        store.actions,
+      ))
+      assert.ok(finalizeData.success)
+
+      // Verify: parent canvas has only the research node card (no web cards)
+      const parentCards = store.all.filter(e => e.type === 'webcard')
+      assert.equal(parentCards.length, 0, 'Web cards should not be on parent canvas')
+
+      // Verify: research card got updated title and description
+      const researchCard = store.find(cardId)!
+      assert.equal(researchCard.title, 'AI Trends 2026')
+      assert.equal(researchCard.description, 'Key findings: AI adoption accelerating, focus on safety.')
+
+      // Verify: remote writes went to the correct document
+      assert.equal(remoteWrites.length, 2)
+      assert.equal(remoteWrites[0].docId, researchDocId)
+      assert.equal(remoteWrites[1].docId, researchDocId)
+    })
+  })
+
   describe('add_node', () => {
     it('creates a canvas document and places a document card', async () => {
       const store = createStore()

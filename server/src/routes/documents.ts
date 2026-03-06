@@ -1,5 +1,9 @@
 import { Router } from 'express'
 import { createClient } from '@supabase/supabase-js'
+import { createRequire } from 'node:module'
+
+const _require = createRequire(import.meta.url)
+const Y = _require('yjs') as typeof import('yjs')
 
 const router = Router()
 
@@ -214,6 +218,88 @@ router.patch('/:id/content', async (req, res) => {
   }
 
   res.json({ content_version: newVersion })
+})
+
+// Add elements to a canvas document's Yjs state (used by AI to write to child canvases)
+router.post('/:id/elements', async (req, res) => {
+  const userId = req.userId!
+  const { id } = req.params
+  const { elements } = req.body as { elements: Array<Record<string, string | number | number[]>> }
+
+  if (!elements || !Array.isArray(elements) || elements.length === 0) {
+    res.status(400).json({ error: 'elements array is required' })
+    return
+  }
+
+  const supabase = getSupabase()
+
+  // Verify ownership and type
+  const { data: doc, error: fetchError } = await supabase
+    .from('documents')
+    .select('content, type')
+    .eq('id', id)
+    .eq('owner_id', userId)
+    .maybeSingle()
+
+  if (fetchError) {
+    res.status(500).json({ error: 'Failed to get document' })
+    return
+  }
+  if (!doc) {
+    res.status(404).json({ error: 'Document not found' })
+    return
+  }
+  if (doc.type !== 'canvas') {
+    res.status(400).json({ error: 'Can only add elements to canvas documents' })
+    return
+  }
+
+  // Load existing Yjs state or create new doc
+  const ydoc = new Y.Doc()
+  if (doc.content) {
+    try {
+      const bytes = Buffer.from(doc.content, 'base64')
+      Y.applyUpdate(ydoc, new Uint8Array(bytes))
+    } catch {
+      // Corrupt state — start fresh
+    }
+  }
+
+  // Add elements to the Y.Array
+  const yElements = ydoc.getArray('elements')
+  const ids: string[] = []
+  for (const el of elements) {
+    const yEl = new Y.Map()
+    for (const [key, value] of Object.entries(el)) {
+      yEl.set(key, value)
+    }
+    // Ensure each element has an id
+    if (!el.id) {
+      const genId = crypto.randomUUID()
+      yEl.set('id', genId)
+      ids.push(genId)
+    } else {
+      ids.push(el.id as string)
+    }
+    yElements.push([yEl])
+  }
+
+  // Persist back to DB
+  const state = Y.encodeStateAsUpdate(ydoc)
+  const { error: updateError } = await supabase
+    .from('documents')
+    .update({ content: Buffer.from(state).toString('base64'), updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('owner_id', userId)
+
+  ydoc.destroy()
+
+  if (updateError) {
+    res.status(500).json({ error: 'Failed to save elements' })
+    return
+  }
+
+  res.json({ ids, count: elements.length })
 })
 
 export default router

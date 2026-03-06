@@ -25,6 +25,8 @@ export interface ElementActions {
   // Document API functions (require auth)
   createDocument?: (opts: { title?: string; type?: string }) => Promise<{ id: string; type: string; content_version: number }>
   updateDocumentContent?: (documentId: string, content: string) => Promise<number>
+  // Write elements to a remote canvas document (for research sub-canvases)
+  addRemoteElements?: (documentId: string, elements: Array<Record<string, string | number | number[]>>) => Promise<{ ids: string[]; count: number }>
 }
 
 export interface FetchUrlFn {
@@ -286,11 +288,23 @@ export async function executeToolCall(
       }
 
       case 'add_web_card': {
-        const { x, y, width = 280, height = 160, url, title, snippet, content, sourceType = 'manual' } = call.input as {
+        const { x, y, width = 280, height = 160, url, title, snippet, content, sourceType = 'manual', target_document_id } = call.input as {
           x: number; y: number; width?: number; height?: number
           url: string; title: string; snippet: string
-          content?: string; sourceType?: string
+          content?: string; sourceType?: string; target_document_id?: string
         }
+
+        // If targeting a child canvas, write remotely via server API
+        if (target_document_id && actions.addRemoteElements) {
+          const elData: Record<string, string | number | number[]> = {
+            type: 'webcard', x, y, width, height, url, title, snippet,
+            faviconUrl: '', sourceType, opacity: 100,
+          }
+          if (content) elData.content = content.slice(0, 5000)
+          const result = await actions.addRemoteElements(target_document_id, [elData])
+          return { tool_use_id: call.id, content: JSON.stringify({ id: result.ids[0], target_document_id, success: true, message: `Created web card "${title}" in research canvas` }) }
+        }
+
         if (!actions.addWebCard) {
           return { tool_use_id: call.id, content: JSON.stringify({ error: 'WebCard creation not available' }) }
         }

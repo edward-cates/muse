@@ -257,7 +257,7 @@ export const IMAGE_TOOLS: ToolDefinition[] = [
 export const RESEARCH_TOOLS: ToolDefinition[] = [
   {
     name: 'add_web_card',
-    description: 'Add a web source card to the canvas showing a URL, title, and snippet.',
+    description: 'Add a web source card to a canvas showing a URL, title, and snippet. Use target_document_id to add the card to a child canvas (e.g. a research sub-canvas) instead of the current one.',
     input_schema: {
       type: 'object',
       properties: {
@@ -274,6 +274,7 @@ export const RESEARCH_TOOLS: ToolDefinition[] = [
           enum: ['search', 'url', 'manual'],
           description: 'How this card was created',
         },
+        target_document_id: { type: 'string', description: 'If provided, add this card to the specified child canvas instead of the current canvas' },
       },
       required: ['x', 'y', 'url', 'title', 'snippet'],
     },

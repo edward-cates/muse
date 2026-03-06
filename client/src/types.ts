@@ -137,6 +137,7 @@ export interface DocumentCardElement {
   documentId: string
   documentType: string   // 'canvas' | 'html_artifact'
   title: string          // cached for display
+  description: string    // summary text shown on the card
   contentVersion: number // re-fetch preview when this changes
   opacity: number
 }

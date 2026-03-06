@@ -232,7 +232,11 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
             {typeIcons[element.documentType] || typeIcons.canvas}
           </div>
           <div className="document-card__title">{element.title || 'Untitled'}</div>
-          <div className="document-card__type">{typeLabels[element.documentType] || element.documentType}</div>
+          {element.description ? (
+            <div className="document-card__description">{element.description}</div>
+          ) : (
+            <div className="document-card__type">{typeLabels[element.documentType] || element.documentType}</div>
+          )}
           <div className="document-card__hint">Double-click to open</div>
         </div>
       )}

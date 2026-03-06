@@ -31,19 +31,22 @@ export function buildComposerConfig(elements: CanvasElement[]): AgentConfig {
   const composerAddendum = `
 
 ## Research capabilities
-You can search the web and create source cards to gather information before building diagrams.
+You can search the web and organize research into a dedicated sub-canvas.
+- Call add_node first to create a research canvas, then pass its documentId as target_document_id when calling add_web_card
 - Use web_search to find relevant sources
 - Use fetch_url to read specific pages
-- Use add_web_card to pin sources on the canvas
+- Use add_web_card with target_document_id to put source cards in the research sub-canvas
 - Use decompose_text to break down long documents into topic cards
 ${cardNote}
 
 ## Workflow
 For mixed requests (e.g. "research X and create a diagram"):
-1. Research first: search the web and read sources
-2. Then build: create shapes, connections, documents, or images based on what you learned
-3. Arrange: lay out everything neatly with arrange_grid or arrange_flow
-4. Summarize: tell the user what you found and built`
+1. Create a research node: call add_node to make a research sub-canvas
+2. Research: search the web, read sources, add cards to the research canvas via target_document_id
+3. Finalize research: update_element on the research card to set title + description
+4. Then build: create shapes, connections, documents, or images on the parent canvas based on what you learned
+5. Arrange: lay out everything neatly with arrange_grid or arrange_flow
+6. Summarize: tell the user what you found and built`
 
   return {
     name: 'composer',
