@@ -322,8 +322,9 @@ export const RESEARCH_TOOLS: ToolDefinition[] = [
       properties: {
         text: { type: 'string', description: 'The full text to decompose into topics' },
         title: { type: 'string', description: 'Title for the research document (default: "Untitled Research")' },
-        x: { type: 'number', description: 'X position for the research card on canvas (default 100)' },
-        y: { type: 'number', description: 'Y position for the research card on canvas (default 100)' },
+        x: { type: 'number', description: 'X position for the first decomposition card (default 100)' },
+        y: { type: 'number', description: 'Y position for the first decomposition card (default 100)' },
+        target_document_id: { type: 'string', description: 'If provided, place decomposition cards in this child canvas instead of the current canvas' },
       },
       required: ['text'],
     },

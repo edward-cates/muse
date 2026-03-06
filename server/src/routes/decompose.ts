@@ -9,13 +9,46 @@ function getSupabase() {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
-const DECOMPOSE_SYSTEM = `You decompose documents into major topics. For each topic provide:
-- title: 2-5 word topic name
-- summary: 2-3 sentence summary
-- color: a hex color from this palette: #f59e0b, #3b82f6, #22c55e, #a855f7, #ef4444, #64748b, #06b6d4, #ec4899
-- lineRanges: array of {start, end} line number ranges that inform this summary
+const DECOMPOSE_SYSTEM = `You decompose documents into major topics. Use the report_topics tool to return your analysis. Line numbers are 1-indexed. Be accurate with line ranges — the user will click these to see the original text.`
 
-Return ONLY valid JSON array. Line numbers are 1-indexed. Be accurate with line ranges.`
+const DECOMPOSE_TOOL: Anthropic.Tool = {
+  name: 'report_topics',
+  description: 'Report the decomposed topics extracted from the document',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      topics: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: '2-5 word topic name' },
+            summary: { type: 'string', description: '2-3 sentence summary' },
+            color: {
+              type: 'string',
+              enum: ['#f59e0b', '#3b82f6', '#22c55e', '#a855f7', '#ef4444', '#64748b', '#06b6d4', '#ec4899'],
+              description: 'Color for this topic',
+            },
+            lineRanges: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  start: { type: 'number', description: 'Start line number (1-indexed)' },
+                  end: { type: 'number', description: 'End line number (1-indexed)' },
+                },
+                required: ['start', 'end'],
+              },
+              description: 'Line ranges from the source document that inform this topic',
+            },
+          },
+          required: ['title', 'summary', 'color', 'lineRanges'],
+        },
+      },
+    },
+    required: ['topics'],
+  },
+}
 
 router.post('/', async (req, res) => {
   const userId = req.userId!
@@ -72,37 +105,30 @@ router.post('/', async (req, res) => {
     .map((line: string, i: number) => `${i + 1}: ${line}`)
     .join('\n')
 
-  // Call Anthropic
-  let responseText: string
+  // Call Anthropic with tool use for structured output
+  let topics: Array<{ title: string; summary: string; color: string; lineRanges: Array<{ start: number; end: number }> }>
   try {
     const client = new Anthropic({ apiKey })
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 4096,
       system: DECOMPOSE_SYSTEM,
+      tools: [DECOMPOSE_TOOL],
+      tool_choice: { type: 'tool', name: 'report_topics' },
       messages: [{ role: 'user', content: numberedText }],
     })
 
-    responseText = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('')
-      .trim()
+    const toolBlock = response.content.find(
+      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
+    )
+    if (!toolBlock) {
+      res.status(500).json({ error: 'Model did not return a tool call' })
+      return
+    }
+    topics = (toolBlock.input as { topics: typeof topics }).topics
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Anthropic API call failed'
     res.status(500).json({ error: message })
-    return
-  }
-
-  // Parse the JSON response
-  let topics: unknown[]
-  try {
-    topics = JSON.parse(responseText)
-    if (!Array.isArray(topics)) {
-      throw new Error('Response is not a JSON array')
-    }
-  } catch {
-    res.status(500).json({ error: 'Failed to parse topics JSON', raw: responseText })
     return
   }
 

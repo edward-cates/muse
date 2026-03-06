@@ -378,27 +378,52 @@ export async function executeToolCall(
       }
 
       case 'decompose_text': {
-        if (!decomposeText || !actions.addDecompositionCard) {
+        if (!decomposeText) {
           return { tool_use_id: call.id, content: JSON.stringify({ error: 'Text decomposition not available' }) }
         }
-        const { text, title, x = 100, y = 100 } = call.input as {
-          text: string; title?: string; x?: number; y?: number
+        const { text, title, x = 100, y = 100, target_document_id } = call.input as {
+          text: string; title?: string; x?: number; y?: number; target_document_id?: string
         }
         const result = await decomposeText(text, title)
         const COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#a855f7', '#ef4444', '#64748b', '#06b6d4', '#ec4899']
         const cardIds: string[] = []
         const CARD_W = 260, CARD_H = 180, GAP = 20, COLS = 3
 
-        for (let i = 0; i < result.topics.length; i++) {
-          const topic = result.topics[i]
-          const col = i % COLS
-          const row = Math.floor(i / COLS)
-          const cx = x + col * (CARD_W + GAP)
-          const cy = y + row * (CARD_H + GAP)
-          const flatRanges = topic.lineRanges.flatMap(r => [r.start, r.end])
-          const color = topic.color || COLORS[i % COLORS.length]
-          const id = actions.addDecompositionCard(cx, cy, CARD_W, CARD_H, topic.title, topic.summary, flatRanges, color, result.documentId)
-          cardIds.push(id)
+        // Write decomposition cards to a child canvas remotely
+        if (target_document_id && actions.addRemoteElements) {
+          const remoteEls: Array<Record<string, string | number | number[]>> = []
+          for (let i = 0; i < result.topics.length; i++) {
+            const topic = result.topics[i]
+            const col = i % COLS
+            const row = Math.floor(i / COLS)
+            const cx = x + col * (CARD_W + GAP)
+            const cy = y + row * (CARD_H + GAP)
+            const flatRanges = topic.lineRanges.flatMap(r => [r.start, r.end])
+            const color = topic.color || COLORS[i % COLORS.length]
+            remoteEls.push({
+              type: 'decomposition_card', x: cx, y: cy, width: CARD_W, height: CARD_H,
+              topic: topic.title, summary: topic.summary, lineRanges: flatRanges,
+              color, documentId: result.documentId, expanded: 0, opacity: 100,
+            })
+          }
+          const remoteResult = await actions.addRemoteElements(target_document_id, remoteEls)
+          cardIds.push(...remoteResult.ids)
+        } else {
+          // Write locally
+          if (!actions.addDecompositionCard) {
+            return { tool_use_id: call.id, content: JSON.stringify({ error: 'Text decomposition not available' }) }
+          }
+          for (let i = 0; i < result.topics.length; i++) {
+            const topic = result.topics[i]
+            const col = i % COLS
+            const row = Math.floor(i / COLS)
+            const cx = x + col * (CARD_W + GAP)
+            const cy = y + row * (CARD_H + GAP)
+            const flatRanges = topic.lineRanges.flatMap(r => [r.start, r.end])
+            const color = topic.color || COLORS[i % COLORS.length]
+            const id = actions.addDecompositionCard(cx, cy, CARD_W, CARD_H, topic.title, topic.summary, flatRanges, color, result.documentId)
+            cardIds.push(id)
+          }
         }
 
         return { tool_use_id: call.id, content: JSON.stringify({
@@ -406,7 +431,8 @@ export async function executeToolCall(
           documentId: result.documentId,
           topicCount: result.topics.length,
           cardIds,
-          message: `Decomposed into ${result.topics.length} topics`,
+          target_document_id,
+          message: `Decomposed "${title || 'text'}" into ${result.topics.length} topics`,
         }) }
       }
 
