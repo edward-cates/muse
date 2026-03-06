@@ -178,7 +178,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
   // Space key for pan-anywhere
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !(e.target as HTMLElement).matches('textarea, input')) {
+      if (e.code === 'Space' && !(e.target as HTMLElement).matches('textarea, input') && !(e.target as HTMLElement).isContentEditable) {
         e.preventDefault()
         setSpaceHeld(true)
       }
@@ -218,7 +218,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
   // Zoom keyboard shortcuts — handled directly to ensure synchronous state updates
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).tagName === 'TEXTAREA' || (e.target as HTMLElement).tagName === 'INPUT') return
+      if ((e.target as HTMLElement).tagName === 'TEXTAREA' || (e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).isContentEditable) return
       const meta = e.metaKey || e.ctrlKey
 
       if (meta && (e.key === '=' || e.key === '+')) {

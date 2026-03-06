@@ -25,8 +25,8 @@ test.describe('Text tool', () => {
     await page.keyboard.press('t')
     await page.mouse.click(300, 300)
 
-    const textarea = page.locator('[data-testid="text-element"] textarea')
-    await expect(textarea).toBeFocused()
+    const content = page.locator('[data-testid="text-content"]')
+    await expect(content).toBeFocused()
   })
 
   test('typing updates the text element content', async ({ page }) => {
@@ -34,8 +34,8 @@ test.describe('Text tool', () => {
     await page.mouse.click(300, 300)
     await page.keyboard.type('Hello world')
 
-    const textarea = page.locator('[data-testid="text-element"] textarea')
-    await expect(textarea).toHaveValue('Hello world')
+    const content = page.locator('[data-testid="text-content"]')
+    await expect(content).toHaveText('Hello world')
   })
 
   test('text element has no visible border', async ({ page }) => {
@@ -188,8 +188,8 @@ test.describe('Text element fill and stroke', () => {
 
     // Deselect to avoid selected-state style overrides, then check
     await page.mouse.click(600, 50)
-    const textarea = page.locator('[data-testid="text-element"] textarea')
-    await expect(textarea).toHaveCSS('color', 'rgb(255, 0, 0)')
+    const content = page.locator('[data-testid="text-content"]')
+    await expect(content).toHaveCSS('color', 'rgb(255, 0, 0)')
   })
 
   test.fixme('fill color controls the text background', async ({ page }) => {
@@ -276,8 +276,8 @@ test.describe('Text element resize', () => {
     await canvas.selectTool('select')
     const el = page.locator('[data-testid="text-element"]')
     await el.click()
-    const textarea = el.locator('textarea')
-    const heightBefore = (await textarea.boundingBox())!.height
+    const content = el.locator('[data-testid="text-content"]')
+    const heightBefore = (await content.boundingBox())!.height
 
     // Drag the E (east) handle inward to make it narrower
     const handle = page.locator('[data-testid="text-element"] [data-handle="e"]')
@@ -288,7 +288,7 @@ test.describe('Text element resize', () => {
     await page.mouse.up()
 
     // Text should reflow taller when the element is narrower
-    const heightAfter = (await textarea.boundingBox())!.height
+    const heightAfter = (await content.boundingBox())!.height
     expect(heightAfter).toBeGreaterThan(heightBefore)
   })
 })
@@ -336,15 +336,15 @@ test.describe('Text element vertical alignment', () => {
 
     // Re-select after resize
     await el.click()
-    const textarea = el.locator('textarea')
+    const content = el.locator('[data-testid="text-content"]')
 
     // Set to top alignment
     await page.locator('.property-panel [data-testid="valign-top"]').click()
-    const topBox = await textarea.boundingBox()
+    const topBox = await content.boundingBox()
 
     // Set to bottom alignment
     await page.locator('.property-panel [data-testid="valign-bottom"]').click()
-    const bottomBox = await textarea.boundingBox()
+    const bottomBox = await content.boundingBox()
 
     // Top alignment should position textarea higher than bottom
     expect(topBox!.y).toBeLessThan(bottomBox!.y)
