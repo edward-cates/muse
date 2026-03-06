@@ -141,10 +141,26 @@ export interface DocumentCardElement {
   opacity: number
 }
 
+export interface DecompositionCardElement {
+  id: string
+  type: 'decomposition_card'
+  x: number
+  y: number
+  width: number
+  height: number
+  topic: string           // topic title
+  summary: string         // 2-3 sentence summary
+  lineRanges: number[]    // flat: [start1, end1, start2, end2, ...]
+  color: string           // dot color hex
+  documentId: string      // parent research document id
+  expanded: boolean       // whether source text is shown
+  opacity: number
+}
+
 /** Any element that arrows/connectors can attach to */
 export type ConnectableElement = ShapeElement | TextElement
 
-export type CanvasElement = ShapeElement | PathElement | LineElement | TextElement | ImageElement | FrameElement | WebCardElement | DocumentCardElement
+export type CanvasElement = ShapeElement | PathElement | LineElement | TextElement | ImageElement | FrameElement | WebCardElement | DocumentCardElement | DecompositionCardElement
 
 export function isShape(el: CanvasElement): el is ShapeElement {
   const shapeTypes: string[] = ['rectangle', 'ellipse', 'diamond']
@@ -177,4 +193,8 @@ export function isWebCard(el: CanvasElement): el is WebCardElement {
 
 export function isDocumentCard(el: CanvasElement): el is DocumentCardElement {
   return el.type === 'document_card'
+}
+
+export function isDecompositionCard(el: CanvasElement): el is DecompositionCardElement {
+  return el.type === 'decomposition_card'
 }

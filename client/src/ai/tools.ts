@@ -187,6 +187,21 @@ export const CANVAS_TOOLS: ToolDefinition[] = [
 
 export const DOCUMENT_TOOLS: ToolDefinition[] = [
   {
+    name: 'add_node',
+    description: 'Create a new canvas document and place a card (node) on the current canvas that links to it. The user can double-click the card to navigate into the new canvas. Returns { documentId, cardElementId }.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Title for the new canvas (default "Untitled")' },
+        x: { type: 'number', description: 'X position for the card on canvas (default 100)' },
+        y: { type: 'number', description: 'Y position for the card on canvas (default 100)' },
+        width: { type: 'number', description: 'Card width (default 280)' },
+        height: { type: 'number', description: 'Card height (default 180)' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'create_document',
     description: 'Create an HTML artifact document and place a card on the canvas. The document can be edited by clicking into it. Returns { documentId, cardElementId }.',
     input_schema: {
@@ -270,6 +285,35 @@ export const RESEARCH_TOOLS: ToolDefinition[] = [
         gap_y: { type: 'number', description: 'Vertical gap (default 40)' },
       },
       required: ['element_ids'],
+    },
+  },
+  {
+    name: 'decompose_text',
+    description: 'Decompose a large text into topics with summaries and source line references. Creates a research document card on the canvas containing decomposition cards. Use this when the user pastes a large document or asks you to break down text.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'The full text to decompose into topics' },
+        title: { type: 'string', description: 'Title for the research document (default: "Untitled Research")' },
+        x: { type: 'number', description: 'X position for the research card on canvas (default 100)' },
+        y: { type: 'number', description: 'Y position for the research card on canvas (default 100)' },
+      },
+      required: ['text'],
+    },
+  },
+  {
+    name: 'generate_image',
+    description: 'Generate an AI image from a text description and place it on the canvas. Requires the user to have configured an OpenAI API key.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'Description of the image to generate' },
+        x: { type: 'number', description: 'X position on canvas (default 100)' },
+        y: { type: 'number', description: 'Y position on canvas (default 100)' },
+        width: { type: 'number', description: 'Display width (default 400)' },
+        height: { type: 'number', description: 'Display height (default 400)' },
+      },
+      required: ['prompt'],
     },
   },
 ]

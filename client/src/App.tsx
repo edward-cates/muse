@@ -3,10 +3,15 @@ import { Canvas, type CanvasHandle } from './components/Canvas'
 import { Toolbar } from './components/Toolbar'
 import { SettingsPanel } from './components/SettingsPanel'
 import { AiPanel } from './components/AiPanel'
+import { SourceTextPanel } from './components/SourceTextPanel'
 import { DocumentsList } from './components/DocumentsList'
 import { DocumentTitle } from './components/DocumentTitle'
+import { NodePicker } from './components/NodePicker'
+import { HistoryBreadcrumb } from './components/HistoryBreadcrumb'
 import { useElements, readElement } from './hooks/useElements'
+import { recordNavigation, useNavigationHistory, useNavigate } from './hooks/useNavigationHistory'
 import { useDocumentApi } from './hooks/useDocument'
+import { useAuth } from './auth/AuthContext'
 import type { Tool, LineType, CanvasElement } from './types'
 import { isShape, isLine, isText } from './types'
 
@@ -18,6 +23,33 @@ export function App({ drawingId }: { drawingId: string }) {
   const [gridEnabled, setGridEnabled] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
   const [minimapVisible, setMinimapVisible] = useState(false)
+  const [sourcePanel, setSourcePanel] = useState<{
+    documentId: string; title: string; text: string; ranges: Array<{start: number; end: number}>
+  } | null>(null)
+
+  const [nodePickerOpen, setNodePickerOpen] = useState(false)
+
+  const { session } = useAuth()
+  const historyTrail = useNavigationHistory(drawingId)
+  const navigate = useNavigate()
+
+  // Record this page in navigation history
+  useEffect(() => {
+    if (!session?.access_token || !drawingId) return
+    // Fetch the document title to record in history
+    fetch(`/api/documents/${drawingId}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.document) {
+          recordNavigation(drawingId, data.document.title || 'Untitled')
+        }
+      })
+      .catch(() => {
+        recordNavigation(drawingId, 'Untitled')
+      })
+  }, [drawingId, session?.access_token])
 
   // Canvas handle for viewport control
   const canvasRef = useRef<CanvasHandle>(null)
@@ -28,7 +60,7 @@ export function App({ drawingId }: { drawingId: string }) {
   const styleClipboardRef = useRef<Record<string, unknown> | null>(null)
 
   const {
-    elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame, addWebCard, addDocumentCard,
+    elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame, addWebCard, addDocumentCard, addDecompositionCard,
     updateElement, deleteElement, undo, redo, stopCapturing,
     reorderElement, groupElements, ungroupElements,
     setLastUsedStyle, doc, yElements,
@@ -45,6 +77,75 @@ export function App({ drawingId }: { drawingId: string }) {
       setSelectedIds([])
     }
   }, [])
+
+  // Show source text panel for decomposition card line references
+  const handleShowSource = useCallback(async (documentId: string, lineRanges: Array<{start: number; end: number}>) => {
+    if (!session?.access_token) return
+
+    // If we already have the text for this document, just update the ranges
+    if (sourcePanel && sourcePanel.documentId === documentId) {
+      setSourcePanel(prev => prev ? { ...prev, ranges: lineRanges } : prev)
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/documents/${documentId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      const doc = data.document
+      if (doc.source_text) {
+        setSourcePanel({
+          documentId,
+          title: doc.title || 'Untitled',
+          text: doc.source_text,
+          ranges: lineRanges,
+        })
+      }
+    } catch {
+      // silently fail — panel just won't open
+    }
+  }, [session?.access_token, sourcePanel])
+
+  // Drill into a selected element — open it as its own canvas
+  const handleDrillIn = useCallback(async (elementId: string) => {
+    if (!session?.access_token) return
+
+    // Read documentId from Yjs map directly (field not on TS type for most elements)
+    const yEl = yElements.toArray().find(m => m.get('id') === elementId)
+    if (!yEl) return
+
+    const existingDocId = yEl.get('documentId') as string | undefined
+    if (existingDocId) {
+      window.location.hash = `/d/${existingDocId}`
+      return
+    }
+
+    // Lazy-create a backing document
+    const el = elements.find(e => e.id === elementId)
+    const title = el && 'text' in el && (el as { text: string }).text
+      ? (el as { text: string }).text.slice(0, 50)
+      : 'Untitled'
+
+    try {
+      const res = await fetch('/api/documents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ title, type: 'canvas' }),
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      const newDocId = data.document.id
+      updateElement(elementId, { documentId: newDocId })
+      window.location.hash = `/d/${newDocId}`
+    } catch {
+      // silently fail
+    }
+  }, [session?.access_token, yElements, elements, updateElement, drawingId])
 
   // Capture last-used style when deselecting a shape
   const prevSelectedRef = useRef<string[]>([])
@@ -82,6 +183,13 @@ export function App({ drawingId }: { drawingId: string }) {
         return
       }
 
+      // Drill into selected element (Cmd+Enter)
+      if (meta && e.key === 'Enter' && selectedIds.length === 1) {
+        e.preventDefault()
+        handleDrillIn(selectedIds[0])
+        return
+      }
+
       // Don't intercept keys when typing in a textarea/input (except undo/redo above)
       // Allow meta shortcuts (copy/paste/etc.) through for non-text inputs like color pickers
       const target = e.target as HTMLElement
@@ -93,7 +201,7 @@ export function App({ drawingId }: { drawingId: string }) {
         }
         if (target.isContentEditable) return
         const inputType = (target as HTMLInputElement).type
-        const isTextInput = tag === 'TEXTAREA' || inputType === 'text' || inputType === 'search' || inputType === 'url' || inputType === 'number'
+        const isTextInput = tag === 'TEXTAREA' || inputType === 'text' || inputType === 'search' || inputType === 'url' || inputType === 'number' || inputType === 'password'
         if (isTextInput || !meta) return
       }
 
@@ -394,7 +502,7 @@ export function App({ drawingId }: { drawingId: string }) {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [elements, selectedIds, undo, redo, deleteElement, reorderElement, groupElements, ungroupElements, updateElement, addShape, addArrow, addText, doc, stopCapturing])
+  }, [elements, selectedIds, undo, redo, deleteElement, reorderElement, groupElements, ungroupElements, updateElement, addShape, addArrow, addText, doc, stopCapturing, handleDrillIn])
 
   return (
     <div className="app">
@@ -424,6 +532,8 @@ export function App({ drawingId }: { drawingId: string }) {
           groupElements={groupElements}
           ungroupElements={ungroupElements}
           stopCapturing={stopCapturing}
+          onShowSource={handleShowSource}
+          onDrillIn={handleDrillIn}
         />
         <Toolbar
           activeTool={activeTool}
@@ -434,8 +544,40 @@ export function App({ drawingId }: { drawingId: string }) {
             const id = addImage(200, 200, w, h, src)
             setSelectedIds([id])
           }}
+          onInsertNode={() => setNodePickerOpen(prev => !prev)}
         />
+        {nodePickerOpen && (
+          <NodePicker
+            currentDocumentId={drawingId}
+            onCreateNew={async () => {
+              if (!session?.access_token) return
+              try {
+                const res = await fetch('/api/documents', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${session.access_token}`,
+                  },
+                  body: JSON.stringify({ title: 'Untitled', type: 'canvas' }),
+                })
+                if (!res.ok) return
+                const data = await res.json()
+                const doc = data.document
+                const id = addDocumentCard(200, 200, 280, 180, doc.id, doc.type, doc.title)
+                setSelectedIds([id])
+              } catch { /* silently fail */ }
+            }}
+            onLinkExisting={(doc) => {
+              const id = addDocumentCard(200, 200, 280, 180, doc.id, doc.type, doc.title)
+              setSelectedIds([id])
+            }}
+            onClose={() => setNodePickerOpen(false)}
+          />
+        )}
         <DocumentTitle documentId={drawingId} />
+        {historyTrail.length > 0 && (
+          <HistoryBreadcrumb items={historyTrail} onNavigate={navigate} />
+        )}
         <DocumentsList currentDocumentId={drawingId} />
       </div>
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
@@ -445,7 +587,7 @@ export function App({ drawingId }: { drawingId: string }) {
         onToggleMinimap={() => setMinimapVisible(prev => !prev)}
         onToggleDarkMode={() => setDarkMode(prev => !prev)}
         elementActions={{
-          addShape, addLine, addArrow, addText, addWebCard, addDocumentCard,
+          addShape, addLine, addArrow, addText, addImage, addWebCard, addDocumentCard, addDecompositionCard,
           updateElement, deleteElement,
           getElements: () => yElements.toArray().map(readElement),
           fitToContent: () => canvasRef.current?.fitToContent(),
@@ -457,6 +599,14 @@ export function App({ drawingId }: { drawingId: string }) {
           updateDocumentContent,
         }}
       />
+      {sourcePanel && (
+        <SourceTextPanel
+          sourceText={sourcePanel.text}
+          title={sourcePanel.title}
+          highlightRanges={sourcePanel.ranges}
+          onClose={() => setSourcePanel(null)}
+        />
+      )}
     </div>
   )
 }

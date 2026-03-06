@@ -7,14 +7,15 @@ import { ImageRenderer } from './ImageRenderer'
 import { FrameRenderer } from './FrameRenderer'
 import { WebCardRenderer } from './WebCardRenderer'
 import { DocumentCardRenderer } from './DocumentCardRenderer'
+import { DecompositionCardRenderer } from './DecompositionCardRenderer'
 import { PathLayer } from './PathLayer'
 import { LineLayer, edgeIntersection, type ConnectableElement } from './LineLayer'
 import { Cursors } from './Cursors'
 import { PropertyPanel } from './PropertyPanel'
 import { AlignmentToolbar } from './AlignmentToolbar'
 import { Minimap } from './Minimap'
-import { isShape, isPath, isLine, isText, isImage, isFrame, isWebCard, isDocumentCard } from '../types'
-import type { Tool, ShapeType, CanvasElement, LineType, ShapeElement, PathElement, LineElement, TextElement, ImageElement, FrameElement, WebCardElement, DocumentCardElement} from '../types'
+import { isShape, isPath, isLine, isText, isImage, isFrame, isWebCard, isDocumentCard, isDecompositionCard } from '../types'
+import type { Tool, ShapeType, CanvasElement, LineType, ShapeElement, PathElement, LineElement, TextElement, ImageElement, FrameElement, WebCardElement, DocumentCardElement, DecompositionCardElement } from '../types'
 
 interface Props {
   activeTool: Tool
@@ -40,6 +41,8 @@ interface Props {
   groupElements: (ids: string[]) => string
   ungroupElements: (groupId: string) => void
   stopCapturing: () => void
+  onShowSource?: (documentId: string, lineRanges: Array<{start: number; end: number}>) => void
+  onDrillIn?: (elementId: string) => void
 }
 
 export interface CanvasHandle {
@@ -60,7 +63,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
   activeTool, activeLineType, selectedIds, onSelectedIdsChange, onToolChange, onShapeCreated,
   elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame,
   updateElement, deleteElement, gridEnabled, darkMode, minimapVisible,
-  setLastUsedStyle, groupElements, ungroupElements, stopCapturing,
+  setLastUsedStyle, groupElements, ungroupElements, stopCapturing, onShowSource, onDrillIn,
 }, ref) {
   const selectedId = selectedIds.length === 1 ? selectedIds[0] : null
   const { awareness } = useCollab()
@@ -169,6 +172,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
   const frames = elements.filter(isFrame)
   const webCards = elements.filter(isWebCard)
   const documentCards = elements.filter(isDocumentCard)
+  const decompositionCards = elements.filter(isDecompositionCard)
   // Elements that can be connector endpoints (shapes + text with resolved bounds)
   const connectables: ConnectableElement[] = useMemo(() => {
     const resolved = texts.map(t => {
@@ -182,8 +186,8 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
       }
       return { ...t, width: 20, height: 20 } as ConnectableElement
     })
-    return [...shapes, ...resolved]
-  }, [shapes, texts])
+    return [...shapes, ...resolved, ...images, ...frames, ...webCards, ...documentCards, ...decompositionCards]
+  }, [shapes, texts, images, frames, webCards, documentCards, decompositionCards])
   shapesRef.current = shapes
   pathsRef.current = paths
   linesRef.current = lines
@@ -361,6 +365,15 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
       if (world.x >= bounds.x && world.x <= bounds.x + bounds.width &&
           world.y >= bounds.y && world.y <= bounds.y + bounds.height) {
         return { ...t, width: bounds.width, height: bounds.height } as ConnectableElement
+      }
+    }
+    // Check card and other rectangular elements (document cards, web cards, images, frames, decomposition cards)
+    const rectElements: ConnectableElement[] = [...documentCards, ...webCards, ...decompositionCards, ...images, ...frames]
+    for (let i = rectElements.length - 1; i >= 0; i--) {
+      const el = rectElements[i]
+      if (world.x >= el.x && world.x <= el.x + el.width &&
+          world.y >= el.y && world.y <= el.y + el.height) {
+        return el
       }
     }
     return undefined
@@ -609,9 +622,9 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
               ids.push(p.id)
             }
           }
-          // Also include web cards and document cards
+          // Also include web cards, document cards, and decomposition cards
           for (const el of elements) {
-            if ((isWebCard(el) || isDocumentCard(el)) &&
+            if ((isWebCard(el) || isDocumentCard(el) || isDecompositionCard(el)) &&
                 el.x + el.width > rect.x && el.x < rect.x + rect.w &&
                 el.y + el.height > rect.y && el.y < rect.y + rect.h) {
               ids.push(el.id)
@@ -1285,6 +1298,18 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
             activeTool={activeTool}
           />
         ))}
+        {decompositionCards.map((dc) => (
+          <DecompositionCardRenderer
+            key={dc.id}
+            element={dc}
+            isSelected={selectedIds.includes(dc.id)}
+            onSelect={handleSelect}
+            onUpdate={updateElement}
+            onShowSource={onShowSource}
+            scale={scale}
+            activeTool={activeTool}
+          />
+        ))}
         {previewSvg}
         {connectionHighlight}
         {/* Endpoint handles for selected connectors */}
@@ -1377,6 +1402,25 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
           />
         </div>
       )}
+
+      {/* Drill-in button */}
+      {selectedIds.length === 1 && activeTool === 'select' && onDrillIn && (() => {
+        const el = elements.find(e => e.id === selectedIds[0])
+        if (!el || isLine(el) || isPath(el)) return null
+        return (
+          <button
+            className="drill-in-btn"
+            data-testid="drill-in-btn"
+            title="Open as canvas (⌘↵)"
+            onMouseDown={e => e.stopPropagation()}
+            onClick={() => onDrillIn(selectedIds[0])}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 3h6v6M14 10l7-7M10 3H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-6" />
+            </svg>
+          </button>
+        )
+      })()}
 
       {/* Alignment toolbar */}
       {selectedIds.length >= 2 && activeTool === 'select' && (

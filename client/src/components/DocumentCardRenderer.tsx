@@ -1,4 +1,5 @@
-import { useRef, useCallback, type MouseEvent } from 'react'
+import { useRef, useCallback, useState, useEffect, type MouseEvent } from 'react'
+import { useAuth } from '../auth/AuthContext'
 import type { DocumentCardElement, Tool } from '../types'
 
 interface Props {
@@ -23,7 +24,8 @@ const HANDLES: { dir: string; x: number; y: number; cursor: string }[] = [
 
 const typeLabels: Record<string, string> = {
   canvas: 'Canvas',
-  html_artifact: 'HTML Artifact',
+  html_artifact: 'HTML Wireframe',
+  research: 'Research',
 }
 
 const typeIcons: Record<string, React.ReactNode> = {
@@ -39,11 +41,63 @@ const typeIcons: Record<string, React.ReactNode> = {
       <polyline points="8 6 2 12 8 18" />
     </svg>
   ),
+  research: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M4 2h12v16H4z" strokeLinejoin="round" />
+      <path d="M7 6h6M7 9h6M7 12h3" />
+    </svg>
+  ),
 }
 
+/** Thumbnail scale: render HTML at 800px wide, scale to fit card */
+const THUMBNAIL_RENDER_WIDTH = 800
+
 export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, scale, activeTool }: Props) {
+  const { session } = useAuth()
   const dragStart = useRef({ x: 0, y: 0 })
   const elStart = useRef({ x: 0, y: 0 })
+  const [htmlContent, setHtmlContent] = useState<string | null>(null)
+
+  // Sync title from server (handles renames done on the child canvas)
+  useEffect(() => {
+    if (!session?.access_token || !element.documentId) return
+    let cancelled = false
+
+    fetch(`/api/documents/${element.documentId}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled || !data?.document) return
+        const serverTitle = data.document.title
+        if (serverTitle && serverTitle !== element.title) {
+          onUpdate(element.id, { title: serverTitle })
+        }
+      })
+      .catch(() => {})
+
+    return () => { cancelled = true }
+  }, [element.documentId, element.id, element.title, session?.access_token, onUpdate])
+
+  // Fetch HTML content for thumbnail preview (html_artifact only)
+  useEffect(() => {
+    if (element.documentType !== 'html_artifact') return
+    if (!session?.access_token || !element.documentId) return
+
+    let cancelled = false
+    fetch(`/api/documents/${element.documentId}/content`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!cancelled && data?.content) {
+          setHtmlContent(data.content)
+        }
+      })
+      .catch(() => {})
+
+    return () => { cancelled = true }
+  }, [element.documentId, element.documentType, element.contentVersion, session?.access_token])
 
   const handleMouseDown = useCallback(
     (e: MouseEvent) => {
@@ -117,12 +171,21 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
   )
 
   const showHandles = isSelected && activeTool === 'select'
+  const isHtml = element.documentType === 'html_artifact'
+  const hasPreview = isHtml && htmlContent
+
+  // Chrome bar height for html_artifact
+  const chromeH = isHtml ? 24 : 0
+  // Area available for content
+  const previewW = element.width
+  const previewH = element.height - chromeH
+  const thumbScale = previewW / THUMBNAIL_RENDER_WIDTH
 
   return (
     <div
-      data-testid="document-card-element"
+      data-testid="document-card"
       data-shape-id={element.id}
-      className={`shape document-card ${isSelected ? 'shape--selected' : ''}`}
+      className={`shape document-card ${isSelected ? 'shape--selected' : ''} ${element.documentType === 'research' ? 'document-card--research' : ''} ${isHtml ? 'document-card--html' : ''}`}
       style={{
         left: element.x,
         top: element.y,
@@ -133,14 +196,46 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
     >
-      <div className="document-card__inner">
-        <div className="document-card__icon">
-          {typeIcons[element.documentType] || typeIcons.canvas}
+      {isHtml && (
+        <div className="document-card__chrome">
+          <span className="document-card__chrome-dot document-card__chrome-dot--r" />
+          <span className="document-card__chrome-dot document-card__chrome-dot--y" />
+          <span className="document-card__chrome-dot document-card__chrome-dot--g" />
         </div>
-        <div className="document-card__title">{element.title || 'Untitled'}</div>
-        <div className="document-card__type">{typeLabels[element.documentType] || element.documentType}</div>
-        <div className="document-card__hint">Double-click to open</div>
-      </div>
+      )}
+      {hasPreview ? (
+        <div
+          className="document-card__preview"
+          style={{
+            top: chromeH,
+            width: previewW,
+            height: previewH,
+          }}
+        >
+          <iframe
+            srcDoc={htmlContent}
+            sandbox=""
+            tabIndex={-1}
+            style={{
+              width: THUMBNAIL_RENDER_WIDTH,
+              height: previewH / thumbScale,
+              transform: `scale(${thumbScale})`,
+              transformOrigin: 'top left',
+              border: 'none',
+              pointerEvents: 'none',
+            }}
+          />
+        </div>
+      ) : (
+        <div className={`document-card__inner ${element.documentType === 'research' ? 'document-card__inner--research' : ''}`}>
+          <div className="document-card__icon">
+            {typeIcons[element.documentType] || typeIcons.canvas}
+          </div>
+          <div className="document-card__title">{element.title || 'Untitled'}</div>
+          <div className="document-card__type">{typeLabels[element.documentType] || element.documentType}</div>
+          <div className="document-card__hint">Double-click to open</div>
+        </div>
+      )}
       {showHandles && HANDLES.map(({ dir, x, y, cursor }) => (
         <div
           key={dir}

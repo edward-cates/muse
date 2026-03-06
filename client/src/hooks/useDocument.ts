@@ -85,7 +85,6 @@ export function useDocumentApi() {
   const createDocument = useCallback(async (opts: {
     title?: string
     type?: string
-    parent_id?: string
   }): Promise<DocumentMeta> => {
     const res = await fetch(API_BASE, {
       method: 'POST',

@@ -18,7 +18,6 @@ export function HtmlArtifactViewer({ documentId }: Props) {
   const [contentVersion, setContentVersion] = useState(0)
   const { content, loading } = useDocumentContent(documentId, contentVersion)
   const { updateContent } = useDocumentApi()
-  const [parentId, setParentId] = useState<string | null>(null)
   const [aiOpen, setAiOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -30,34 +29,14 @@ export function HtmlArtifactViewer({ documentId }: Props) {
   // Keep contentRef in sync
   useEffect(() => { contentRef.current = content ?? null }, [content])
 
-  // Fetch parent_id for back navigation
-  useEffect(() => {
-    if (!session?.access_token) return
-    fetch('/api/documents', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ id: documentId }),
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.document?.parent_id) setParentId(data.document.parent_id)
-      })
-      .catch(() => {})
-  }, [documentId, session?.access_token])
-
   // Auto-scroll messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   const handleBack = useCallback(() => {
-    if (parentId) {
-      window.location.hash = `/d/${parentId}`
-    }
-  }, [parentId])
+    window.history.back()
+  }, [])
 
   const handleSubmit = useCallback(async () => {
     if (!input.trim() || !session?.access_token || streaming) return
@@ -181,8 +160,8 @@ export function HtmlArtifactViewer({ documentId }: Props) {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        {parentId && (
-          <button onClick={handleBack} style={styles.backBtn} title="Back to canvas">
+        {window.history.length > 1 && (
+          <button onClick={handleBack} style={styles.backBtn} title="Go back">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />
             </svg>

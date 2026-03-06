@@ -46,6 +46,7 @@ export function DocumentShell() {
   switch (docType) {
     case 'html_artifact':
       return <HtmlArtifactViewer documentId={documentId} />
+    case 'research':
     case 'canvas':
     default:
       return (

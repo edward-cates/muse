@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import * as Y from 'yjs'
 import { useCollab } from '../collab/CollabContext'
-import type { CanvasElement, ShapeType, ShapeElement, PathElement, LineElement, LineType, WebCardElement, DocumentCardElement } from '../types'
+import type { CanvasElement, ShapeType, ShapeElement, PathElement, LineElement, LineType, WebCardElement, DocumentCardElement, DecompositionCardElement } from '../types'
 
 type YMapVal = string | number | number[]
 
@@ -118,6 +118,23 @@ export function readElement(m: Y.Map<YMapVal>): CanvasElement {
       documentType: (m.get('documentType') as string) || 'canvas',
       title: (m.get('title') as string) || 'Untitled',
       contentVersion: (m.get('contentVersion') as number) || 0,
+      opacity: (m.get('opacity') as number) ?? 100,
+    }
+  }
+  if (type === 'decomposition_card') {
+    return {
+      id: m.get('id') as string,
+      type: 'decomposition_card',
+      x: m.get('x') as number,
+      y: m.get('y') as number,
+      width: (m.get('width') as number) || 260,
+      height: (m.get('height') as number) || 180,
+      topic: (m.get('topic') as string) || '',
+      summary: (m.get('summary') as string) || '',
+      lineRanges: (m.get('lineRanges') as number[]) || [],
+      color: (m.get('color') as string) || '#64748b',
+      documentId: (m.get('documentId') as string) || '',
+      expanded: (m.get('expanded') as unknown as boolean) ?? false,
       opacity: (m.get('opacity') as number) ?? 100,
     }
   }
@@ -373,6 +390,28 @@ export function useElements() {
     [yElements],
   )
 
+  const addDecompositionCard = useCallback(
+    (x: number, y: number, w: number, h: number, topic: string, summary: string, lineRanges: number[], color: string, documentId: string): string => {
+      const id = crypto.randomUUID()
+      const yEl = new Y.Map<YMapVal>()
+      yEl.set('id', id)
+      yEl.set('type', 'decomposition_card')
+      yEl.set('x', x)
+      yEl.set('y', y)
+      yEl.set('width', w)
+      yEl.set('height', h)
+      yEl.set('topic', topic)
+      yEl.set('summary', summary)
+      yEl.set('lineRanges', lineRanges)
+      yEl.set('color', color)
+      yEl.set('documentId', documentId)
+      yEl.set('expanded', 0)
+      yElements.push([yEl])
+      return id
+    },
+    [yElements],
+  )
+
   const updateElement = useCallback(
     (id: string, updates: Record<string, unknown>) => {
       yElements.forEach((yEl) => {
@@ -492,7 +531,7 @@ export function useElements() {
   }, [])
 
   return {
-    elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame, addWebCard, addDocumentCard,
+    elements, addShape, addPath, addLine, addArrow, addText, addImage, addFrame, addWebCard, addDocumentCard, addDecompositionCard,
     updateElement, deleteElement, undo, redo, stopCapturing,
     reorderElement, groupElements, ungroupElements,
     setLastUsedStyle, doc, yElements,

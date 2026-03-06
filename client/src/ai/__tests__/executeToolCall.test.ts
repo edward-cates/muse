@@ -49,6 +49,15 @@ function createStore(initial: CanvasElement[] = []) {
       elements.push({ id, type: 'webcard', x, y, width: w, height: h, url, title, snippet })
       return id
     },
+    addDocumentCard(x, y, w, h, documentId, documentType, title) {
+      const id = `el-${counter++}`
+      elements.push({ id, type: 'document_card', x, y, width: w, height: h, documentId, documentType, title })
+      return id
+    },
+    async createDocument(opts: { title?: string; type?: string }) {
+      const id = `doc-${counter++}`
+      return { id, type: opts.type || 'canvas', content_version: 0 }
+    },
     updateElement(id, updates) {
       const el = elements.find(e => e.id === id)
       if (el) Object.assign(el, updates)
@@ -344,6 +353,53 @@ describe('executeToolCall', () => {
       assert.equal(el.url, 'https://example.com')
       assert.equal(el.title, 'Example')
       assert.equal(el.snippet, 'A test site')
+    })
+  })
+
+  describe('add_node', () => {
+    it('creates a canvas document and places a document card', async () => {
+      const store = createStore()
+      const data = parse(await executeToolCall(
+        call('add_node', { title: 'My Canvas', x: 200, y: 300 }),
+        store.actions,
+      ))
+      assert.ok(data.success)
+      assert.ok(data.documentId, 'Should return a documentId')
+      assert.ok(data.cardElementId, 'Should return a cardElementId')
+      const el = store.find(data.cardElementId)!
+      assert.equal(el.type, 'document_card')
+      assert.equal(el.documentType, 'canvas')
+      assert.equal(el.title, 'My Canvas')
+      assert.equal(el.x, 200)
+      assert.equal(el.y, 300)
+    })
+
+    it('uses defaults when no arguments provided', async () => {
+      const store = createStore()
+      const data = parse(await executeToolCall(
+        call('add_node', {}),
+        store.actions,
+      ))
+      assert.ok(data.success)
+      const el = store.find(data.cardElementId)!
+      assert.equal(el.title, 'Untitled')
+      assert.equal(el.x, 100)
+      assert.equal(el.y, 100)
+      assert.equal(el.width, 280)
+      assert.equal(el.height, 180)
+    })
+
+    it('returns error when document creation is not available', async () => {
+      const store = createStore()
+      // Remove document actions to simulate unavailability
+      delete (store.actions as Record<string, unknown>).createDocument
+      delete (store.actions as Record<string, unknown>).addDocumentCard
+      const data = parse(await executeToolCall(
+        call('add_node', { title: 'Test' }),
+        store.actions,
+      ))
+      assert.ok(data.error)
+      assert.ok(data.error.includes('not available'))
     })
   })
 

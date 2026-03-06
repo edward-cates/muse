@@ -1,8 +1,8 @@
-import type { ShapeElement, LineElement, ArrowheadStyle, TextElement } from '../types'
+import type { ShapeElement, LineElement, ArrowheadStyle, TextElement, ImageElement, FrameElement, WebCardElement, DocumentCardElement, DecompositionCardElement } from '../types'
 import { buildPath } from '../lib/pathBuilders'
 
 /** Any element that can be a connector endpoint (has spatial bounds). */
-export type ConnectableElement = ShapeElement | TextElement
+export type ConnectableElement = ShapeElement | TextElement | ImageElement | FrameElement | WebCardElement | DocumentCardElement | DecompositionCardElement
 
 interface Props {
   shapes: ConnectableElement[]

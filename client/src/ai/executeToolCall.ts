@@ -15,18 +15,28 @@ export interface ElementActions {
   addText: (x: number, y: number) => string
   addWebCard?: (x: number, y: number, w: number, h: number, url: string, title: string, snippet: string) => string
   addDocumentCard?: (x: number, y: number, w: number, h: number, documentId: string, documentType: string, title: string) => string
+  addDecompositionCard?: (x: number, y: number, w: number, h: number, topic: string, summary: string, lineRanges: number[], color: string, documentId: string) => string
+  addImage?: (x: number, y: number, w: number, h: number, src: string) => string
   updateElement: (id: string, updates: Record<string, unknown>) => void
   deleteElement: (id: string) => void
   getElements: () => CanvasElement[]
   fitToContent?: () => void
   fitToElements?: (ids: string[]) => void
   // Document API functions (require auth)
-  createDocument?: (opts: { title?: string; type?: string; parent_id?: string }) => Promise<{ id: string; type: string; content_version: number }>
+  createDocument?: (opts: { title?: string; type?: string }) => Promise<{ id: string; type: string; content_version: number }>
   updateDocumentContent?: (documentId: string, content: string) => Promise<number>
 }
 
 export interface FetchUrlFn {
   (url: string): Promise<{ title: string; text: string; url: string }>
+}
+
+export interface DecomposeTextFn {
+  (text: string, title?: string): Promise<{ documentId: string; topics: Array<{ title: string; summary: string; color: string; lineRanges: Array<{ start: number; end: number }> }> }>
+}
+
+export interface GenerateImageFn {
+  (prompt: string): Promise<{ imageUrl: string }>
 }
 
 function findElement(elements: CanvasElement[], id: string): CanvasElement | undefined {
@@ -55,6 +65,8 @@ export async function executeToolCall(
   call: ToolCall,
   actions: ElementActions,
   fetchUrl?: FetchUrlFn,
+  decomposeText?: DecomposeTextFn,
+  generateImage?: GenerateImageFn,
 ): Promise<{ tool_use_id: string; content: string }> {
   try {
     const elements = actions.getElements()
@@ -299,6 +311,18 @@ export async function executeToolCall(
         return { tool_use_id: call.id, content: JSON.stringify(result) }
       }
 
+      case 'add_node': {
+        if (!actions.createDocument || !actions.addDocumentCard) {
+          return { tool_use_id: call.id, content: JSON.stringify({ error: 'Document creation not available' }) }
+        }
+        const { title = 'Untitled', x = 100, y = 100, width = 280, height = 180 } = call.input as {
+          title?: string; x?: number; y?: number; width?: number; height?: number
+        }
+        const doc = await actions.createDocument({ title, type: 'canvas' })
+        const cardId = actions.addDocumentCard(x, y, width, height, doc.id, 'canvas', title)
+        return { tool_use_id: call.id, content: JSON.stringify({ documentId: doc.id, cardElementId: cardId, success: true, message: `Created canvas node "${title}"` }) }
+      }
+
       case 'create_document': {
         if (!actions.createDocument || !actions.updateDocumentContent || !actions.addDocumentCard) {
           return { tool_use_id: call.id, content: JSON.stringify({ error: 'Document creation not available' }) }
@@ -325,6 +349,51 @@ export async function executeToolCall(
           }
         }
         return { tool_use_id: call.id, content: JSON.stringify({ success: true, content_version: newVersion }) }
+      }
+
+      case 'decompose_text': {
+        if (!decomposeText || !actions.addDecompositionCard) {
+          return { tool_use_id: call.id, content: JSON.stringify({ error: 'Text decomposition not available' }) }
+        }
+        const { text, title, x = 100, y = 100 } = call.input as {
+          text: string; title?: string; x?: number; y?: number
+        }
+        const result = await decomposeText(text, title)
+        const COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#a855f7', '#ef4444', '#64748b', '#06b6d4', '#ec4899']
+        const cardIds: string[] = []
+        const CARD_W = 260, CARD_H = 180, GAP = 20, COLS = 3
+
+        for (let i = 0; i < result.topics.length; i++) {
+          const topic = result.topics[i]
+          const col = i % COLS
+          const row = Math.floor(i / COLS)
+          const cx = x + col * (CARD_W + GAP)
+          const cy = y + row * (CARD_H + GAP)
+          const flatRanges = topic.lineRanges.flatMap(r => [r.start, r.end])
+          const color = topic.color || COLORS[i % COLORS.length]
+          const id = actions.addDecompositionCard(cx, cy, CARD_W, CARD_H, topic.title, topic.summary, flatRanges, color, result.documentId)
+          cardIds.push(id)
+        }
+
+        return { tool_use_id: call.id, content: JSON.stringify({
+          success: true,
+          documentId: result.documentId,
+          topicCount: result.topics.length,
+          cardIds,
+          message: `Decomposed into ${result.topics.length} topics`,
+        }) }
+      }
+
+      case 'generate_image': {
+        if (!generateImage || !actions.addImage) {
+          return { tool_use_id: call.id, content: JSON.stringify({ error: 'Image generation not available' }) }
+        }
+        const { prompt, x = 100, y = 100, width = 400, height = 400 } = call.input as {
+          prompt: string; x?: number; y?: number; width?: number; height?: number
+        }
+        const result = await generateImage(prompt)
+        const id = actions.addImage(x, y, width, height, result.imageUrl)
+        return { tool_use_id: call.id, content: JSON.stringify({ id, success: true, message: `Generated image for "${prompt.slice(0, 50)}"` }) }
       }
 
       default:

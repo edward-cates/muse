@@ -124,8 +124,8 @@ describe('Documents API', () => {
 
   it('GET /api/documents returns list of documents', async () => {
     const mockDocuments = [
-      { id: 'abc', title: 'My Drawing', type: 'canvas', parent_id: null, content_version: 0, created_at: '2025-01-01T00:00:00Z', updated_at: '2025-06-01T00:00:00Z' },
-      { id: 'def', title: 'Untitled', type: 'canvas', parent_id: null, content_version: 0, created_at: '2025-01-02T00:00:00Z', updated_at: '2025-05-01T00:00:00Z' },
+      { id: 'abc', title: 'My Drawing', type: 'canvas', content_version: 0, created_at: '2025-01-01T00:00:00Z', updated_at: '2025-06-01T00:00:00Z' },
+      { id: 'def', title: 'Untitled', type: 'canvas', content_version: 0, created_at: '2025-01-02T00:00:00Z', updated_at: '2025-05-01T00:00:00Z' },
     ]
     setMockRoutes([{
       method: 'GET',
@@ -189,7 +189,7 @@ describe('Documents API', () => {
           insertBody = body
           return {
             status: 200,
-            data: { id: documentId, owner_id: TEST_USER_ID, title: 'Untitled', type: 'canvas', parent_id: null, content_version: 0, created_at: '2025-01-01', updated_at: '2025-01-01' },
+            data: { id: documentId, owner_id: TEST_USER_ID, title: 'Untitled', type: 'canvas', content_version: 0, created_at: '2025-01-01', updated_at: '2025-01-01' },
           }
         },
       },
@@ -212,44 +212,6 @@ describe('Documents API', () => {
     assert.equal(parsed.type, 'canvas')
   })
 
-  it('POST /api/documents creates html_artifact with parent_id', async () => {
-    const parentId = '22222222-2222-2222-2222-222222222222'
-    let insertBody = ''
-
-    setMockRoutes([
-      {
-        method: 'GET',
-        table: 'documents',
-        handler: () => ({ status: 200, data: null }),
-      },
-      {
-        method: 'POST',
-        table: 'documents',
-        handler: (_req, body) => {
-          insertBody = body
-          return {
-            status: 200,
-            data: { id: 'new-id', owner_id: TEST_USER_ID, title: 'My Widget', type: 'html_artifact', parent_id: parentId, content_version: 0, created_at: '2025-01-01', updated_at: '2025-01-01' },
-          }
-        },
-      },
-    ])
-
-    const res = await fetch(url('/api/documents'), {
-      method: 'POST',
-      headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ id: 'new-id', title: 'My Widget', type: 'html_artifact', parent_id: parentId }),
-    })
-    assert.equal(res.status, 200)
-    const body = await res.json() as { document: { type: string; parent_id: string } }
-    assert.equal(body.document.type, 'html_artifact')
-    assert.equal(body.document.parent_id, parentId)
-
-    const parsed = JSON.parse(insertBody)
-    assert.equal(parsed.type, 'html_artifact')
-    assert.equal(parsed.parent_id, parentId)
-  })
-
   it('POST /api/documents returns existing document without modification', async () => {
     const documentId = '22222222-2222-2222-2222-222222222222'
     let insertCalled = false
@@ -260,7 +222,7 @@ describe('Documents API', () => {
         table: 'documents',
         handler: () => ({
           status: 200,
-          data: { id: documentId, title: 'My Renamed Drawing', type: 'canvas', parent_id: null, content_version: 0, created_at: '2025-01-01', updated_at: '2025-06-01' },
+          data: { id: documentId, title: 'My Renamed Drawing', type: 'canvas', content_version: 0, created_at: '2025-01-01', updated_at: '2025-06-01' },
         }),
       },
       {
@@ -300,7 +262,7 @@ describe('Documents API', () => {
           insertBody = body
           return {
             status: 200,
-            data: { id: 'new-id', owner_id: TEST_USER_ID, title: 'My Diagram', type: 'canvas', parent_id: null, content_version: 0, created_at: '2025-01-01', updated_at: '2025-01-01' },
+            data: { id: 'new-id', owner_id: TEST_USER_ID, title: 'My Diagram', type: 'canvas', content_version: 0, created_at: '2025-01-01', updated_at: '2025-01-01' },
           }
         },
       },
@@ -341,6 +303,33 @@ describe('Documents API', () => {
     assert.equal(res.status, 500)
     const body = await res.json() as { error: string }
     assert.equal(body.error, 'Failed to create document')
+  })
+
+  it('POST /api/documents returns 401 on foreign key violation (user not in auth.users)', async () => {
+    setMockRoutes([
+      {
+        method: 'GET',
+        table: 'documents',
+        handler: () => ({ status: 200, data: null }),
+      },
+      {
+        method: 'POST',
+        table: 'documents',
+        handler: () => ({
+          status: 400,
+          data: { message: 'insert or update on table "documents" violates foreign key constraint "documents_owner_id_fkey"', code: '23503' },
+        }),
+      },
+    ])
+
+    const res = await fetch(url('/api/documents'), {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ title: 'Test' }),
+    })
+    assert.equal(res.status, 401)
+    const body = await res.json() as { error: string }
+    assert.match(body.error, /sign out/)
   })
 
   // ── PATCH /api/documents/:id ──

@@ -1,5 +1,5 @@
 import type { CanvasElement } from '../types'
-import { isShape, isLine, isText, isImage, isFrame, isWebCard, isDocumentCard } from '../types'
+import { isShape, isLine, isText, isImage, isFrame, isWebCard, isDocumentCard, isDecompositionCard } from '../types'
 
 function describeElement(el: CanvasElement): string {
   if (isShape(el)) {
@@ -27,6 +27,13 @@ function describeElement(el: CanvasElement): string {
   }
   if (isDocumentCard(el)) {
     return `DocCard<${el.id.slice(0, 8)}> "${el.title}" (${el.documentType}) at (${el.x},${el.y}) ${el.width}×${el.height} docId=${el.documentId}`
+  }
+  if (isDecompositionCard(el)) {
+    const ranges = []
+    for (let i = 0; i < el.lineRanges.length; i += 2) {
+      ranges.push(`${el.lineRanges[i]}-${el.lineRanges[i + 1]}`)
+    }
+    return `DecompCard<${el.id.slice(0, 8)}> "${el.topic}" at (${el.x},${el.y}) ${el.width}×${el.height} color=${el.color} docId=${el.documentId} lines=[${ranges.join(',')}]`
   }
   return `Unknown<${el.id.slice(0, 8)}>`
 }
@@ -102,6 +109,15 @@ ${elementLines}${connections}
 - Document cards can be double-clicked to open in a full-page editor.
 - Use update_document_content to modify existing artifacts by their document ID (shown in DocCard elements).
 - HTML must be self-contained (inline <style> and <script>).
+
+## Decomposition Cards
+- DecompCard elements are topic cards created by decompose_text. They show a topic title, summary, and line references to the source document.
+- You can move/resize them with update_element, delete them with delete_element.
+- Use decompose_text when the user pastes a long document or asks to break down / analyze text.
+
+## Image Generation
+- Use generate_image to create AI-generated images from text prompts and place them on the canvas.
+- Images are placed as ImageElement nodes. The user needs an OpenAI API key configured for this to work.
 
 ## Rules
 - Start with a 1-2 sentence plan of what you're about to create (layout, shape count, connections), then call tools.

@@ -45,9 +45,11 @@ canvas_edit — The user wants to create, modify, or arrange visual elements on 
 
 research — The user wants to find information, look something up, or learn about a topic. Includes bare URLs. Examples: "what is a CRDT?", "search for React hooks best practices", "https://example.com summarize this".
 
+compose — The user wants BOTH research AND visual creation in one request. Examples: "research AI trends and make a diagram", "find info about React and create a dashboard", "look up competitors and build a comparison chart".
+
 chat — General conversation that is neither canvas editing nor research. Examples: "hello", "what can you do?", "thanks".`
 
-const VALID_INTENTS = ['canvas_edit', 'research', 'chat'] as const
+const VALID_INTENTS = ['canvas_edit', 'research', 'compose', 'chat'] as const
 
 router.post('/classify', async (req, res) => {
   const userId = req.userId!

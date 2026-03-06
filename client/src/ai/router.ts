@@ -1,9 +1,10 @@
-export type AgentIntent = 'canvas_edit' | 'research' | 'chat'
+export type AgentIntent = 'canvas_edit' | 'research' | 'compose' | 'chat'
 
 const RESEARCH_KEYWORDS = [
   'search', 'find', 'look up', 'lookup', 'research', 'what is', 'what are',
   'who is', 'who are', 'learn about', 'articles', 'sources', 'investigate',
   'explore topic', 'summarize', 'fetch', 'read this', 'read the',
+  'decompose', 'break down', 'break this down', 'analyze this', 'ingest',
 ]
 
 const CANVAS_KEYWORDS = [
@@ -14,11 +15,12 @@ const CANVAS_KEYWORDS = [
   'wireframe', 'sketch', 'design', 'build', 'make',
   'tree', 'graph', 'chart', 'dashboard', 'grid',
   'table', 'hierarchy', 'architecture',
+  'generate image', 'image of', 'picture of',
 ]
 
 const URL_RE = /https?:\/\/[^\s]+/i
 
-const VALID_INTENTS: readonly AgentIntent[] = ['canvas_edit', 'research', 'chat']
+const VALID_INTENTS: readonly AgentIntent[] = ['canvas_edit', 'research', 'compose', 'chat']
 
 /** Keyword-based intent heuristic (synchronous fallback) */
 export function classifyIntentLocal(message: string): AgentIntent {
@@ -40,6 +42,8 @@ export function classifyIntentLocal(message: string): AgentIntent {
     if (lower.includes(kw)) canvasScore++
   }
 
+  // Both research and canvas signals → compose (unified agent)
+  if (researchScore > 0 && canvasScore > 0) return 'compose'
   if (researchScore > canvasScore) return 'research'
   if (canvasScore > 0) return 'canvas_edit'
   return 'chat'

@@ -7,11 +7,12 @@ interface Props {
   onToolChange: (tool: Tool) => void
   onLineTypeChange: (lineType: LineType) => void
   onInsertImage?: (src: string, w: number, h: number) => void
+  onInsertNode?: () => void
 }
 
 const LINE_TOOLS: Tool[] = ['line', 'arrow']
 
-export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeChange, onInsertImage }: Props) {
+export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeChange, onInsertImage, onInsertNode }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleInsertImage = () => {
@@ -204,6 +205,21 @@ export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeCh
         style={{ display: 'none' }}
         onChange={handleFileChange}
       />
+
+      {/* Insert node */}
+      {onInsertNode && (
+        <button
+          data-testid="insert-node"
+          className="toolbar__btn"
+          onClick={onInsertNode}
+          title="Insert Node"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="3" />
+            <path d="M12 8v8M8 12h8" />
+          </svg>
+        </button>
+      )}
 
       {/* Line type sub-selector */}
       {LINE_TOOLS.includes(activeTool) && (

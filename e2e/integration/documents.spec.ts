@@ -244,39 +244,6 @@ test.describe('Documents API (real DB)', () => {
     expect(result.status).toBe(404)
   })
 
-  test('parent_id links artifact to canvas', async ({ page }) => {
-    await page.goto('/')
-    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
-    const canvasId = getDocumentId(page.url())
-    await page.waitForTimeout(1500)
-
-    // Create an artifact with parent_id pointing to the canvas
-    const createResult = await apiCall(page, 'POST', '/api/documents', {
-      title: 'Child Artifact',
-      type: 'html_artifact',
-      parent_id: canvasId,
-    })
-    const doc = (createResult.data as { document: { id: string; parent_id: string } }).document
-    expect(doc.parent_id).toBe(canvasId)
-
-    // Save some content
-    await apiCall(page, 'PATCH', `/api/documents/${doc.id}/content`, {
-      content: '<h1>Child</h1>',
-    })
-
-    // Navigate to the artifact
-    await page.goto(`/#/d/${doc.id}`)
-    await expect(page.locator('iframe[title="HTML Artifact"]')).toBeVisible({ timeout: 10_000 })
-
-    // Should show a "Back" button since it has a parent
-    await expect(page.locator('button:has-text("Back")')).toBeVisible({ timeout: 10_000 })
-
-    // Click back — should navigate to the parent canvas
-    await page.locator('button:has-text("Back")').click()
-    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
-    expect(getDocumentId(page.url())).toBe(canvasId)
-  })
-
   test('HTML artifact viewer renders content in iframe', async ({ page }) => {
     await page.goto('/')
     await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
@@ -305,6 +272,197 @@ test.describe('Documents API (real DB)', () => {
     // Check iframe content
     const frame = page.frameLocator('iframe[title="HTML Artifact"]')
     await expect(frame.locator('#test-heading')).toHaveText('Render Test Heading', { timeout: 10_000 })
+  })
+
+  test('renaming a child document updates its card title on the parent canvas', async ({ page }) => {
+    // 1. Create a node in a canvas
+    await page.goto('/')
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    const parentDocId = getDocumentId(page.url())
+    await page.waitForTimeout(1500)
+
+    // Click Insert Node → pick "Create new"
+    await page.locator('[data-testid="insert-node"]').click()
+    await page.locator('[data-testid="node-picker-new"]').click()
+    const card = page.locator('[data-testid="document-card"]')
+    await expect(card).toBeVisible({ timeout: 5000 })
+    await expect(card.locator('.document-card__title')).toHaveText('Untitled')
+
+    // Allow Yjs to persist the card
+    await page.waitForTimeout(2000)
+
+    // 2. Double-click on that node to open it
+    const box = await card.boundingBox()
+    await page.mouse.dblclick(box!.x + box!.width / 2, box!.y + box!.height / 2)
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    await page.waitForTimeout(1000)
+
+    // 3. Change its title
+    const patchDone = page.waitForResponse(
+      resp => resp.url().includes('/api/documents/') && resp.request().method() === 'PATCH',
+    )
+    await page.locator('.drawing-title__display').click()
+    await page.locator('.drawing-title__input').fill('Renamed Node')
+    await page.locator('.drawing-title__input').press('Enter')
+    await patchDone
+
+    // 4. Go back to the first canvas
+    await page.goto(`/#/d/${parentDocId}`)
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+
+    // 5. Assert the title changed on the card
+    const cardAfter = page.locator('[data-testid="document-card"]')
+    await expect(cardAfter.locator('.document-card__title')).toHaveText('Renamed Node', { timeout: 10_000 })
+  })
+
+  test('circular reference: link existing canvas, double-click to navigate back', async ({ page }) => {
+    // 1. Start on canvas A
+    await page.goto('/')
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    const canvasAId = getDocumentId(page.url())
+    await page.waitForTimeout(1500)
+
+    // Rename canvas A so we can identify it
+    const patchA = page.waitForResponse(
+      r => r.url().includes('/api/documents/') && r.request().method() === 'PATCH',
+    )
+    await page.locator('.drawing-title__display').click()
+    await page.locator('.drawing-title__input').fill('Canvas A')
+    await page.locator('.drawing-title__input').press('Enter')
+    await patchA
+
+    // 2. Insert a new node → creates canvas B
+    await page.locator('[data-testid="insert-node"]').click()
+    await page.locator('[data-testid="node-picker"]').waitFor({ state: 'visible', timeout: 3000 })
+    await page.locator('[data-testid="node-picker-new"]').click()
+
+    const cardOnA = page.locator('[data-testid="document-card"]')
+    await expect(cardOnA).toHaveCount(1, { timeout: 5000 })
+
+    // Wait for Yjs persistence
+    await page.waitForTimeout(2000)
+
+    // 3. Double-click card to enter canvas B
+    const box = await cardOnA.boundingBox()
+    await page.mouse.dblclick(box!.x + box!.width / 2, box!.y + box!.height / 2)
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    const canvasBId = getDocumentId(page.url())
+    expect(canvasBId).not.toBe(canvasAId)
+    await page.waitForTimeout(1500)
+
+    // 4. On canvas B, insert a link to the existing canvas A
+    await page.locator('[data-testid="insert-node"]').click()
+    await page.locator('[data-testid="node-picker"]').waitFor({ state: 'visible', timeout: 3000 })
+
+    // Canvas A should appear in the list — click it
+    const canvasAEntry = page.locator(`[data-testid="node-picker-doc-${canvasAId}"]`)
+    await expect(canvasAEntry).toBeVisible({ timeout: 5000 })
+    await canvasAEntry.click()
+
+    const cardOnB = page.locator('[data-testid="document-card"]')
+    await expect(cardOnB).toHaveCount(1, { timeout: 5000 })
+    await expect(cardOnB.locator('.document-card__title')).toHaveText('Canvas A', { timeout: 5000 })
+
+    // Wait for Yjs persistence
+    await page.waitForTimeout(2000)
+
+    // 5. Double-click the canvas A card to go back
+    const box2 = await cardOnB.boundingBox()
+    await page.mouse.dblclick(box2!.x + box2!.width / 2, box2!.y + box2!.height / 2)
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+
+    // 6. We should be back on canvas A
+    expect(getDocumentId(page.url())).toBe(canvasAId)
+
+    // And it should still have the card pointing to canvas B
+    const cardBackOnA = page.locator('[data-testid="document-card"]')
+    await expect(cardBackOnA).toHaveCount(1, { timeout: 10_000 })
+  })
+
+  test('history breadcrumbs show last 3 pages and navigate on click', async ({ page }) => {
+    // Create 4 named documents
+    await page.goto('/')
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    await page.waitForTimeout(1500)
+
+    const names = ['Page A', 'Page B', 'Page C', 'Page D']
+    const ids: string[] = []
+    for (const name of names) {
+      const result = await apiCall(page, 'POST', '/api/documents', { title: name, type: 'canvas' })
+      ids.push((result.data as { document: { id: string } }).document.id)
+    }
+
+    // Navigate through them: A → B → C → D
+    for (const id of ids) {
+      await page.goto(`/#/d/${id}`)
+      await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+      await page.waitForTimeout(500)
+    }
+
+    // Now on Page D — breadcrumb should show last 3: A, B, C (not D, that's current)
+    const crumbs = page.locator('[data-testid="history-breadcrumb"] [data-testid="breadcrumb-item"]')
+    await expect(crumbs).toHaveCount(3, { timeout: 5000 })
+    await expect(crumbs.nth(0)).toContainText('Page A')
+    await expect(crumbs.nth(1)).toContainText('Page B')
+    await expect(crumbs.nth(2)).toContainText('Page C')
+
+    // Click Page B breadcrumb → should navigate there
+    await crumbs.nth(1).click()
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    expect(getDocumentId(page.url())).toBe(ids[1])
+  })
+
+  test('breadcrumbs update when a canvas is renamed', async ({ page }) => {
+    await page.goto('/')
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    await page.waitForTimeout(1500)
+
+    // Create two documents
+    const resA = await apiCall(page, 'POST', '/api/documents', { title: 'Alpha', type: 'canvas' })
+    const idA = (resA.data as { document: { id: string } }).document.id
+    const resB = await apiCall(page, 'POST', '/api/documents', { title: 'Beta', type: 'canvas' })
+    const idB = (resB.data as { document: { id: string } }).document.id
+
+    // Visit A
+    await page.goto(`/#/d/${idA}`)
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    await page.waitForTimeout(500)
+
+    // Rename A to "Alpha Renamed"
+    const patchA = page.waitForResponse(
+      r => r.url().includes('/api/documents/') && r.request().method() === 'PATCH',
+    )
+    await page.locator('.drawing-title__display').click()
+    await page.locator('.drawing-title__input').fill('Alpha Renamed')
+    await page.locator('.drawing-title__input').press('Enter')
+    await patchA
+
+    // Visit B
+    await page.goto(`/#/d/${idB}`)
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    await page.waitForTimeout(500)
+
+    // Rename B to "Beta Renamed"
+    const patchB = page.waitForResponse(
+      r => r.url().includes('/api/documents/') && r.request().method() === 'PATCH',
+    )
+    await page.locator('.drawing-title__display').click()
+    await page.locator('.drawing-title__input').fill('Beta Renamed')
+    await page.locator('.drawing-title__input').press('Enter')
+    await patchB
+
+    // Navigate to a third page so A and B show as breadcrumbs
+    const resC = await apiCall(page, 'POST', '/api/documents', { title: 'Charlie', type: 'canvas' })
+    const idC = (resC.data as { document: { id: string } }).document.id
+    await page.goto(`/#/d/${idC}`)
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+
+    // Breadcrumbs should show the RENAMED titles (last two entries before current)
+    const crumbs = page.locator('[data-testid="history-breadcrumb"] [data-testid="breadcrumb-item"]')
+    const count = await crumbs.count()
+    // The last two breadcrumbs should be Alpha Renamed and Beta Renamed
+    await expect(crumbs.nth(count - 2)).toContainText('Alpha Renamed')
+    await expect(crumbs.nth(count - 1)).toContainText('Beta Renamed')
   })
 
   test('backward compat: /api/drawings alias still works', async ({ page }) => {

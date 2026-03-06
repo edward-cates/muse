@@ -2,11 +2,12 @@ import { useState, useRef, useEffect, type FormEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../auth/AuthContext'
 import { useConnection } from '../hooks/useConnection'
-import { executeToolCall, type ToolCall, type ElementActions } from '../ai/executeToolCall'
+import { executeToolCall, type ToolCall, type ElementActions, type DecomposeTextFn, type GenerateImageFn } from '../ai/executeToolCall'
 import { captureCanvas, computeBounds } from '../ai/canvasCapture'
 import { classifyIntent, type AgentIntent } from '../ai/router'
 import { buildCanvasEditorConfig } from '../ai/agents/canvasEditor'
 import { buildResearcherConfig } from '../ai/agents/researcher'
+import { buildComposerConfig } from '../ai/agents/composer'
 import type { AgentConfig } from '../ai/agents/types'
 import type { CanvasElement } from '../types'
 
@@ -104,6 +105,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
   const CANVAS_MUTATING_TOOLS = new Set([
     'add_shape', 'add_text', 'add_line', 'add_arrow', 'add_web_card',
     'update_element', 'delete_element', 'arrange_grid', 'arrange_flow',
+    'create_document', 'decompose_text', 'generate_image',
   ])
 
   async function parseStreamAndExecute(
@@ -167,7 +169,16 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
             break
 
           case 'input_json_delta':
-            if (currentTool) currentTool.inputJson += event.partial_json
+            if (currentTool) {
+              currentTool.inputJson += event.partial_json
+              // Show streaming progress for content-heavy tools
+              if (currentTool.name === 'create_document' || currentTool.name === 'update_document_content') {
+                const len = currentTool.inputJson.length
+                const blocks = Math.min(Math.floor(len / 500), 20)
+                const bar = '█'.repeat(blocks) + '░'.repeat(Math.max(0, 3 - blocks))
+                onStatus?.(`Writing wireframe ${bar} ${(len / 1000).toFixed(1)}k`)
+              }
+            }
             break
 
           case 'content_block_stop':
@@ -231,6 +242,10 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         }
       }
       case 'set_viewport': return `Adjusting view...`
+      case 'create_document': return `Creating document...`
+      case 'update_document_content': return `Updating document...`
+      case 'decompose_text': return `Decomposing text into topics...`
+      case 'generate_image': return `Generating image...`
       default: return `Running ${tc.name}...`
     }
   }
@@ -241,6 +256,8 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         return buildCanvasEditorConfig(elements)
       case 'research':
         return buildResearcherConfig(elements)
+      case 'compose':
+        return buildComposerConfig(elements)
       case 'chat':
       default:
         return {
@@ -259,6 +276,40 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
   ): Promise<AgentConfig> {
     const intent = await classifyIntent(text, token, signal)
     return buildAgentConfigFromIntent(intent)
+  }
+
+  /** Decompose text via server endpoint */
+  const decomposeTextViaServer: DecomposeTextFn = async (text, title) => {
+    const res = await fetch('/api/decompose', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session!.access_token}`,
+      },
+      body: JSON.stringify({ text, title }),
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.error || `Decompose failed (${res.status})`)
+    }
+    return res.json()
+  }
+
+  /** Generate image via server endpoint */
+  const generateImageViaServer: GenerateImageFn = async (prompt) => {
+    const res = await fetch('/api/image-gen', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session!.access_token}`,
+      },
+      body: JSON.stringify({ prompt }),
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.error || `Image generation failed (${res.status})`)
+    }
+    return res.json()
   }
 
   /** Fetch URL via server proxy */
@@ -345,7 +396,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         res, abort.signal,
         async (tc) => {
           setStatus(describeToolAction(tc))
-          const result = await executeToolCall(tc, elementActions, fetchUrlViaServer)
+          const result = await executeToolCall(tc, elementActions, fetchUrlViaServer, decomposeTextViaServer, generateImageViaServer)
 
           const parsed = (() => { try { return JSON.parse(result.content) } catch { return {} } })()
 
@@ -516,16 +567,14 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
       }
     }
 
-    // Add user message to chat display (with screenshot thumbnail)
-    setChatMessages((prev) => [...prev, {
-      role: 'user',
-      content: text,
-      ...(screenshotBase64 ? { imageBase64: screenshotBase64 } : {}),
-    }])
+    // Add user message to chat display
+    setChatMessages((prev) => [...prev, { role: 'user', content: text }])
 
     // Show which agent is handling this
     if (agentConfig.name !== 'chat') {
-      const agentLabel = agentConfig.name === 'researcher' ? 'Researching' : 'Editing canvas'
+      const agentLabel = agentConfig.name === 'researcher' ? 'Researching'
+        : agentConfig.name === 'composer' ? 'Composing'
+        : 'Editing canvas'
       setChatMessages((prev) => [...prev, { role: 'status', content: agentLabel }])
     }
 

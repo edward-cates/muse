@@ -15,8 +15,8 @@ describe('classifyIntentLocal', () => {
     assert.equal(classifyIntentLocal('what can you do?'), 'chat')
   })
 
-  it('classifies "find articles about CRDTs and add them to the board" as research', () => {
-    assert.equal(classifyIntentLocal('find articles about CRDTs and add them to the board'), 'research')
+  it('classifies "find articles about CRDTs and add them to the board" as compose', () => {
+    assert.equal(classifyIntentLocal('find articles about CRDTs and add them to the board'), 'compose')
   })
 
   it('classifies "add a box labeled Auth" as canvas_edit', () => {

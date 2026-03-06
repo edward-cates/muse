@@ -1,0 +1,67 @@
+.decomposition-card {
+  background: #fff;
+  border-radius: 8px;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  border: 1px solid #e5e5e0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.decomposition-card__header {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #f0f0ec;
+}
+
+.decomposition-card__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.decomposition-card__topic {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1a1a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.decomposition-card__summary {
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #555;
+  flex: 1;
+  overflow: hidden;
+}
+
+.decomposition-card__refs {
+  padding: 6px 12px 10px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.decomposition-card__ref {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #f5f5f0;
+  color: #888;
+  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  cursor: pointer;
+  border: none;
+  transition: background 0.1s, color 0.1s;
+}
+
+.decomposition-card__ref:hover {
+  background: #e0e7ff;
+  color: #4338ca;
+}

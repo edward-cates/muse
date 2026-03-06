@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
 
   let query = supabase
     .from('documents')
-    .select('id, title, type, parent_id, content_version, created_at, updated_at')
+    .select('id, title, type, content_version, created_at, updated_at')
     .eq('owner_id', userId)
     .order('updated_at', { ascending: false })
 
@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
 // Create or register a document
 router.post('/', async (req, res) => {
   const userId = req.userId!
-  const { id, title, type, parent_id } = req.body
+  const { id, title, type } = req.body
   const supabase = getSupabase()
 
   // If an ID is provided, check if the document already exists.
@@ -44,7 +44,7 @@ router.post('/', async (req, res) => {
   if (id) {
     const { data: existing } = await supabase
       .from('documents')
-      .select('id, title, type, parent_id, content_version, created_at, updated_at')
+      .select('id, title, type, content_version, created_at, updated_at')
       .eq('id', id)
       .maybeSingle()
 
@@ -61,14 +61,43 @@ router.post('/', async (req, res) => {
       owner_id: userId,
       title: title || 'Untitled',
       type: type || 'canvas',
-      ...(parent_id ? { parent_id } : {}),
     })
     .select()
     .single()
 
   if (error) {
     console.error('POST /api/documents insert error:', error)
+    if (error.code === '23503') {
+      res.status(401).json({ error: 'User account not found. Please sign out and sign back in.' })
+      return
+    }
     res.status(500).json({ error: 'Failed to create document' })
+    return
+  }
+
+  res.json({ document: data })
+})
+
+// Get a single document (metadata + source_text)
+router.get('/:id', async (req, res) => {
+  const userId = req.userId!
+  const { id } = req.params
+  const supabase = getSupabase()
+
+  const { data, error } = await supabase
+    .from('documents')
+    .select('id, title, type, content_version, source_text, created_at, updated_at')
+    .eq('id', id)
+    .eq('owner_id', userId)
+    .maybeSingle()
+
+  if (error) {
+    res.status(500).json({ error: 'Failed to get document' })
+    return
+  }
+
+  if (!data) {
+    res.status(404).json({ error: 'Document not found' })
     return
   }
 
