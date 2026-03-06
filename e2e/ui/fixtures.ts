@@ -1,6 +1,6 @@
 import { type Page, type Locator } from '@playwright/test'
 
-export type ToolName = 'select' | 'rectangle' | 'ellipse' | 'diamond' | 'line' | 'arrow' | 'draw' | 'text' | 'hand' | 'eraser' | 'frame' | 'triangle' | 'hexagon' | 'star' | 'cloud'
+export type ToolName = 'select' | 'rectangle' | 'ellipse' | 'diamond' | 'line' | 'arrow' | 'draw' | 'text' | 'hand' | 'eraser' | 'frame'
 
 export class CanvasPage {
   readonly page: Page
@@ -21,11 +21,6 @@ export class CanvasPage {
   // --- Tool selection ---
 
   async selectTool(tool: ToolName) {
-    const FLYOUT_SHAPES: ToolName[] = ['triangle', 'hexagon', 'star', 'cloud']
-    if (FLYOUT_SHAPES.includes(tool)) {
-      // Open the shape picker flyout first
-      await this.page.locator('[data-testid="more-shapes"]').click()
-    }
     await this.page.locator(`[data-testid="tool-${tool}"]`).click()
   }
 
@@ -48,7 +43,7 @@ export class CanvasPage {
     return this.page.locator('.shape')
   }
 
-  shapesOfType(type: 'rectangle' | 'ellipse' | 'diamond' | 'triangle' | 'hexagon' | 'star' | 'cloud'): Locator {
+  shapesOfType(type: 'rectangle' | 'ellipse' | 'diamond'): Locator {
     return this.page.locator(`[data-testid="shape-${type}"]`)
   }
 

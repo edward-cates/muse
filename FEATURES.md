@@ -12,9 +12,6 @@ Legend: `[x]` = shipped, `[~]` = partial, `[ ]` = missing
 - [x] Rectangle
 - [x] Ellipse
 - [x] Diamond
-- [ ] Triangle
-- [ ] Hexagon, pentagon, octagon, star
-- [ ] Cloud, heart, parallelogram, trapezoid
 - [ ] Rounded rectangle (separate from rx=3 default)
 - [ ] Sticky note / callout shape
 - [ ] Custom shape definitions (SVG/stencil import)
@@ -324,7 +321,6 @@ Legend: `[x]` = shipped, `[~]` = partial, `[ ]` = missing
 - [ ] Eraser tool (E)
 - [ ] Image insert
 - [ ] Frame tool
-- [ ] More shape flyout (triangle, hexagon, star, etc.)
 - [ ] Zoom controls (+/−/fit)
 
 ---
@@ -362,8 +358,7 @@ Legend: `[x]` = shipped, `[~]` = partial, `[ ]` = missing
 ### P2 — Power features (makes it serious)
 1. Waypoints on connectors
 2. Smart elbow routing (obstacle avoidance)
-3. More shape types (triangle, hexagon, star, cloud)
-4. Frame/container elements
+3. Frame/container elements
 5. Layers panel
 6. Dark mode
 7. Minimap
