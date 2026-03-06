@@ -865,7 +865,8 @@ body {
   line-height: 1.45;
   letter-spacing: -0.01em;
   color: var(--text);
-  padding: 4px 6px;
+  padding: 0;
+  margin: 0;
   pointer-events: none;
   cursor: inherit;
   overflow: hidden;
@@ -874,15 +875,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  transition: background 0.15s ease, box-shadow 0.15s ease;
-  border-radius: 3px;
 }
 
 .text-element__content--editing {
   pointer-events: auto;
   cursor: text;
-  background: rgba(0, 0, 0, 0.03);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 .text-element__content::placeholder {
@@ -1387,10 +1384,6 @@ body {
   color: #e0e0e0;
 }
 
-[data-theme="dark"] .text-element__content--editing {
-  background: rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-}
 
 [data-theme="dark"] .text-element__content::placeholder {
   color: rgba(255, 255, 255, 0.2);

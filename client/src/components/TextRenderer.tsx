@@ -186,6 +186,8 @@ export function TextRenderer({ element, isSelected, isEditing, onSelect, onUpdat
           className={`text-element__content ${isEditing ? 'text-element__content--editing' : ''}`}
           defaultValue={element.text}
           placeholder={isEditing ? 'Type here...' : ''}
+          spellCheck={false}
+          autoComplete="off"
           style={{
             fontSize: element.fontSize,
             fontFamily: element.fontFamily,
