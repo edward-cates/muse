@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Muse Wireframe - Inside a Node</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #f5f5f0;
+    font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
+    color: #1a1a1a;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* --- Top bar --- */
+  .topbar {
+    height: 48px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0dc;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    position: relative;
+    z-index: 10;
+  }
+  .topbar__logo { font-weight: 700; font-size: 15px; letter-spacing: -0.3px; }
+  .topbar__sep { width: 1px; height: 20px; background: #e0e0dc; }
+  .topbar__breadcrumb {
+    display: flex; align-items: center; gap: 6px; font-size: 13px;
+  }
+  .topbar__breadcrumb-link {
+    color: #4f46e5; cursor: pointer; text-decoration: none;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .topbar__breadcrumb-link:hover { text-decoration: underline; }
+  .topbar__breadcrumb-chevron { color: #bbb; font-size: 11px; }
+  .topbar__breadcrumb-current { color: #666; font-weight: 500; }
+  .topbar__spacer { flex: 1; }
+  .topbar__avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: #c4b5fd;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: #4c1d95;
+  }
+
+  /* --- Toolbar (left) --- */
+  .toolbar {
+    position: fixed; left: 12px; top: 50%; transform: translateY(-50%);
+    background: #fff; border: 1px solid #e0e0dc; border-radius: 10px;
+    padding: 6px; display: flex; flex-direction: column; gap: 2px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); z-index: 10;
+  }
+  .toolbar__btn {
+    width: 36px; height: 36px; border: none; background: transparent;
+    border-radius: 7px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #555; font-size: 16px;
+  }
+  .toolbar__btn:hover { background: #f0f0ec; }
+  .toolbar__btn--active { background: #eef2ff; color: #4f46e5; }
+  .toolbar__divider { height: 1px; background: #e0e0dc; margin: 4px 2px; }
+
+  /* --- Canvas area --- */
+  .canvas-area {
+    position: fixed; inset: 48px 320px 0 0; overflow: hidden;
+    background: radial-gradient(circle, #ddd 1px, transparent 1px);
+    background-size: 24px 24px; background-position: 12px 12px;
+  }
+  .canvas-world { position: absolute; inset: 0; }
+
+  /* --- Context border: subtle indication you're inside a node --- */
+  .canvas-area::before {
+    content: '';
+    position: absolute; inset: 0;
+    border: 3px solid rgba(79, 70, 229, 0.12);
+    border-radius: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .canvas-context {
+    position: absolute; left: 16px; bottom: 16px; z-index: 6;
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.92); border: 1px solid #e0e0dc;
+    padding: 6px 12px; border-radius: 6px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .canvas-context__dot {
+    width: 10px; height: 10px; border-radius: 3px; background: #4f46e5;
+    flex-shrink: 0;
+  }
+  .canvas-context__label {
+    font-size: 11px; color: #666;
+  }
+  .canvas-context__label strong {
+    color: #1a1a1a; font-weight: 600;
+  }
+
+  /* --- Shared node --- */
+  .node {
+    position: absolute; border-radius: 8px; background: #fff;
+    border: 1.5px solid #d4d4d0; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    cursor: grab;
+  }
+  .node:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.1); }
+  .node--selected {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 2px rgba(79,70,229,0.18), 0 3px 12px rgba(0,0,0,0.08);
+  }
+
+  /* --- Shape nodes --- */
+  .node--shape {
+    display: flex; align-items: center; justify-content: center;
+  }
+  .node--shape svg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+  }
+  .shape-text {
+    position: relative; z-index: 1; font-size: 13px; font-weight: 500;
+    text-align: center; padding: 8px;
+  }
+
+  /* --- Diamond shape --- */
+  .node--diamond {
+    display: flex; align-items: center; justify-content: center;
+    background: transparent; border: none; box-shadow: none;
+  }
+  .node--diamond svg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+  }
+  .node--diamond .shape-text {
+    font-size: 12px;
+  }
+
+  /* --- Sticky note --- */
+  .node--note {
+    padding: 12px 14px; background: #fffde7; border-color: #e8e5b5;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06), 2px 2px 0 rgba(0,0,0,0.03);
+  }
+  .node--note p { font-size: 12px; line-height: 1.5; color: #555; }
+  .node--note .note__label {
+    font-size: 10px; font-weight: 600; color: #b8860b; margin-bottom: 4px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  /* --- Research node --- */
+  .node--research {
+    overflow: hidden; padding: 0;
+  }
+  .research__header {
+    padding: 12px 14px; display: flex; align-items: center; gap: 10px;
+    background: #f0fdf4; border-bottom: 1px solid #dcfce7;
+  }
+  .research__icon {
+    width: 28px; height: 28px; border-radius: 6px; background: #22c55e;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .research__icon svg { color: #fff; }
+  .research__title { font-size: 13px; font-weight: 600; }
+  .research__meta { font-size: 11px; color: #888; }
+  .research__topics {
+    padding: 10px 14px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .research__topic-pill {
+    font-size: 11px; padding: 5px 10px; background: #f5f5f0;
+    border-radius: 4px; color: #555; display: flex; align-items: center; gap: 6px;
+  }
+  .research__topic-pill .dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  .research__footer {
+    padding: 8px 14px; border-top: 1px solid #eee;
+    font-size: 10px; color: #999;
+  }
+
+  /* --- HTML wireframe card --- */
+  .node--html-card {
+    overflow: hidden; padding: 0;
+  }
+  .html-card__bar {
+    height: 20px; background: #f8f8f6; border-bottom: 1px solid #e0e0dc;
+    display: flex; align-items: center; padding: 0 8px; gap: 4px;
+  }
+  .html-card__dot { width: 5px; height: 5px; border-radius: 50%; }
+  .html-card__dot--r { background: #fca5a5; }
+  .html-card__dot--y { background: #fde68a; }
+  .html-card__dot--g { background: #86efac; }
+  .html-card__body { padding: 8px; background: #fff; }
+  .html-card__preview-header {
+    height: 8px; width: 60%; background: #e8e8e4; border-radius: 2px; margin-bottom: 6px;
+  }
+  .html-card__preview-input {
+    height: 12px; width: 90%; background: #f5f5f0; border: 1px solid #e8e8e4;
+    border-radius: 2px; margin-bottom: 4px;
+  }
+  .html-card__preview-btn {
+    height: 10px; width: 40%; background: #4f46e5; border-radius: 2px; margin-top: 4px;
+  }
+  .html-card__preview-label {
+    font-size: 8px; color: #bbb; text-align: center; margin-top: 4px;
+    letter-spacing: 0.3px;
+  }
+  .html-card__label {
+    font-size: 10px; color: #888; padding: 4px 8px 6px;
+    border-top: 1px solid #f0f0ec;
+  }
+
+  /* --- Connectors --- */
+  .connectors-layer {
+    position: absolute; inset: 0; pointer-events: none; z-index: 5;
+  }
+  .connectors-layer path {
+    fill: none; stroke: #4f46e5; stroke-width: 1.5;
+  }
+
+  /* --- AI Panel --- */
+  .ai-panel {
+    position: fixed; right: 0; top: 48px; width: 320px; bottom: 0;
+    background: #fff; border-left: 1px solid #e0e0dc;
+    display: flex; flex-direction: column; z-index: 10;
+  }
+  .ai-panel__header {
+    padding: 14px 16px; border-bottom: 1px solid #e0e0dc;
+    font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ai-panel__dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+  .ai-panel__body { flex: 1; padding: 16px; overflow-y: auto; }
+  .ai-panel__msg { margin-bottom: 12px; font-size: 13px; line-height: 1.55; }
+  .ai-panel__msg--user {
+    color: #fff; background: #4f46e5; padding: 10px 12px;
+    border-radius: 8px; border-top-right-radius: 2px; text-align: right;
+  }
+  .ai-panel__msg--ai {
+    color: #333; background: #f5f5f0; padding: 10px 12px;
+    border-radius: 8px; border-top-left-radius: 2px;
+  }
+  .ai-panel__msg--tool {
+    font-size: 11px; color: #888; font-family: 'SF Mono', monospace;
+    padding: 6px 8px; background: #fafaf8; border: 1px solid #e8e8e4;
+    border-radius: 4px;
+  }
+  .ai-panel__input-area {
+    padding: 12px 16px; border-top: 1px solid #e0e0dc;
+    display: flex; gap: 8px;
+  }
+  .ai-panel__input {
+    flex: 1; border: 1px solid #d4d4d0; border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; outline: none;
+    font-family: inherit; background: #fafaf8;
+  }
+  .ai-panel__send {
+    width: 36px; height: 36px; border-radius: 8px; border: none;
+    background: #4f46e5; color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* --- Annotations --- */
+  .annotation {
+    position: absolute; z-index: 20; pointer-events: none;
+    font-size: 11px; font-weight: 500; color: #7c3aed;
+    background: rgba(237,233,254,0.92); border: 1px solid #c4b5fd;
+    padding: 4px 10px; border-radius: 4px; white-space: nowrap;
+    backdrop-filter: blur(4px);
+  }
+  .annotation--with-arrow {
+    display: flex; align-items: center; gap: 6px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar__logo">Muse</div>
+  <div class="topbar__sep"></div>
+  <div class="topbar__breadcrumb">
+    <a class="topbar__breadcrumb-link" href="#">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      System Architecture
+    </a>
+    <span class="topbar__breadcrumb-chevron">/</span>
+    <span class="topbar__breadcrumb-current">Auth Service</span>
+  </div>
+  <div class="topbar__spacer"></div>
+  <div class="topbar__avatar">E</div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <button class="toolbar__btn toolbar__btn--active" title="Select">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2l10 5.5L8 9l-1.5 5L3 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Rectangle">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Ellipse">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="8" rx="6" ry="5" stroke="currentColor" stroke-width="1.5"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Diamond">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2L14 8L8 14L2 8Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+  </button>
+  <div class="toolbar__divider"></div>
+  <button class="toolbar__btn" title="Draw">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 13c2-3 4-5 6-8s3-2 4-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Arrow">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 13L13 3m0 0H7m6 0v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Text">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4h8M8 4v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+  </button>
+  <div class="toolbar__divider"></div>
+  <button class="toolbar__btn" title="Hand">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 5v5.5a2.5 2.5 0 005 0V5M3 7v3.5a4.5 4.5 0 009 0V4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</div>
+
+<!-- Main canvas -->
+<div class="canvas-area">
+  <div class="canvas-world">
+
+    <!-- Connector arrows between flow shapes -->
+    <svg class="connectors-layer" width="100%" height="100%">
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#4f46e5"/>
+        </marker>
+        <marker id="arrow-red" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#ef4444"/>
+        </marker>
+        <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#22c55e"/>
+        </marker>
+      </defs>
+
+      <!-- Login form -> Validate credentials -->
+      <path d="M276,195 L346,195" stroke="#4f46e5" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Validate credentials -> Valid? diamond -->
+      <path d="M496,195 L546,195" stroke="#4f46e5" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Valid? -> Issue JWT (yes, going right) -->
+      <path d="M636,195 L706,195" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+      <!-- "Yes" label -->
+      <text x="666" y="188" font-size="10" fill="#22c55e" font-weight="500" font-family="-apple-system, sans-serif">Yes</text>
+
+      <!-- Valid? -> Show error (no, going down) -->
+      <path d="M591,240 L591,290" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+      <!-- "No" label -->
+      <text x="598" y="270" font-size="10" fill="#ef4444" font-weight="500" font-family="-apple-system, sans-serif">No</text>
+    </svg>
+
+    <!-- ==========================================
+         AUTH FLOW DIAGRAM (shapes inside this node)
+         ========================================== -->
+
+    <!-- Shape 1: Login form -->
+    <div class="node node--shape" style="left:130px;top:165px;width:146px;height:60px">
+      <svg viewBox="0 0 146 60" preserveAspectRatio="none">
+        <rect x="1" y="1" width="144" height="58" rx="4" fill="#eef2ff" stroke="#4f46e5" stroke-width="1.5"/>
+      </svg>
+      <div class="shape-text">Login form</div>
+    </div>
+
+    <!-- Shape 2: Validate credentials -->
+    <div class="node node--shape" style="left:346px;top:165px;width:150px;height:60px">
+      <svg viewBox="0 0 150 60" preserveAspectRatio="none">
+        <rect x="1" y="1" width="148" height="58" rx="4" fill="#eef2ff" stroke="#4f46e5" stroke-width="1.5"/>
+      </svg>
+      <div class="shape-text">Validate credentials</div>
+    </div>
+
+    <!-- Shape 3: Valid? (diamond) -->
+    <div class="node node--diamond" style="left:546px;top:150px;width:90px;height:90px">
+      <svg viewBox="0 0 90 90" preserveAspectRatio="none">
+        <path d="M45,2 L88,45 L45,88 L2,45 Z" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.5"/>
+      </svg>
+      <div class="shape-text">Valid?</div>
+    </div>
+
+    <!-- Shape 4: Issue JWT -->
+    <div class="node node--shape node--selected" style="left:706px;top:165px;width:130px;height:60px">
+      <svg viewBox="0 0 130 60" preserveAspectRatio="none">
+        <rect x="1" y="1" width="128" height="58" rx="4" fill="#f0fdf4" stroke="#4f46e5" stroke-width="2"/>
+      </svg>
+      <div class="shape-text">Issue JWT</div>
+    </div>
+
+    <!-- Shape 5: Show error -->
+    <div class="node node--shape" style="left:531px;top:290px;width:120px;height:55px">
+      <svg viewBox="0 0 120 55" preserveAspectRatio="none">
+        <rect x="1" y="1" width="118" height="53" rx="4" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+      </svg>
+      <div class="shape-text">Show error</div>
+    </div>
+
+    <!-- ==========================================
+         STICKY NOTE
+         ========================================== -->
+    <div class="node node--note" style="left:140px;top:310px;width:200px">
+      <div class="note__label">TODO</div>
+      <p>Add rate limiting to login endpoint. Maybe 5 attempts per minute per IP?</p>
+    </div>
+
+    <!-- ==========================================
+         RESEARCH NODE (nested inside this node)
+         ========================================== -->
+    <div class="node node--research" style="left:140px;top:430px;width:240px">
+      <div class="research__header">
+        <div class="research__icon">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 2h8v12H4z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 5h4M6 7.5h4M6 10h2" stroke="white" stroke-width="1"/></svg>
+        </div>
+        <div>
+          <div class="research__title">OAuth 2.0 Spec Notes</div>
+          <div class="research__meta">3 topics extracted</div>
+        </div>
+      </div>
+      <div class="research__topics">
+        <div class="research__topic-pill"><span class="dot" style="background:#3b82f6"></span> Authorization Code Flow</div>
+        <div class="research__topic-pill"><span class="dot" style="background:#f59e0b"></span> Token Refresh Strategy</div>
+        <div class="research__topic-pill"><span class="dot" style="background:#ef4444"></span> Security Considerations</div>
+      </div>
+      <div class="research__footer">Double-click to open &middot; 3 topics</div>
+    </div>
+
+    <!-- ==========================================
+         HTML WIREFRAME THUMBNAIL
+         ========================================== -->
+    <div class="node node--html-card" style="left:440px;top:400px;width:150px">
+      <div class="html-card__bar">
+        <div class="html-card__dot html-card__dot--r"></div>
+        <div class="html-card__dot html-card__dot--y"></div>
+        <div class="html-card__dot html-card__dot--g"></div>
+      </div>
+      <div class="html-card__body">
+        <!-- Miniaturized login form wireframe -->
+        <div class="html-card__preview-header"></div>
+        <div class="html-card__preview-input"></div>
+        <div class="html-card__preview-input"></div>
+        <div class="html-card__preview-btn"></div>
+        <div class="html-card__preview-label">Login page wireframe</div>
+      </div>
+      <div class="html-card__label">login-page.html</div>
+    </div>
+
+    <!-- ==========================================
+         ANNOTATIONS (purple)
+         ========================================== -->
+
+    <!-- Annotation: breadcrumb explanation -->
+    <div class="annotation annotation--with-arrow" style="left:100px;top:16px">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M12 8H4M4 8l3-3M4 8l3 3" stroke="#7c3aed" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back navigates up
+    </div>
+
+    <!-- Annotation: inside a node -->
+    <div class="annotation" style="left:340px;top:16px">
+      You're inside a node &mdash; it has its own canvas
+    </div>
+
+    <!-- Annotation: recursive -->
+    <div class="annotation" style="left:46px;top:540px">
+      Nodes within nodes &mdash; recursive
+    </div>
+    <!-- Arrow from recursive annotation to research node -->
+    <svg style="position:absolute;left:85px;top:520px;z-index:20;pointer-events:none" width="80" height="30">
+      <defs><marker id="anno-arrow" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto"><path d="M0,0 L6,2.5 L0,5" fill="#7c3aed"/></marker></defs>
+      <path d="M45,28 C50,10 80,5 100,5" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="4 3" fill="none" marker-end="url(#anno-arrow)"/>
+    </svg>
+
+  </div>
+
+  <!-- Context label in bottom-left -->
+  <div class="canvas-context">
+    <div class="canvas-context__dot"></div>
+    <div class="canvas-context__label">Inside <strong>Auth Service</strong> node</div>
+  </div>
+</div>
+
+<!-- AI Panel -->
+<div class="ai-panel">
+  <div class="ai-panel__header">
+    <div class="ai-panel__dot"></div>
+    AI Agent
+  </div>
+  <div class="ai-panel__body">
+    <div class="ai-panel__msg ai-panel__msg--user">
+      Diagram the auth flow for me
+    </div>
+    <div class="ai-panel__msg ai-panel__msg--tool">
+      add_shape({type: "rectangle", text: "Login form",<br>
+      &nbsp;&nbsp;x: 130, y: 165, width: 146, height: 60})
+    </div>
+    <div class="ai-panel__msg ai-panel__msg--tool">
+      add_shape({type: "rectangle",<br>
+      &nbsp;&nbsp;text: "Validate credentials", ...})<br>
+      add_shape({type: "diamond", text: "Valid?", ...})<br>
+      add_shape({type: "rectangle", text: "Issue JWT", ...})<br>
+      add_shape({type: "rectangle", text: "Show error", ...})
+    </div>
+    <div class="ai-panel__msg ai-panel__msg--tool">
+      add_line({from: "Login form",<br>
+      &nbsp;&nbsp;to: "Validate credentials"})<br>
+      add_line({from: "Validate credentials",<br>
+      &nbsp;&nbsp;to: "Valid?"})<br>
+      add_line({from: "Valid?", to: "Issue JWT"})<br>
+      add_line({from: "Valid?", to: "Show error"})
+    </div>
+    <div class="ai-panel__msg ai-panel__msg--ai">
+      I've laid out the auth flow. The login form validates credentials, then either issues a JWT on success or shows an error on failure. The diamond is the decision point.<br><br>
+      Want me to add more detail &mdash; like a "Redirect to dashboard" step after JWT issuance?
+    </div>
+  </div>
+  <div class="ai-panel__input-area">
+    <input class="ai-panel__input" placeholder="Ask about auth flow or add to canvas..." />
+    <button class="ai-panel__send">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</div>
+
+</body>
+</html>

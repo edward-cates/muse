@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Muse Wireframe - AI Creating Nodes</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #f5f5f0;
+    font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
+    color: #1a1a1a;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* --- Animations --- */
+  @keyframes newGlow {
+    0% { box-shadow: 0 0 0 0 rgba(79,70,229,0.25), 0 1px 4px rgba(0,0,0,0.06); }
+    50% { box-shadow: 0 0 0 6px rgba(79,70,229,0.08), 0 3px 12px rgba(0,0,0,0.08); }
+    100% { box-shadow: 0 0 0 0 rgba(79,70,229,0.25), 0 1px 4px rgba(0,0,0,0.06); }
+  }
+  @keyframes newGlowGreen {
+    0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.25), 0 1px 4px rgba(0,0,0,0.06); }
+    50% { box-shadow: 0 0 0 6px rgba(34,197,94,0.08), 0 3px 12px rgba(0,0,0,0.08); }
+    100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.25), 0 1px 4px rgba(0,0,0,0.06); }
+  }
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulseWorking {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* --- Top bar --- */
+  .topbar {
+    height: 48px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0dc;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    position: relative;
+    z-index: 10;
+  }
+  .topbar__logo { font-weight: 700; font-size: 15px; letter-spacing: -0.3px; }
+  .topbar__sep { width: 1px; height: 20px; background: #e0e0dc; }
+  .topbar__title { font-size: 13px; color: #666; }
+  .topbar__spacer { flex: 1; }
+  .topbar__avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: #c4b5fd;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: #4c1d95;
+  }
+
+  /* --- Toolbar (left) --- */
+  .toolbar {
+    position: fixed; left: 12px; top: 50%; transform: translateY(-50%);
+    background: #fff; border: 1px solid #e0e0dc; border-radius: 10px;
+    padding: 6px; display: flex; flex-direction: column; gap: 2px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); z-index: 10;
+  }
+  .toolbar__btn {
+    width: 36px; height: 36px; border: none; background: transparent;
+    border-radius: 7px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #555; font-size: 16px;
+  }
+  .toolbar__btn:hover { background: #f0f0ec; }
+  .toolbar__btn--active { background: #eef2ff; color: #4f46e5; }
+  .toolbar__divider { height: 1px; background: #e0e0dc; margin: 4px 2px; }
+
+  /* --- Canvas area --- */
+  .canvas-area {
+    position: fixed; inset: 48px 320px 0 0; overflow: hidden;
+    background: radial-gradient(circle, #ddd 1px, transparent 1px);
+    background-size: 24px 24px; background-position: 12px 12px;
+  }
+  .canvas-world { position: absolute; inset: 0; }
+
+  /* --- Shared node base --- */
+  .node {
+    position: absolute; border-radius: 8px; background: #fff;
+    border: 1.5px solid #d4d4d0; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    cursor: grab;
+  }
+  .node:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.1); }
+  .node--new {
+    animation: newGlow 2s ease-in-out infinite;
+  }
+  .node--new-green {
+    animation: newGlowGreen 2s ease-in-out infinite;
+  }
+
+  /* --- Flow diagram shapes --- */
+  .node--flow {
+    display: flex; align-items: center; justify-content: center;
+    background: #eef2ff; border-color: #818cf8;
+    width: 120px; height: 56px;
+  }
+  .node--flow .flow__text {
+    font-size: 13px; font-weight: 600; color: #4338ca;
+    text-align: center;
+  }
+
+  /* --- AI-generated image card --- */
+  .node--image {
+    overflow: hidden; padding: 0; width: 200px;
+  }
+  .image-card__preview {
+    height: 120px;
+    background: linear-gradient(135deg, #818cf8 0%, #c084fc 40%, #f472b6 70%, #fb923c 100%);
+    background-size: 300% 300%;
+    animation: shimmer 3s ease-in-out infinite;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .image-card__preview-text {
+    font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 500;
+    text-align: center; padding: 0 16px;
+  }
+  .image-card__footer {
+    padding: 10px 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .image-card__title {
+    font-size: 12px; font-weight: 500; color: #333; flex: 1;
+  }
+  .image-card__badge {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 10px; color: #818cf8; font-weight: 500;
+    background: #eef2ff; padding: 3px 8px; border-radius: 4px;
+    white-space: nowrap;
+  }
+  .image-card__spinner {
+    width: 10px; height: 10px; border: 1.5px solid #c7d2fe;
+    border-top-color: #4f46e5; border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .image-card__progress {
+    margin: 0 12px 10px;
+    height: 3px; background: #e8e8e4; border-radius: 2px;
+    overflow: hidden;
+  }
+  .image-card__progress-bar {
+    height: 100%; width: 62%;
+    background: linear-gradient(90deg, #818cf8, #c084fc);
+    border-radius: 2px;
+    animation: shimmer 2s ease-in-out infinite;
+    background-size: 200% 100%;
+  }
+
+  /* --- HTML wireframe thumbnail --- */
+  .node--html-card {
+    overflow: hidden; padding: 0; width: 180px;
+    position: relative;
+  }
+  .html-card__bar {
+    height: 20px; background: #f8f8f6; border-bottom: 1px solid #e0e0dc;
+    display: flex; align-items: center; padding: 0 8px; gap: 4px;
+  }
+  .html-card__dot { width: 5px; height: 5px; border-radius: 50%; }
+  .html-card__dot--r { background: #fca5a5; }
+  .html-card__dot--y { background: #fde68a; }
+  .html-card__dot--g { background: #86efac; }
+  .html-card__body {
+    padding: 8px 10px; background: #fff;
+    min-height: 100px;
+  }
+  .html-card__hero {
+    height: 28px; background: linear-gradient(90deg, #eef2ff, #e0e7ff);
+    border-radius: 3px; margin-bottom: 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .html-card__hero-text {
+    font-size: 6px; font-weight: 700; color: #4338ca; letter-spacing: 0.3px;
+  }
+  .html-card__line {
+    height: 3px; background: #e8e8e4; border-radius: 2px; margin-bottom: 3px;
+  }
+  .html-card__line--short { width: 60%; }
+  .html-card__line--med { width: 80%; }
+  .html-card__cols {
+    display: flex; gap: 4px; margin-top: 6px;
+  }
+  .html-card__col {
+    flex: 1; height: 20px; background: #f5f5f0; border-radius: 2px;
+  }
+  .html-card__btn-mini {
+    width: 32px; height: 8px; background: #818cf8; border-radius: 2px;
+    margin: 6px auto 0;
+  }
+  .html-card__badge {
+    position: absolute; top: -6px; right: -6px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #22c55e; border: 2px solid #fff;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  }
+  .html-card__badge svg { color: #fff; }
+
+  /* --- Research node --- */
+  .node--research {
+    overflow: hidden; padding: 0; width: 240px;
+  }
+  .research__header {
+    padding: 10px 12px; display: flex; align-items: center; gap: 8px;
+    background: #f0fdf4; border-bottom: 1px solid #dcfce7;
+  }
+  .research__icon {
+    width: 26px; height: 26px; border-radius: 6px; background: #22c55e;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .research__title { font-size: 12px; font-weight: 600; }
+  .research__meta { font-size: 10px; color: #888; }
+  .research__topics {
+    padding: 8px 12px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .research__topic-pill {
+    font-size: 10px; padding: 4px 8px; background: #f5f5f0;
+    border-radius: 4px; color: #555; display: flex; align-items: center; gap: 6px;
+  }
+  .research__topic-pill .dot {
+    width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  /* --- AI text note --- */
+  .node--ai-note {
+    padding: 12px 14px; background: #fafafe; border-color: #d4d4e8;
+    position: relative;
+  }
+  .node--ai-note p {
+    font-size: 12px; line-height: 1.55; color: #444;
+  }
+  .ai-note__indicator {
+    position: absolute; top: 8px; right: 8px;
+    font-size: 9px; color: #a5a5c0; font-weight: 500;
+    display: flex; align-items: center; gap: 3px;
+  }
+  .ai-note__indicator svg { opacity: 0.6; }
+
+  /* --- Connector SVG layer --- */
+  .connectors-layer {
+    position: absolute; inset: 0; pointer-events: none; z-index: 5;
+  }
+  .connectors-layer path {
+    fill: none; stroke: #4f46e5; stroke-width: 1.5;
+  }
+  .connectors-layer path.dashed {
+    stroke-dasharray: 6 4; stroke: #b0b0b0; stroke-width: 1;
+  }
+
+  /* --- AI Panel (right) --- */
+  .ai-panel {
+    position: fixed; right: 0; top: 48px; width: 320px; bottom: 0;
+    background: #fff; border-left: 1px solid #e0e0dc;
+    display: flex; flex-direction: column; z-index: 10;
+  }
+  .ai-panel__header {
+    padding: 14px 16px; border-bottom: 1px solid #e0e0dc;
+    font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ai-panel__dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+    animation: pulseWorking 1.5s ease-in-out infinite;
+  }
+  .ai-panel__working {
+    margin-left: auto;
+    font-size: 10px; font-weight: 500; color: #818cf8;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .ai-panel__working-spinner {
+    width: 10px; height: 10px; border: 1.5px solid #c7d2fe;
+    border-top-color: #4f46e5; border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .ai-panel__body {
+    flex: 1; padding: 14px 16px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .ai-panel__msg {
+    font-size: 12px; line-height: 1.55;
+    animation: fadeInUp 0.3s ease-out;
+  }
+  .ai-panel__msg--user {
+    color: #fff; background: #4f46e5; padding: 10px 12px;
+    border-radius: 10px 10px 2px 10px;
+    align-self: flex-end;
+    max-width: 90%;
+  }
+  .ai-panel__msg--ai {
+    color: #333; background: #f5f5f0; padding: 10px 12px;
+    border-radius: 10px 10px 10px 2px;
+    align-self: flex-start;
+    max-width: 95%;
+  }
+  .ai-panel__msg--ai strong { color: #1a1a1a; }
+  .ai-panel__msg--ai ul {
+    margin: 6px 0 2px 16px; padding: 0;
+  }
+  .ai-panel__msg--ai li {
+    margin-bottom: 3px;
+  }
+  .ai-panel__tool-group {
+    display: flex; flex-direction: column; gap: 3px;
+    align-self: flex-start;
+    max-width: 95%;
+  }
+  .ai-panel__msg--tool {
+    font-size: 10px; color: #777; font-family: 'SF Mono', 'Fira Code', monospace;
+    padding: 5px 8px; background: #fafaf8; border: 1px solid #e8e8e4;
+    border-radius: 4px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .ai-panel__msg--tool .tool-icon {
+    width: 14px; height: 14px; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .tool-icon--search { background: #dcfce7; color: #16a34a; }
+  .tool-icon--shape { background: #e0e7ff; color: #4338ca; }
+  .tool-icon--line { background: #e0e7ff; color: #4338ca; }
+  .tool-icon--html { background: #fef3c7; color: #d97706; }
+  .tool-icon--image { background: #fce7f3; color: #db2777; }
+  .tool-icon--note { background: #f3e8ff; color: #7c3aed; }
+  .tool-check {
+    color: #22c55e; font-size: 10px; margin-left: auto; flex-shrink: 0;
+  }
+  .ai-panel__input-area {
+    padding: 12px 16px; border-top: 1px solid #e0e0dc;
+    display: flex; gap: 8px;
+  }
+  .ai-panel__input {
+    flex: 1; border: 1px solid #d4d4d0; border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; outline: none;
+    font-family: inherit; background: #fafaf8;
+  }
+  .ai-panel__send {
+    width: 36px; height: 36px; border-radius: 8px; border: none;
+    background: #4f46e5; color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* --- Annotations --- */
+  .annotation {
+    position: absolute; z-index: 20; pointer-events: none;
+    font-size: 11px; font-weight: 500; color: #7c3aed;
+    background: rgba(237,233,254,0.92); border: 1px solid #c4b5fd;
+    padding: 4px 10px; border-radius: 4px; white-space: nowrap;
+    backdrop-filter: blur(4px);
+  }
+  .annotation--bottom {
+    position: fixed; bottom: 20px; left: 50%;
+    transform: translateX(-70%);
+    font-size: 12px; padding: 6px 14px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar__logo">Muse</div>
+  <div class="topbar__sep"></div>
+  <div class="topbar__title">Product launch planning</div>
+  <div class="topbar__spacer"></div>
+  <div class="topbar__avatar">E</div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <button class="toolbar__btn toolbar__btn--active" title="Select">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2l10 5.5L8 9l-1.5 5L3 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Rectangle">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Ellipse">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="8" rx="6" ry="5" stroke="currentColor" stroke-width="1.5"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Diamond">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2l6 6-6 6-6-6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Arrow">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 13L13 3m0 0H7m6 0v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <div class="toolbar__divider"></div>
+  <button class="toolbar__btn" title="Draw">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 13c2-3 4-5 6-8s3-2 4-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Text">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4h8M8 4v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+  </button>
+</div>
+
+<!-- Main canvas -->
+<div class="canvas-area">
+  <div class="canvas-world">
+
+    <!-- ====================================
+         SVG Connectors
+         ==================================== -->
+    <svg class="connectors-layer" width="100%" height="100%">
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#4f46e5"/>
+        </marker>
+        <marker id="arrow-gray" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#b0b0b0"/>
+        </marker>
+      </defs>
+
+      <!-- Flow arrows: Research -> Design -> Build -> Launch -->
+      <path d="M210,78 L240,78" marker-end="url(#arrow)"/>
+      <path d="M360,78 L390,78" marker-end="url(#arrow)"/>
+      <path d="M510,78 L540,78" marker-end="url(#arrow)"/>
+
+      <!-- Dashed relationship lines from AI -->
+      <!-- Research node -> "Research" shape -->
+      <path d="M280,310 C300,280 160,140 150,106" class="dashed" marker-end="url(#arrow-gray)"/>
+      <!-- HTML wireframe -> "Design" shape -->
+      <path d="M380,310 C380,260 330,140 300,106" class="dashed" marker-end="url(#arrow-gray)"/>
+      <!-- Image card -> "Launch" shape -->
+      <path d="M560,310 C570,260 590,140 600,106" class="dashed" marker-end="url(#arrow-gray)"/>
+    </svg>
+
+    <!-- ====================================
+         1. FLOW DIAGRAM — 4 shapes in a row
+         ==================================== -->
+    <div class="node node--flow node--new" style="left:90px; top:50px;">
+      <div class="flow__text">Research</div>
+    </div>
+    <div class="node node--flow node--new" style="left:240px; top:50px;">
+      <div class="flow__text">Design</div>
+    </div>
+    <div class="node node--flow node--new" style="left:390px; top:50px;">
+      <div class="flow__text">Build</div>
+    </div>
+    <div class="node node--flow node--new" style="left:540px; top:50px;">
+      <div class="flow__text">Launch</div>
+    </div>
+
+    <!-- ====================================
+         2. AI-GENERATED IMAGE (still generating)
+         ==================================== -->
+    <div class="node node--image node--new" style="left:490px; top:310px;">
+      <div class="image-card__preview">
+        <div class="image-card__preview-text">Product launch<br>hero image</div>
+      </div>
+      <div class="image-card__progress">
+        <div class="image-card__progress-bar"></div>
+      </div>
+      <div class="image-card__footer">
+        <div class="image-card__title">Hero image</div>
+        <div class="image-card__badge">
+          <div class="image-card__spinner"></div>
+          AI generating...
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================
+         3. HTML WIREFRAME THUMBNAIL (done)
+         ==================================== -->
+    <div class="node node--html-card node--new-green" style="left:310px; top:310px;">
+      <div class="html-card__badge">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.5 3.5L13 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="html-card__bar">
+        <div class="html-card__dot html-card__dot--r"></div>
+        <div class="html-card__dot html-card__dot--y"></div>
+        <div class="html-card__dot html-card__dot--g"></div>
+        <span style="font-size:8px;color:#999;margin-left:4px">Landing page</span>
+      </div>
+      <div class="html-card__body">
+        <div class="html-card__hero">
+          <div class="html-card__hero-text">LAUNCH YOUR PRODUCT</div>
+        </div>
+        <div class="html-card__line"></div>
+        <div class="html-card__line html-card__line--med"></div>
+        <div class="html-card__line html-card__line--short"></div>
+        <div class="html-card__cols">
+          <div class="html-card__col"></div>
+          <div class="html-card__col"></div>
+          <div class="html-card__col"></div>
+        </div>
+        <div class="html-card__btn-mini"></div>
+      </div>
+    </div>
+
+    <!-- ====================================
+         4. RESEARCH NODE
+         ==================================== -->
+    <div class="node node--research node--new-green" style="left:90px; top:180px; width:240px;">
+      <div class="research__header">
+        <div class="research__icon">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="white" stroke-width="1.5"/><path d="M11 11l3 3" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div>
+          <div class="research__title">Competitor Analysis</div>
+          <div class="research__meta">4 competitors researched</div>
+        </div>
+      </div>
+      <div class="research__topics">
+        <div class="research__topic-pill"><span class="dot" style="background:#3b82f6"></span> Market positioning</div>
+        <div class="research__topic-pill"><span class="dot" style="background:#f59e0b"></span> Pricing models</div>
+        <div class="research__topic-pill"><span class="dot" style="background:#ef4444"></span> Feature gaps</div>
+        <div class="research__topic-pill"><span class="dot" style="background:#a855f7"></span> User reviews</div>
+      </div>
+    </div>
+
+    <!-- ====================================
+         5. AI TEXT NOTE
+         ==================================== -->
+    <div class="node node--ai-note node--new" style="left:90px; top:420px; width:260px;">
+      <div class="ai-note__indicator">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M8 1a7 7 0 100 14A7 7 0 008 1z" stroke="currentColor" stroke-width="1.2"/><path d="M6 6.5c0-1.1.9-2 2-2s2 .9 2 2c0 .8-.5 1.3-1.2 1.6-.3.1-.8.3-.8.7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="8" cy="11" r="0.7" fill="currentColor"/></svg>
+        AI
+      </div>
+      <p><strong>Key insight:</strong> competitors are all missing mobile-first onboarding. This is our opening.</p>
+    </div>
+
+    <!-- ====================================
+         ANNOTATIONS
+         ==================================== -->
+    <div class="annotation" style="left:420px; top:24px;">AI places nodes on canvas using tools</div>
+    <div class="annotation annotation--bottom">Research, diagrams, wireframes, images &mdash; all from conversation</div>
+
+  </div>
+</div>
+
+<!-- AI Panel -->
+<div class="ai-panel">
+  <div class="ai-panel__header">
+    <div class="ai-panel__dot"></div>
+    AI Agent
+    <div class="ai-panel__working">
+      <div class="ai-panel__working-spinner"></div>
+      Working...
+    </div>
+  </div>
+  <div class="ai-panel__body">
+
+    <!-- User message -->
+    <div class="ai-panel__msg ai-panel__msg--user">
+      Help me plan the product launch. Research our competitors, create a timeline, generate a landing page wireframe, and make a hero image.
+    </div>
+
+    <!-- Tool calls -->
+    <div class="ai-panel__tool-group">
+      <div class="ai-panel__msg ai-panel__msg--tool">
+        <div class="tool-icon tool-icon--search">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4" stroke="currentColor" stroke-width="2"/><path d="M10 10l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        web_search("competitor analysis SaaS onboarding")
+        <span class="tool-check">&#10003;</span>
+      </div>
+      <div class="ai-panel__msg ai-panel__msg--tool">
+        <div class="tool-icon tool-icon--shape">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        add_research_node({title: "Competitor Analysis"})
+        <span class="tool-check">&#10003;</span>
+      </div>
+      <div class="ai-panel__msg ai-panel__msg--tool">
+        <div class="tool-icon tool-icon--shape">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        add_shape({text: "Research", x: 90, y: 50})
+        <span class="tool-check">&#10003;</span>
+      </div>
+      <div class="ai-panel__msg ai-panel__msg--tool">
+        <div class="tool-icon tool-icon--shape">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        add_shape({text: "Design", x: 240, y: 50})
+        <span class="tool-check">&#10003;</span>
+      </div>
+      <div class="ai-panel__msg ai-panel__msg--tool">
+        <div class="tool-icon tool-icon--shape">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        add_shape x2 ("Build", "Launch")
+        <span class="tool-check">&#10003;</span>
+      </div>
+      <div class="ai-panel__msg ai-panel__msg--tool">
+        <div class="tool-icon tool-icon--line">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none"><path d="M3 13L13 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        add_line x3 (Research&rarr;Design&rarr;Build&rarr;Launch)
+        <span class="tool-check">&#10003;</span>
+      </div>
+      <div class="ai-panel__msg ai-panel__msg--tool">
+        <div class="tool-icon tool-icon--note">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none"><path d="M4 2h8v12H4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        </div>
+        add_note({text: "Key insight: competitors..."})
+        <span class="tool-check">&#10003;</span>
+      </div>
+      <div class="ai-panel__msg ai-panel__msg--tool">
+        <div class="tool-icon tool-icon--html">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none"><path d="M5 3L2 8l3 5M11 3l3 5-3 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        create_document({type: "html_artifact", ...})
+        <span class="tool-check">&#10003;</span>
+      </div>
+      <div class="ai-panel__msg ai-panel__msg--tool">
+        <div class="tool-icon tool-icon--image">
+          <svg width="8" height="8" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" stroke-width="2"/><circle cx="6" cy="7" r="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+        </div>
+        generate_image({prompt: "hero image..."})
+        <div class="image-card__spinner" style="margin-left:auto"></div>
+      </div>
+    </div>
+
+    <!-- AI summary message -->
+    <div class="ai-panel__msg ai-panel__msg--ai">
+      I'm working on your launch plan. So far I've:
+      <ul>
+        <li>Researched 4 competitors and created a research node with findings</li>
+        <li>Laid out a 4-phase timeline: Research &rarr; Design &rarr; Build &rarr; Launch</li>
+        <li>Generated a landing page wireframe</li>
+        <li>Started generating a hero image (still processing)</li>
+      </ul>
+      <br>
+      The competitor research revealed an opening &mdash; <strong>none of them have mobile-first onboarding</strong>. Want me to dig deeper into that?
+    </div>
+
+  </div>
+
+  <!-- Annotation for AI panel -->
+  <div style="position:absolute; top:8px; right:328px; z-index:30;">
+    <div class="annotation">One prompt, multiple outputs</div>
+  </div>
+
+  <div class="ai-panel__input-area">
+    <input class="ai-panel__input" placeholder="Yes, dig into the mobile onboarding gap..." />
+    <button class="ai-panel__send">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</div>
+
+</body>
+</html>

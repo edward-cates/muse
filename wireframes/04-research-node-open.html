@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Muse Wireframe 04 - Research Node Open</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #f5f5f0;
+    font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
+    color: #1a1a1a;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* --- Top bar --- */
+  .topbar {
+    height: 48px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0dc;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    position: relative;
+    z-index: 10;
+  }
+  .topbar__logo { font-weight: 700; font-size: 15px; letter-spacing: -0.3px; }
+  .topbar__sep { width: 1px; height: 20px; background: #e0e0dc; }
+  .topbar__title { font-size: 13px; color: #666; }
+  .topbar__breadcrumb { font-size: 13px; color: #4f46e5; cursor: pointer; }
+  .topbar__breadcrumb:hover { text-decoration: underline; }
+  .topbar__chevron { font-size: 11px; color: #bbb; }
+  .topbar__spacer { flex: 1; }
+  .topbar__avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: #c4b5fd;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: #4c1d95;
+  }
+
+  /* --- Toolbar (left) --- */
+  .toolbar {
+    position: fixed; left: 12px; top: 50%; transform: translateY(-50%);
+    background: #fff; border: 1px solid #e0e0dc; border-radius: 10px;
+    padding: 6px; display: flex; flex-direction: column; gap: 2px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); z-index: 10;
+  }
+  .toolbar__btn {
+    width: 36px; height: 36px; border: none; background: transparent;
+    border-radius: 7px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #555; font-size: 16px;
+  }
+  .toolbar__btn:hover { background: #f0f0ec; }
+  .toolbar__btn--active { background: #eef2ff; color: #4f46e5; }
+  .toolbar__divider { height: 1px; background: #e0e0dc; margin: 4px 2px; }
+
+  /* --- Canvas area --- */
+  .canvas-area {
+    position: fixed; inset: 48px 0 0 0; overflow: hidden;
+    background: radial-gradient(circle, #ddd 1px, transparent 1px);
+    background-size: 24px 24px; background-position: 12px 12px;
+  }
+  .canvas-world { position: absolute; inset: 0; }
+
+  /* --- Decomposition cards --- */
+  .dcard {
+    position: absolute; background: #fff;
+    border: 1.5px solid #d4d4d0; border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden;
+    cursor: grab;
+  }
+  .dcard:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.1); }
+  .dcard--expanded {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 2px rgba(79,70,229,0.15), 0 3px 12px rgba(0,0,0,0.08);
+  }
+  .dcard__header {
+    padding: 10px 12px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #f0f0ec;
+  }
+  .dcard__dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .dcard__title {
+    font-size: 12px; font-weight: 600; color: #1a1a1a;
+  }
+  .dcard__summary {
+    padding: 10px 12px; font-size: 11px; line-height: 1.55; color: #555;
+  }
+  .dcard__refs {
+    padding: 6px 12px 10px; display: flex; gap: 4px; flex-wrap: wrap;
+  }
+  .dcard__ref {
+    font-size: 9px; padding: 2px 7px; border-radius: 3px;
+    background: #f5f5f0; color: #888; font-family: 'SF Mono', 'Fira Code', monospace;
+    cursor: pointer; transition: background 0.15s, color 0.15s;
+  }
+  .dcard__ref:hover { background: #e0e7ff; color: #4338ca; }
+  .dcard__ref--active { background: #e0e7ff; color: #4338ca; }
+
+  /* --- Expanded source block inside card --- */
+  .dcard__source {
+    padding: 0 12px 12px;
+  }
+  .dcard__source-label {
+    font-size: 9px; color: #999; margin-bottom: 4px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .dcard__source-block {
+    background: #fafaf8; border: 1px solid #e8e8e4; border-radius: 4px;
+    padding: 8px 10px; font-size: 10px; line-height: 1.65; color: #333;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    max-height: 120px; overflow-y: auto;
+  }
+  .dcard__source-block .highlight {
+    background: #fef08a; padding: 0 2px; border-radius: 1px;
+  }
+
+  /* --- User-drawn shapes on canvas --- */
+  .user-shape {
+    position: absolute; border: 1.5px solid #4f46e5; border-radius: 6px;
+    background: rgba(238,242,255,0.7); display: flex; align-items: center;
+    justify-content: center; font-size: 12px; color: #4f46e5; font-weight: 600;
+    cursor: grab;
+  }
+
+  /* --- Sticky note --- */
+  .sticky-note {
+    position: absolute; background: #fffde7; border: 1.5px solid #e8e5b5;
+    border-radius: 6px; padding: 10px 12px;
+    font-size: 11px; line-height: 1.5; color: #555;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); cursor: grab;
+    max-width: 180px;
+  }
+
+  /* --- Connectors layer --- */
+  .connectors-layer {
+    position: absolute; inset: 0; pointer-events: none; z-index: 5;
+  }
+  .connectors-layer path {
+    fill: none; stroke: #4f46e5; stroke-width: 1.5;
+  }
+
+  /* --- Source panel (right) --- */
+  .source-panel {
+    position: fixed; right: 0; top: 48px; width: 320px; bottom: 0;
+    background: #fff; border-left: 1px solid #e0e0dc;
+    display: flex; flex-direction: column; z-index: 10;
+  }
+  .source-panel__header {
+    padding: 14px 16px; border-bottom: 1px solid #e0e0dc;
+  }
+  .source-panel__label {
+    font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .source-panel__title {
+    font-size: 13px; font-weight: 600; color: #1a1a1a;
+  }
+  .source-panel__meta {
+    font-size: 11px; color: #999; margin-top: 2px;
+  }
+  .source-panel__body {
+    flex: 1; overflow-y: auto; padding: 0;
+  }
+  .source-panel__line {
+    display: flex; padding: 0 16px; line-height: 1.7;
+    font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px;
+  }
+  .source-panel__line-num {
+    width: 32px; flex-shrink: 0; color: #ccc; text-align: right;
+    padding-right: 12px; user-select: none;
+  }
+  .source-panel__line-text {
+    color: #666; flex: 1;
+  }
+  .source-panel__line--dim .source-panel__line-text {
+    color: #bbb;
+  }
+  .source-panel__line--highlight {
+    background: #fefce8;
+  }
+  .source-panel__line--highlight .source-panel__line-text {
+    color: #333;
+  }
+  .source-panel__line--highlight .source-panel__line-num {
+    color: #ca8a04;
+  }
+  .source-panel__section-gap {
+    padding: 4px 16px;
+    font-size: 10px; color: #ccc; text-align: center;
+    border-top: 1px dashed #e8e8e4;
+    border-bottom: 1px dashed #e8e8e4;
+    margin: 2px 0;
+  }
+
+  /* --- Annotations --- */
+  .annotation {
+    position: absolute; z-index: 20; pointer-events: none;
+    font-size: 11px; font-weight: 500; color: #7c3aed;
+    background: rgba(237,233,254,0.92); border: 1px solid #c4b5fd;
+    padding: 4px 10px; border-radius: 4px; white-space: nowrap;
+    backdrop-filter: blur(4px);
+  }
+  .annotation__line {
+    position: absolute; z-index: 19; pointer-events: none;
+  }
+  .annotation__line path {
+    fill: none; stroke: #c4b5fd; stroke-width: 1; stroke-dasharray: 4 3;
+  }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar__logo">Muse</div>
+  <div class="topbar__sep"></div>
+  <span class="topbar__breadcrumb">Client project board</span>
+  <span class="topbar__chevron">&#9656;</span>
+  <div class="topbar__title">Q1 Strategy Doc</div>
+  <div class="topbar__spacer"></div>
+  <div class="topbar__avatar">E</div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <button class="toolbar__btn toolbar__btn--active" title="Select">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2l10 5.5L8 9l-1.5 5L3 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Rectangle">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Ellipse">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="8" rx="6" ry="5" stroke="currentColor" stroke-width="1.5"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Arrow">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 13L13 3m0 0H7m6 0v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <div class="toolbar__divider"></div>
+  <button class="toolbar__btn" title="Draw">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 13c2-3 4-5 6-8s3-2 4-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+  </button>
+  <button class="toolbar__btn" title="Text">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4h8M8 4v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+  </button>
+</div>
+
+<!-- Main canvas area -->
+<div class="canvas-area">
+  <div class="canvas-world">
+
+    <!-- === Connector lines === -->
+    <svg class="connectors-layer" width="100%" height="100%">
+      <defs>
+        <marker id="arrow-indigo" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6" fill="#4f46e5"/>
+        </marker>
+        <marker id="arrow-indigo-start" markerWidth="8" markerHeight="6" refX="1" refY="3" orient="auto">
+          <path d="M8,0 L0,3 L8,6" fill="#4f46e5"/>
+        </marker>
+      </defs>
+
+      <!-- PRIORITY shape -> AI Opportunities card -->
+      <path d="M268,108 C310,108 310,140 290,168" marker-end="url(#arrow-indigo)"/>
+
+      <!-- Ask CTO shape -> Data Infrastructure card -->
+      <path d="M538,490 C540,520 420,520 360,524" marker-end="url(#arrow-indigo)"/>
+
+      <!-- Risk Factors -> Team & Hiring (user-drawn relationship arrow) -->
+      <path d="M460,370 C500,380 510,440 480,460" marker-end="url(#arrow-indigo)"/>
+    </svg>
+
+    <!-- ===================================================
+         DECOMPOSITION CARDS (auto-generated by ingest pipeline)
+         =================================================== -->
+
+    <!-- Card 1: Business Objectives (amber) -->
+    <div class="dcard" style="left:90px;top:60px;width:250px">
+      <div class="dcard__header">
+        <div class="dcard__dot" style="background:#f59e0b"></div>
+        <div class="dcard__title">Business Objectives</div>
+      </div>
+      <div class="dcard__summary">
+        Expand into 3 new verticals (healthcare, fintech, logistics) by Q3.
+        Target $2M ARR by end of year. Reduce customer churn below 5%.
+      </div>
+      <div class="dcard__refs">
+        <span class="dcard__ref">lines 12-34</span>
+        <span class="dcard__ref">lines 45-52</span>
+      </div>
+    </div>
+
+    <!-- Card 2: AI Opportunities (blue) -- EXPANDED -->
+    <div class="dcard dcard--expanded" style="left:90px;top:190px;width:260px">
+      <div class="dcard__header">
+        <div class="dcard__dot" style="background:#3b82f6"></div>
+        <div class="dcard__title">AI Opportunities</div>
+      </div>
+      <div class="dcard__summary">
+        Three areas identified: automated lead scoring, support ticket triage,
+        and predictive inventory. Lead scoring has strongest data readiness and
+        clearest ROI path.
+      </div>
+      <div class="dcard__refs">
+        <span class="dcard__ref dcard__ref--active">lines 55-89</span>
+        <span class="dcard__ref">lines 102-118</span>
+      </div>
+      <div class="dcard__source">
+        <div class="dcard__source-label">lines 55-89 from source:</div>
+        <div class="dcard__source-block">
+          We see three immediate opportunities for
+          AI integration across the product:<br><br>
+          1. <span class="highlight">Automated lead scoring</span>
+          using existing CRM data -- our sales
+          team currently spends <span class="highlight">~12h/week
+          manually qualifying</span> leads
+          through a spreadsheet process.<br><br>
+          2. Support ticket triage -- <span class="highlight">67%
+          of tickets</span> follow predictable
+          resolution patterns that could be
+          classified automatically.<br><br>
+          3. <span class="highlight">Predictive inventory</span>
+          management for the logistics vertical,
+          pending data pipeline improvements.
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Data Infrastructure (green) -->
+    <div class="dcard" style="left:90px;top:530px;width:250px">
+      <div class="dcard__header">
+        <div class="dcard__dot" style="background:#22c55e"></div>
+        <div class="dcard__title">Data Infrastructure</div>
+      </div>
+      <div class="dcard__summary">
+        Current stack: Postgres + Redshift. Data quality issues in 3 of 8
+        pipelines. Snowflake migration planned for Q2 pending headcount.
+      </div>
+      <div class="dcard__refs">
+        <span class="dcard__ref">lines 120-156</span>
+        <span class="dcard__ref">lines 158-164</span>
+      </div>
+    </div>
+
+    <!-- Card 4: Team & Hiring (purple) -->
+    <div class="dcard" style="left:420px;top:460px;width:250px">
+      <div class="dcard__header">
+        <div class="dcard__dot" style="background:#a855f7"></div>
+        <div class="dcard__title">Team & Hiring</div>
+      </div>
+      <div class="dcard__summary">
+        Current: 14 eng, 3 data, 2 ML. Need: senior ML eng, data eng,
+        product designer. Pipeline thin -- 4 roles open 90+ days.
+      </div>
+      <div class="dcard__refs">
+        <span class="dcard__ref">lines 160-195</span>
+      </div>
+    </div>
+
+    <!-- Card 5: Risk Factors (red) -->
+    <div class="dcard" style="left:420px;top:280px;width:250px">
+      <div class="dcard__header">
+        <div class="dcard__dot" style="background:#ef4444"></div>
+        <div class="dcard__title">Risk Factors</div>
+      </div>
+      <div class="dcard__summary">
+        Single-tenant architecture limits ability to scale beyond 50 clients.
+        Two critical hires unfilled for 4+ months. Regulatory uncertainty
+        in healthcare vertical could delay launch.
+      </div>
+      <div class="dcard__refs">
+        <span class="dcard__ref">lines 200-231</span>
+        <span class="dcard__ref">lines 240-248</span>
+      </div>
+    </div>
+
+    <!-- ===================================================
+         USER-DRAWN ANNOTATIONS ON THE CANVAS
+         =================================================== -->
+
+    <!-- "PRIORITY" shape linked to AI Opportunities -->
+    <div class="user-shape" style="left:200px;top:80px;width:110px;height:38px">
+      PRIORITY
+    </div>
+
+    <!-- "Ask CTO" shape linked to Data Infrastructure -->
+    <div class="user-shape" style="left:460px;top:560px;width:110px;height:38px">
+      Ask CTO
+    </div>
+
+    <!-- Sticky note -->
+    <div class="sticky-note" style="left:430px;top:150px">
+      Cross-reference with data audit from Feb
+    </div>
+
+    <!-- ===================================================
+         ANNOTATIONS (purple wireframe labels)
+         =================================================== -->
+
+    <div class="annotation" style="left:76px;top:32px">
+      AI decomposed the doc into topics
+    </div>
+
+    <!-- Annotation line from label to line ref pills -->
+    <svg class="annotation__line" style="left:210px;top:145px" width="100" height="48">
+      <path d="M80,0 C80,20 40,35 20,45"/>
+    </svg>
+    <div class="annotation" style="left:270px;top:134px">
+      Click line refs to jump to source
+    </div>
+
+    <div class="annotation" style="left:565px;top:538px">
+      You can draw here -- it's a canvas
+    </div>
+
+  </div>
+</div>
+
+<!-- Source panel (right side) -->
+<div class="source-panel">
+  <div class="source-panel__header">
+    <div class="source-panel__label">Original document</div>
+    <div class="source-panel__title">Q1 Strategy Doc</div>
+    <div class="source-panel__meta">14 pages &middot; 3,200 words</div>
+  </div>
+  <div class="source-panel__body">
+
+    <!-- Lines before the highlighted section (dimmed) -->
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">42</span>
+      <span class="source-panel__line-text">customer churn below the 5% threshold</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">43</span>
+      <span class="source-panel__line-text">established in the board review.</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">44</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">45</span>
+      <span class="source-panel__line-text">Pricing adjustments for enterprise</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">46</span>
+      <span class="source-panel__line-text">tier accounts will take effect in Q2,</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">47</span>
+      <span class="source-panel__line-text">with projected uplift of 15-20% on</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">48</span>
+      <span class="source-panel__line-text">average contract value.</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">49</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">50</span>
+      <span class="source-panel__line-text">Sales team capacity is a constraint;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">51</span>
+      <span class="source-panel__line-text">see section on AI opportunities for</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">52</span>
+      <span class="source-panel__line-text">potential automation solutions.</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">53</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">54</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+
+    <!-- Highlighted section: lines 55-89 (active card reference) -->
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">55</span>
+      <span class="source-panel__line-text"><strong>3. AI Integration Opportunities</strong></span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">56</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">57</span>
+      <span class="source-panel__line-text">We see three immediate opportunities</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">58</span>
+      <span class="source-panel__line-text">for AI integration across the product:</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">59</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">60</span>
+      <span class="source-panel__line-text">1. Automated lead scoring using</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">61</span>
+      <span class="source-panel__line-text">existing CRM data. Our sales team</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">62</span>
+      <span class="source-panel__line-text">currently spends approximately 12</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">63</span>
+      <span class="source-panel__line-text">hours per week manually qualifying</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">64</span>
+      <span class="source-panel__line-text">leads through a spreadsheet-based</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">65</span>
+      <span class="source-panel__line-text">scoring process. This is our highest-</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">66</span>
+      <span class="source-panel__line-text">confidence AI use case due to clean</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">67</span>
+      <span class="source-panel__line-text">data availability in Salesforce.</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">68</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">69</span>
+      <span class="source-panel__line-text">2. Support ticket triage. Analysis</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">70</span>
+      <span class="source-panel__line-text">of the last 6 months shows 67% of</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">71</span>
+      <span class="source-panel__line-text">tickets follow predictable resolution</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">72</span>
+      <span class="source-panel__line-text">patterns that could be classified</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">73</span>
+      <span class="source-panel__line-text">and routed automatically. Expected</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">74</span>
+      <span class="source-panel__line-text">reduction in first-response time:</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">75</span>
+      <span class="source-panel__line-text">40-60%.</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">76</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">77</span>
+      <span class="source-panel__line-text">3. Predictive inventory management</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">78</span>
+      <span class="source-panel__line-text">for the logistics vertical. This</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">79</span>
+      <span class="source-panel__line-text">depends on data pipeline work in</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">80</span>
+      <span class="source-panel__line-text">section 4 (Data Infrastructure).</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">81</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">82</span>
+      <span class="source-panel__line-text">Timeline estimate: lead scoring</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">83</span>
+      <span class="source-panel__line-text">MVP in 6 weeks, ticket triage in</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">84</span>
+      <span class="source-panel__line-text">8-10 weeks, inventory prediction</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">85</span>
+      <span class="source-panel__line-text">in Q3 (blocked on Snowflake).</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">86</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">87</span>
+      <span class="source-panel__line-text">Budget allocation: $180K for ML</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">88</span>
+      <span class="source-panel__line-text">infrastructure and compute, plus</span>
+    </div>
+    <div class="source-panel__line source-panel__line--highlight">
+      <span class="source-panel__line-num">89</span>
+      <span class="source-panel__line-text">headcount (see Team section).</span>
+    </div>
+
+    <!-- Lines after highlighted section (dimmed again) -->
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">90</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">91</span>
+      <span class="source-panel__line-text">Risk mitigation: if ML eng hire</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">92</span>
+      <span class="source-panel__line-text">is delayed, consider contractor for</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">93</span>
+      <span class="source-panel__line-text">lead scoring MVP specifically.</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">94</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">95</span>
+      <span class="source-panel__line-text">Internal stakeholder alignment:</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">96</span>
+      <span class="source-panel__line-text">VP Sales is champion for lead</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">97</span>
+      <span class="source-panel__line-text">scoring. Support lead cautiously</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">98</span>
+      <span class="source-panel__line-text">supportive of triage automation.</span>
+    </div>
+
+    <div class="source-panel__section-gap">. . .</div>
+
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">102</span>
+      <span class="source-panel__line-text">Additional context on model</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">103</span>
+      <span class="source-panel__line-text">selection and vendor evaluation</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">104</span>
+      <span class="source-panel__line-text">criteria for AI tooling...</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">105</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">106</span>
+      <span class="source-panel__line-text">Preference for hosted solutions</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">107</span>
+      <span class="source-panel__line-text">to reduce operational burden on</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">108</span>
+      <span class="source-panel__line-text">the infra team, which is already</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">109</span>
+      <span class="source-panel__line-text">stretched thin across the Snowflake</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">110</span>
+      <span class="source-panel__line-text">migration and reliability work.</span>
+    </div>
+
+    <div class="source-panel__section-gap">. . .</div>
+
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">120</span>
+      <span class="source-panel__line-text"><strong>4. Data Infrastructure</strong></span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">121</span>
+      <span class="source-panel__line-text">&nbsp;</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">122</span>
+      <span class="source-panel__line-text">Current state: production database</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">123</span>
+      <span class="source-panel__line-text">on Postgres (RDS), analytics on</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">124</span>
+      <span class="source-panel__line-text">Redshift. 8 ETL pipelines, 3 with</span>
+    </div>
+    <div class="source-panel__line source-panel__line--dim">
+      <span class="source-panel__line-num">125</span>
+      <span class="source-panel__line-text">known data quality issues...</span>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

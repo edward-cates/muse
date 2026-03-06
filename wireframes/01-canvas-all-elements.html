@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Muse — Canvas with All Element Types</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #f5f5f0;
+    --card-bg: #ffffff;
+    --border: #d4d4d0;
+    --border-light: #e5e5e0;
+    --text: #1a1a1a;
+    --text-muted: #71717a;
+    --text-faint: #a1a19a;
+    --indigo: #4f46e5;
+    --indigo-glow: rgba(79, 70, 229, 0.15);
+    --green-bg: #f0fdf4;
+    --green: #22c55e;
+    --green-dark: #16a34a;
+    --yellow-bg: #fefce8;
+    --yellow-border: #fbbf24;
+    --purple: #7c3aed;
+    --font: -apple-system, 'Inter', system-ui, sans-serif;
+  }
+
+  html, body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  /* ═══════════════════════════════════════════
+     TOP BAR
+     ═══════════════════════════════════════════ */
+  .topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 48px;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    z-index: 100;
+    gap: 12px;
+  }
+  .topbar__logo {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .topbar__sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+  }
+  .topbar__title {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .topbar__spacer { flex: 1; }
+  .topbar__avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* ═══════════════════════════════════════════
+     LEFT TOOLBAR
+     ═══════════════════════════════════════════ */
+  .toolbar {
+    position: fixed;
+    top: 60px;
+    left: 12px;
+    width: 44px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 0;
+    gap: 2px;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .toolbar__btn {
+    width: 36px;
+    height: 34px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.15s;
+  }
+  .toolbar__btn:hover {
+    background: #f0f0eb;
+    color: var(--text);
+  }
+  .toolbar__btn--active {
+    background: #eef2ff;
+    color: var(--indigo);
+  }
+  .toolbar__btn svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 1.8;
+    fill: none;
+    stroke: currentColor;
+  }
+  .toolbar__divider {
+    width: 24px;
+    height: 1px;
+    background: var(--border-light);
+    margin: 4px 0;
+  }
+
+  /* ═══════════════════════════════════════════
+     CANVAS
+     ═══════════════════════════════════════════ */
+  .canvas {
+    position: fixed;
+    top: 48px;
+    left: 0;
+    right: 320px;
+    bottom: 0;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .canvas__dots {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, #d4d4d0 0.8px, transparent 0.8px);
+    background-size: 24px 24px;
+    opacity: 0.5;
+  }
+  .canvas__world {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ═══════════════════════════════════════════
+     SVG CONNECTORS LAYER
+     ═══════════════════════════════════════════ */
+  .canvas__lines {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .connector {
+    fill: none;
+    stroke: #4f46e5;
+    stroke-width: 1.5;
+  }
+  .connector--dashed {
+    stroke-dasharray: 6 4;
+  }
+  .connector--green {
+    stroke: var(--green-dark);
+  }
+  .connector--gray {
+    stroke: #94a3b8;
+  }
+
+  /* ═══════════════════════════════════════════
+     SHAPE ELEMENTS
+     ═══════════════════════════════════════════ */
+  .shape {
+    position: absolute;
+    z-index: 2;
+  }
+  .shape__outline {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .shape__text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    pointer-events: none;
+    text-align: center;
+    padding: 8px;
+    line-height: 1.35;
+  }
+  .shape--selected {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  .shape--selected .shape__outline rect,
+  .shape--selected .shape__outline ellipse,
+  .shape--selected .shape__outline polygon {
+    stroke: var(--indigo) !important;
+    stroke-width: 2 !important;
+  }
+
+  /* Resize handles */
+  .resize-handle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    border: 1.5px solid var(--indigo);
+    border-radius: 2px;
+    z-index: 10;
+  }
+  .resize-handle--nw { top: -4px; left: -4px; cursor: nw-resize; }
+  .resize-handle--n  { top: -4px; left: calc(50% - 4px); cursor: n-resize; }
+  .resize-handle--ne { top: -4px; right: -4px; cursor: ne-resize; }
+  .resize-handle--e  { top: calc(50% - 4px); right: -4px; cursor: e-resize; }
+  .resize-handle--se { bottom: -4px; right: -4px; cursor: se-resize; }
+  .resize-handle--s  { bottom: -4px; left: calc(50% - 4px); cursor: s-resize; }
+  .resize-handle--sw { bottom: -4px; left: -4px; cursor: sw-resize; }
+  .resize-handle--w  { top: calc(50% - 4px); left: -4px; cursor: w-resize; }
+
+  /* Selection glow ring */
+  .shape--selected::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 6px;
+    box-shadow: 0 0 0 2px var(--indigo), 0 0 12px var(--indigo-glow);
+    pointer-events: none;
+  }
+
+  /* ═══════════════════════════════════════════
+     STICKY NOTE NODE
+     ═══════════════════════════════════════════ */
+  .sticky-note {
+    position: absolute;
+    z-index: 2;
+    width: 200px;
+    min-height: 120px;
+    background: var(--yellow-bg);
+    border: 1px solid var(--yellow-border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: #713f12;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .sticky-note__title {
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    color: #a16207;
+  }
+
+  /* ═══════════════════════════════════════════
+     IMAGE NODE (AI-generated)
+     ═══════════════════════════════════════════ */
+  .image-node {
+    position: absolute;
+    z-index: 2;
+    width: 220px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .image-node__preview {
+    width: 100%;
+    height: 150px;
+    background: linear-gradient(135deg, #a78bfa 0%, #818cf8 30%, #6366f1 60%, #4f46e5 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .image-node__placeholder-icon {
+    color: rgba(255,255,255,0.5);
+  }
+  .image-node__placeholder-icon svg {
+    width: 48px;
+    height: 48px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.2;
+  }
+  .image-node__badge {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .image-node__badge svg {
+    width: 12px;
+    height: 12px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+  }
+  .image-node__footer {
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  /* ═══════════════════════════════════════════
+     HTML WIREFRAME NODE
+     ═══════════════════════════════════════════ */
+  .html-node {
+    position: absolute;
+    z-index: 2;
+    width: 240px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    cursor: pointer;
+  }
+  .html-node__chrome {
+    height: 24px;
+    background: #f4f4f1;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    gap: 5px;
+  }
+  .html-node__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+  .html-node__dot--red { background: #ef4444; }
+  .html-node__dot--yellow { background: #f59e0b; }
+  .html-node__dot--green { background: #22c55e; }
+  .html-node__chrome-url {
+    margin-left: 8px;
+    font-size: 9px;
+    color: var(--text-faint);
+    background: #eaeae5;
+    padding: 2px 8px;
+    border-radius: 3px;
+    flex: 1;
+    text-align: center;
+  }
+  .html-node__preview {
+    padding: 12px;
+    min-height: 160px;
+  }
+  /* Miniature page content */
+  .mini-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .mini-nav__logo {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    background: var(--indigo);
+  }
+  .mini-nav__link {
+    width: 24px;
+    height: 4px;
+    background: #d4d4d0;
+    border-radius: 2px;
+  }
+  .mini-nav__btn {
+    margin-left: auto;
+    width: 32px;
+    height: 10px;
+    background: var(--indigo);
+    border-radius: 3px;
+  }
+  .mini-heading {
+    width: 70%;
+    height: 8px;
+    background: #3f3f46;
+    border-radius: 2px;
+    margin-bottom: 6px;
+  }
+  .mini-subheading {
+    width: 90%;
+    height: 5px;
+    background: #d4d4d0;
+    border-radius: 2px;
+    margin-bottom: 12px;
+  }
+  .mini-input {
+    width: 100%;
+    height: 14px;
+    background: #f4f4f1;
+    border: 1px solid #e5e5e0;
+    border-radius: 3px;
+    margin-bottom: 6px;
+  }
+  .mini-btn {
+    width: 50%;
+    height: 12px;
+    background: var(--indigo);
+    border-radius: 3px;
+    margin-bottom: 12px;
+  }
+  .mini-cards {
+    display: flex;
+    gap: 6px;
+  }
+  .mini-card {
+    flex: 1;
+    height: 28px;
+    background: #f9f9f6;
+    border: 1px solid #e5e5e0;
+    border-radius: 4px;
+  }
+  .html-node__hint {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border-light);
+    font-size: 11px;
+    color: var(--text-faint);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .html-node__hint svg {
+    width: 13px;
+    height: 13px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+  }
+
+  /* ═══════════════════════════════════════════
+     RESEARCH NODE
+     ═══════════════════════════════════════════ */
+  .research-node {
+    position: absolute;
+    z-index: 2;
+    width: 240px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .research-node__header {
+    background: var(--green-bg);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #dcfce7;
+  }
+  .research-node__icon {
+    width: 28px;
+    height: 28px;
+    background: #dcfce7;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--green-dark);
+  }
+  .research-node__icon svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+  }
+  .research-node__title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .research-node__subtitle {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+  .research-node__topics {
+    padding: 12px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .topic-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    background: #f9f9f6;
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .topic-pill__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .topic-pill__dot--blue { background: #3b82f6; }
+  .topic-pill__dot--purple { background: #8b5cf6; }
+  .topic-pill__dot--orange { background: #f97316; }
+  .topic-pill__dot--teal { background: #14b8a6; }
+  .topic-pill__dot--rose { background: #f43f5e; }
+  .research-node__footer {
+    padding: 8px 14px;
+    border-top: 1px solid var(--border-light);
+    font-size: 10.5px;
+    color: var(--text-faint);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  /* ═══════════════════════════════════════════
+     AI PANEL (right)
+     ═══════════════════════════════════════════ */
+  .ai-panel {
+    position: fixed;
+    top: 48px;
+    right: 0;
+    width: 320px;
+    bottom: 0;
+    background: var(--card-bg);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+  }
+  .ai-panel__header {
+    height: 44px;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .ai-panel__header-icon {
+    width: 20px;
+    height: 20px;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ai-panel__header-icon svg {
+    width: 12px;
+    height: 12px;
+    stroke: #fff;
+    fill: none;
+    stroke-width: 2;
+  }
+  .ai-panel__messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .ai-msg {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .ai-msg--user .ai-msg__bubble {
+    background: #f0f0eb;
+    border-radius: 12px 12px 4px 12px;
+    align-self: flex-end;
+  }
+  .ai-msg--ai .ai-msg__bubble {
+    background: #f5f3ff;
+    border-radius: 12px 12px 12px 4px;
+    align-self: flex-start;
+  }
+  .ai-msg__label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-faint);
+  }
+  .ai-msg--user .ai-msg__label { text-align: right; }
+  .ai-msg__bubble {
+    padding: 10px 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+    max-width: 100%;
+  }
+  .ai-msg__tool-call {
+    background: #fefce8;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 11.5px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    color: #92400e;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .ai-msg__tool-call svg {
+    width: 14px;
+    height: 14px;
+    stroke: #92400e;
+    fill: none;
+    stroke-width: 2;
+    flex-shrink: 0;
+  }
+  .ai-panel__input {
+    border-top: 1px solid var(--border-light);
+    padding: 12px 16px;
+  }
+  .ai-panel__input-box {
+    width: 100%;
+    background: #f9f9f6;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-family: var(--font);
+    color: var(--text-faint);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .ai-panel__send-btn {
+    width: 28px;
+    height: 28px;
+    background: var(--indigo);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .ai-panel__send-btn svg {
+    width: 14px;
+    height: 14px;
+    stroke: #fff;
+    fill: none;
+    stroke-width: 2;
+  }
+
+  /* ═══════════════════════════════════════════
+     ANNOTATIONS
+     ═══════════════════════════════════════════ */
+  .annotation {
+    position: absolute;
+    z-index: 50;
+    background: var(--purple);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 6px;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+    pointer-events: none;
+  }
+  .annotation::after {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: var(--purple);
+    transform: rotate(45deg);
+  }
+  .annotation--down::after {
+    bottom: -4px;
+    left: 20px;
+  }
+  .annotation--up::after {
+    top: -4px;
+    left: 20px;
+  }
+  .annotation--left::after {
+    left: -4px;
+    top: calc(50% - 4px);
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     TOP BAR
+     ═══════════════════════════════════════════ -->
+<div class="topbar">
+  <div class="topbar__logo">Muse</div>
+  <div class="topbar__sep"></div>
+  <div class="topbar__title">Client project board</div>
+  <div class="topbar__spacer"></div>
+  <div class="topbar__avatar">E</div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     LEFT TOOLBAR
+     ═══════════════════════════════════════════ -->
+<div class="toolbar">
+  <!-- Select (active) -->
+  <div class="toolbar__btn toolbar__btn--active">
+    <svg viewBox="0 0 24 24"><path d="M4 4l7 17 2.5-6.5L20 12 4 4z"/></svg>
+  </div>
+  <!-- Rectangle -->
+  <div class="toolbar__btn">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+  </div>
+  <!-- Ellipse -->
+  <div class="toolbar__btn">
+    <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="7"/></svg>
+  </div>
+  <!-- Diamond -->
+  <div class="toolbar__btn">
+    <svg viewBox="0 0 24 24"><path d="M12 2l10 10-10 10L2 12z"/></svg>
+  </div>
+  <div class="toolbar__divider"></div>
+  <!-- Draw -->
+  <div class="toolbar__btn">
+    <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
+  </div>
+  <!-- Arrow -->
+  <div class="toolbar__btn">
+    <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+  </div>
+  <!-- Text -->
+  <div class="toolbar__btn">
+    <svg viewBox="0 0 24 24"><path d="M4 7V4h16v3"/><path d="M12 4v16"/><path d="M8 20h8"/></svg>
+  </div>
+  <div class="toolbar__divider"></div>
+  <!-- Hand / Pan -->
+  <div class="toolbar__btn">
+    <svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 00-4 0"/><path d="M14 10V4a2 2 0 00-4 0v6"/><path d="M10 10.5V6a2 2 0 00-4 0v8"/><path d="M18 8a2 2 0 014 0v7a8 8 0 01-8 8h-2c-2.5 0-4.5-1-6.2-2.8L3 17.2a2 2 0 012.8-2.8L8 16"/></svg>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     CANVAS
+     ═══════════════════════════════════════════ -->
+<div class="canvas">
+  <div class="canvas__dots"></div>
+  <div class="canvas__world">
+
+    <!-- SVG Connectors Layer -->
+    <svg class="canvas__lines" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Arrowhead markers -->
+        <marker id="arrowhead-indigo" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" fill="#4f46e5">
+          <polygon points="0 0, 10 3.5, 0 7"/>
+        </marker>
+        <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" fill="#16a34a">
+          <polygon points="0 0, 10 3.5, 0 7"/>
+        </marker>
+        <marker id="arrowhead-gray" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" fill="#94a3b8">
+          <polygon points="0 0, 10 3.5, 0 7"/>
+        </marker>
+      </defs>
+
+      <!-- Arrow: "User Auth" → "Session" (straight) -->
+      <path class="connector" d="M 272 200 L 390 200" marker-end="url(#arrowhead-indigo)"/>
+
+      <!-- Arrow: "Session" → "Dashboard" (straight) -->
+      <path class="connector" d="M 520 200 L 620 200" marker-end="url(#arrowhead-indigo)"/>
+
+      <!-- Elbow: "User Auth" → "API Gateway" (elbow connector) -->
+      <path class="connector" d="M 210 240 L 210 330 L 320 330" marker-end="url(#arrowhead-indigo)"/>
+
+      <!-- Arrow: "API Gateway" → Research node -->
+      <path class="connector connector--green" d="M 440 330 L 540 400" marker-end="url(#arrowhead-green)"/>
+
+      <!-- Dashed: Image node → "Dashboard" -->
+      <path class="connector connector--gray connector--dashed" d="M 290 500 L 640 260" marker-end="url(#arrowhead-gray)"/>
+
+      <!-- Arrow: Sticky note → "User Auth" -->
+      <path class="connector connector--gray" d="M 200 435 L 195 240" marker-end="url(#arrowhead-gray)"/>
+    </svg>
+
+    <!-- ═══════════════ SHAPES ═══════════════ -->
+
+    <!-- Shape: "User Auth" (rectangle, SELECTED) -->
+    <div class="shape shape--selected" style="left: 130px; top: 160px; width: 140px; height: 80px;">
+      <svg class="shape__outline" viewBox="0 0 140 80" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="138" height="78" rx="6" fill="#ffffff" stroke="#4f46e5" stroke-width="2"/>
+      </svg>
+      <div class="shape__text">User Auth</div>
+      <!-- Resize handles (shown because selected) -->
+      <div class="resize-handle resize-handle--nw"></div>
+      <div class="resize-handle resize-handle--n"></div>
+      <div class="resize-handle resize-handle--ne"></div>
+      <div class="resize-handle resize-handle--e"></div>
+      <div class="resize-handle resize-handle--se"></div>
+      <div class="resize-handle resize-handle--s"></div>
+      <div class="resize-handle resize-handle--sw"></div>
+      <div class="resize-handle resize-handle--w"></div>
+    </div>
+
+    <!-- Shape: "Session" (rectangle) -->
+    <div class="shape" style="left: 390px; top: 165px; width: 130px; height: 70px;">
+      <svg class="shape__outline" viewBox="0 0 130 70" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="128" height="68" rx="6" fill="#f0f9ff" stroke="#0ea5e9" stroke-width="1.5"/>
+      </svg>
+      <div class="shape__text">Session<br><span style="font-size:10px;color:#64748b;font-weight:400">JWT + refresh</span></div>
+    </div>
+
+    <!-- Shape: "Dashboard" (rectangle) -->
+    <div class="shape" style="left: 620px; top: 155px; width: 140px; height: 80px;">
+      <svg class="shape__outline" viewBox="0 0 140 80" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="138" height="78" rx="6" fill="#ffffff" stroke="#a3a3a0" stroke-width="1.5"/>
+      </svg>
+      <div class="shape__text">Dashboard</div>
+    </div>
+
+    <!-- Shape: "API Gateway" (diamond) -->
+    <div class="shape" style="left: 300px; top: 290px; width: 140px; height: 80px;">
+      <svg class="shape__outline" viewBox="0 0 140 80" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="70,2 138,40 70,78 2,40" fill="#fefce8" stroke="#eab308" stroke-width="1.5"/>
+      </svg>
+      <div class="shape__text" style="font-size:12px;">API Gateway</div>
+    </div>
+
+    <!-- Shape: "Status" (ellipse) -->
+    <div class="shape" style="left: 640px; top: 290px; width: 110px; height: 60px;">
+      <svg class="shape__outline" viewBox="0 0 110 60" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="55" cy="30" rx="53" ry="28" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+      </svg>
+      <div class="shape__text" style="font-size:12px;">Status: Live</div>
+    </div>
+
+    <!-- ═══════════════ STICKY NOTE ═══════════════ -->
+    <div class="sticky-note" style="left: 100px; top: 450px;">
+      <div class="sticky-note__title">Notes</div>
+      Need to verify OAuth callback URLs for production. Ask team about rate limiting strategy before launch. Review error states for expired tokens.
+    </div>
+
+    <!-- ═══════════════ AI IMAGE NODE ═══════════════ -->
+    <div class="image-node" style="left: 80px; top: 620px;">
+      <div class="image-node__preview">
+        <div class="image-node__placeholder-icon">
+          <svg viewBox="0 0 48 48"><rect x="4" y="4" width="40" height="40" rx="4"/><circle cx="16" cy="16" r="4"/><path d="M4 34l10-10 8 8 6-6 16 14"/></svg>
+        </div>
+        <div class="image-node__badge">
+          <svg viewBox="0 0 24 24"><path d="M12 2a4 4 0 014 4c0 1.5-1 2.5-2 3.5L12 12l-2-2.5C9 8.5 8 7.5 8 6a4 4 0 014-4z"/><path d="M5 20h14"/><path d="M12 12v8"/></svg>
+          AI generated
+        </div>
+      </div>
+      <div class="image-node__footer">auth-flow-hero.png</div>
+    </div>
+
+    <!-- ═══════════════ HTML WIREFRAME NODE ═══════════════ -->
+    <div class="html-node" style="left: 420px; top: 440px;">
+      <div class="html-node__chrome">
+        <div class="html-node__dot html-node__dot--red"></div>
+        <div class="html-node__dot html-node__dot--yellow"></div>
+        <div class="html-node__dot html-node__dot--green"></div>
+        <div class="html-node__chrome-url">login.acme.com</div>
+      </div>
+      <div class="html-node__preview">
+        <!-- Miniaturized page -->
+        <div class="mini-nav">
+          <div class="mini-nav__logo"></div>
+          <div class="mini-nav__link"></div>
+          <div class="mini-nav__link"></div>
+          <div class="mini-nav__link"></div>
+          <div class="mini-nav__btn"></div>
+        </div>
+        <div class="mini-heading"></div>
+        <div class="mini-subheading"></div>
+        <div class="mini-input"></div>
+        <div class="mini-input"></div>
+        <div class="mini-btn"></div>
+        <div class="mini-cards">
+          <div class="mini-card"></div>
+          <div class="mini-card"></div>
+          <div class="mini-card"></div>
+        </div>
+      </div>
+      <div class="html-node__hint">
+        <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Click to view full page
+      </div>
+    </div>
+
+    <!-- ═══════════════ RESEARCH NODE ═══════════════ -->
+    <div class="research-node" style="left: 540px; top: 400px; transform: translateX(140px);">
+      <div class="research-node__header">
+        <div class="research-node__icon">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <div>
+          <div class="research-node__title">Client Strategy Brief</div>
+          <div class="research-node__subtitle">Uploaded doc &middot; decomposed</div>
+        </div>
+      </div>
+      <div class="research-node__topics">
+        <div class="topic-pill"><div class="topic-pill__dot topic-pill__dot--blue"></div>Business Objectives</div>
+        <div class="topic-pill"><div class="topic-pill__dot topic-pill__dot--purple"></div>AI Opportunities</div>
+        <div class="topic-pill"><div class="topic-pill__dot topic-pill__dot--orange"></div>Data State</div>
+        <div class="topic-pill"><div class="topic-pill__dot topic-pill__dot--teal"></div>Team Structure</div>
+        <div class="topic-pill"><div class="topic-pill__dot topic-pill__dot--rose"></div>Compliance</div>
+      </div>
+      <div class="research-node__footer">8 topics &middot; 12 pages</div>
+    </div>
+
+    <!-- ═══════════════ ANNOTATIONS ═══════════════ -->
+    <div class="annotation annotation--down" style="left: 100px; top: 115px;">
+      Every element is a node &mdash; move, resize, connect
+    </div>
+    <div class="annotation annotation--left" style="left: 672px; top: 502px;">
+      Click to view full page
+    </div>
+    <div class="annotation annotation--up" style="left: 690px; top: 605px;">
+      Double-click to open node's canvas
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     AI PANEL
+     ═══════════════════════════════════════════ -->
+<div class="ai-panel">
+  <div class="ai-panel__header">
+    <div class="ai-panel__header-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2a4 4 0 014 4c0 1.5-1 2.5-2 3.5L12 12l-2-2.5C9 8.5 8 7.5 8 6a4 4 0 014-4z"/><path d="M5 20h14"/><path d="M12 12v8"/></svg>
+    </div>
+    AI Collaborator
+  </div>
+  <div class="ai-panel__messages">
+    <!-- User message -->
+    <div class="ai-msg ai-msg--user">
+      <div class="ai-msg__label">You</div>
+      <div class="ai-msg__bubble">Generate a landing page wireframe for the auth flow</div>
+    </div>
+    <!-- AI response -->
+    <div class="ai-msg ai-msg--ai">
+      <div class="ai-msg__label">AI</div>
+      <div class="ai-msg__bubble">I'll create an HTML wireframe for the auth flow and add it to your canvas.</div>
+      <div class="ai-msg__tool-call">
+        <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        generate_html_wireframe("auth login page")
+      </div>
+      <div class="ai-msg__tool-call">
+        <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        add_to_canvas({x: 420, y: 440})
+      </div>
+      <div class="ai-msg__bubble" style="margin-top: 4px;">Done! I placed the wireframe on your canvas next to the auth flow shapes. It includes a login form with email/password fields, social auth buttons, and a card layout. Click the card to view it full-size.</div>
+    </div>
+  </div>
+  <div class="ai-panel__input">
+    <div class="ai-panel__input-box">
+      <span>Ask anything or describe changes...</span>
+      <div class="ai-panel__send-btn">
+        <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

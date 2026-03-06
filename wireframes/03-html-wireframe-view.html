@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Muse Wireframe - HTML Wireframe View</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #f5f5f0;
+    font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
+    color: #1a1a1a;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* --- Top bar --- */
+  .topbar {
+    height: 48px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0dc;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  .topbar__logo { font-weight: 700; font-size: 15px; letter-spacing: -0.3px; }
+  .topbar__sep { width: 1px; height: 20px; background: #e0e0dc; }
+  .topbar__back {
+    font-size: 12px; color: #4f46e5; cursor: pointer; font-weight: 500;
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 6px;
+    border: 1px solid #e0e7ff; background: #fafafe;
+    text-decoration: none;
+  }
+  .topbar__back:hover { background: #eef2ff; }
+  .topbar__breadcrumb { font-size: 13px; color: #4f46e5; cursor: pointer; }
+  .topbar__breadcrumb:hover { text-decoration: underline; }
+  .topbar__breadcrumb-sep { font-size: 13px; color: #ccc; }
+  .topbar__title { font-size: 13px; color: #666; font-weight: 500; }
+  .topbar__spacer { flex: 1; }
+  .topbar__edit-btn {
+    font-size: 12px; font-weight: 500; color: #4f46e5;
+    padding: 6px 14px; border-radius: 6px;
+    border: 1px solid #c7d2fe; background: #eef2ff;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+  }
+  .topbar__edit-btn:hover { background: #e0e7ff; }
+  .topbar__avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: #c4b5fd;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: #4c1d95;
+  }
+
+  /* --- Main layout --- */
+  .view-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* --- Wireframe content area --- */
+  .wireframe-viewport {
+    flex: 1;
+    background: #f3f4f6;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    overflow-y: auto;
+    padding: 40px 24px;
+    position: relative;
+  }
+
+  /* --- The rendered wireframe (login page) --- */
+  .wireframe-page {
+    width: 100%;
+    max-width: 960px;
+    min-height: 600px;
+    background: #f9fafb;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    position: relative;
+  }
+
+  /* --- Login card inside the wireframe --- */
+  .login-card {
+    width: 100%;
+    max-width: 420px;
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
+    padding: 40px 36px 36px;
+  }
+  .login-card__logo {
+    width: 48px; height: 48px; border-radius: 10px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    margin: 0 auto 24px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .login-card__logo-letter {
+    font-size: 22px; font-weight: 700; color: #fff;
+  }
+  .login-card__heading {
+    font-size: 22px; font-weight: 700; text-align: center;
+    color: #111827; margin-bottom: 4px;
+  }
+  .login-card__subheading {
+    font-size: 14px; color: #6b7280; text-align: center;
+    margin-bottom: 28px;
+  }
+  .login-card__label {
+    display: block; font-size: 13px; font-weight: 500;
+    color: #374151; margin-bottom: 6px;
+  }
+  .login-card__input {
+    width: 100%; height: 42px; border: 1px solid #d1d5db;
+    border-radius: 8px; padding: 0 14px; font-size: 14px;
+    font-family: inherit; background: #fff; color: #111827;
+    outline: none; margin-bottom: 18px;
+  }
+  .login-card__input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+  .login-card__input--password { margin-bottom: 12px; }
+  .login-card__forgot {
+    display: block; text-align: right; font-size: 12px;
+    color: #6366f1; text-decoration: none; margin-bottom: 22px;
+    cursor: pointer;
+  }
+  .login-card__forgot:hover { text-decoration: underline; }
+  .login-card__submit {
+    width: 100%; height: 44px; border: none; border-radius: 8px;
+    background: #4f46e5; color: #fff; font-size: 15px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+    margin-bottom: 24px;
+  }
+  .login-card__submit:hover { background: #4338ca; }
+  .login-card__divider {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 24px;
+  }
+  .login-card__divider-line {
+    flex: 1; height: 1px; background: #e5e7eb;
+  }
+  .login-card__divider-text {
+    font-size: 12px; color: #9ca3af; text-transform: lowercase;
+  }
+  .login-card__google {
+    width: 100%; height: 44px; border: 1px solid #d1d5db;
+    border-radius: 8px; background: #fff; font-size: 14px;
+    font-weight: 500; color: #374151; cursor: pointer;
+    font-family: inherit; display: flex; align-items: center;
+    justify-content: center; gap: 10px; margin-bottom: 24px;
+  }
+  .login-card__google:hover { background: #f9fafb; border-color: #9ca3af; }
+  .login-card__google-icon {
+    width: 18px; height: 18px;
+  }
+  .login-card__signup {
+    text-align: center; font-size: 13px; color: #6b7280;
+  }
+  .login-card__signup a {
+    color: #4f46e5; text-decoration: none; font-weight: 500;
+  }
+  .login-card__signup a:hover { text-decoration: underline; }
+
+  /* --- AI panel (right) --- */
+  .ai-panel {
+    width: 320px; flex-shrink: 0;
+    background: #fff; border-left: 1px solid #e0e0dc;
+    display: flex; flex-direction: column;
+  }
+  .ai-panel__header {
+    padding: 14px 16px; border-bottom: 1px solid #e0e0dc;
+    font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ai-panel__icon {
+    width: 20px; height: 20px; border-radius: 5px;
+    background: #eef2ff; display: flex; align-items: center;
+    justify-content: center;
+  }
+  .ai-panel__body { flex: 1; padding: 16px; overflow-y: auto; }
+  .ai-panel__msg { margin-bottom: 12px; font-size: 13px; line-height: 1.55; }
+  .ai-panel__msg--user {
+    color: #fff; background: #4f46e5; padding: 10px 14px;
+    border-radius: 12px; border-top-right-radius: 4px;
+    margin-left: 32px;
+  }
+  .ai-panel__msg--ai {
+    color: #333; background: #f5f5f0; padding: 10px 14px;
+    border-radius: 12px; border-top-left-radius: 4px;
+    margin-right: 24px;
+  }
+  .ai-panel__input-area {
+    padding: 12px 16px; border-top: 1px solid #e0e0dc;
+    display: flex; gap: 8px;
+  }
+  .ai-panel__input {
+    flex: 1; border: 1px solid #d4d4d0; border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; outline: none;
+    font-family: inherit; background: #fafaf8;
+  }
+  .ai-panel__input:focus { border-color: #4f46e5; }
+  .ai-panel__send {
+    width: 36px; height: 36px; border-radius: 8px; border: none;
+    background: #4f46e5; color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .ai-panel__send:hover { background: #4338ca; }
+
+  /* --- Annotations --- */
+  .annotation {
+    position: absolute; z-index: 20; pointer-events: none;
+    font-size: 11px; font-weight: 500; color: #7c3aed;
+    background: rgba(237,233,254,0.92); border: 1px solid #c4b5fd;
+    padding: 4px 10px; border-radius: 4px; white-space: nowrap;
+    backdrop-filter: blur(4px);
+  }
+  .annotation--multiline {
+    white-space: normal; max-width: 240px;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+
+  /* --- Thumbnail preview (annotation illustration) --- */
+  .annotation__thumbnail {
+    width: 60px; height: 44px; border-radius: 4px;
+    border: 1px solid #c4b5fd; background: #fafafe;
+    flex-shrink: 0; overflow: hidden; padding: 3px;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 2px;
+  }
+  .annotation__thumb-bar {
+    width: 100%; height: 3px; background: #e0e0dc; border-radius: 1px;
+  }
+  .annotation__thumb-card {
+    width: 28px; height: 20px; border-radius: 2px;
+    border: 0.5px solid #d1d5db; background: #fff;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 1px; padding: 2px;
+  }
+  .annotation__thumb-line {
+    width: 18px; height: 1.5px; background: #d1d5db; border-radius: 1px;
+  }
+  .annotation__thumb-btn {
+    width: 14px; height: 3px; background: #6366f1; border-radius: 1px;
+  }
+
+  /* --- Arrow connector for annotation --- */
+  .annotation__arrow {
+    position: absolute; z-index: 19; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar__logo">Muse</div>
+  <div class="topbar__sep"></div>
+  <a class="topbar__back">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Back to canvas
+  </a>
+  <span class="topbar__breadcrumb">Client project board</span>
+  <span class="topbar__breadcrumb-sep">/</span>
+  <span class="topbar__title">Login Page Wireframe</span>
+  <div class="topbar__spacer"></div>
+  <button class="topbar__edit-btn">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    Edit with AI
+  </button>
+  <div class="topbar__avatar">E</div>
+</div>
+
+<!-- Main layout: wireframe + AI panel -->
+<div class="view-layout">
+
+  <!-- Wireframe viewport -->
+  <div class="wireframe-viewport">
+
+    <!-- The rendered wireframe: a login/signup page -->
+    <div class="wireframe-page">
+
+      <div class="login-card">
+        <!-- Logo -->
+        <div class="login-card__logo">
+          <span class="login-card__logo-letter">A</span>
+        </div>
+
+        <!-- Heading -->
+        <h1 class="login-card__heading">Welcome back</h1>
+        <p class="login-card__subheading">Sign in to your account to continue</p>
+
+        <!-- Email field -->
+        <label class="login-card__label">Email address</label>
+        <input class="login-card__input" type="text" value="jane@acme.com" readonly />
+
+        <!-- Password field -->
+        <label class="login-card__label">Password</label>
+        <input class="login-card__input login-card__input--password" type="password" value="............" readonly />
+
+        <!-- Forgot password -->
+        <a class="login-card__forgot">Forgot password?</a>
+
+        <!-- Sign in button -->
+        <button class="login-card__submit">Sign in</button>
+
+        <!-- Divider -->
+        <div class="login-card__divider">
+          <div class="login-card__divider-line"></div>
+          <span class="login-card__divider-text">or</span>
+          <div class="login-card__divider-line"></div>
+        </div>
+
+        <!-- Google button -->
+        <button class="login-card__google">
+          <svg class="login-card__google-icon" viewBox="0 0 18 18" fill="none">
+            <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+            <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.26c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+            <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+            <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 2.58 9 3.58z" fill="#EA4335"/>
+          </svg>
+          Continue with Google
+        </button>
+
+        <!-- Sign up link -->
+        <div class="login-card__signup">
+          Don't have an account? <a href="#">Sign up</a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Annotation: Full HTML page -->
+    <div class="annotation" style="top: 52px; left: 50%; transform: translateX(-50%);">
+      Full HTML page — AI generated, AI editable
+    </div>
+
+    <!-- Annotation: Appears as thumbnail on canvas -->
+    <div class="annotation annotation--multiline" style="bottom: 28px; left: 40px;">
+      <div class="annotation__thumbnail">
+        <div class="annotation__thumb-bar"></div>
+        <div class="annotation__thumb-card">
+          <div class="annotation__thumb-line"></div>
+          <div class="annotation__thumb-line" style="width:12px"></div>
+          <div class="annotation__thumb-btn"></div>
+        </div>
+      </div>
+      <span>Appears as this thumbnail on the canvas</span>
+    </div>
+
+    <!-- Arrow from thumbnail annotation towards the wireframe -->
+    <svg class="annotation__arrow" style="bottom: 70px; left: 170px;" width="80" height="50" viewBox="0 0 80 50">
+      <defs>
+        <marker id="anno-arrow" markerWidth="6" markerHeight="5" refX="5" refY="2.5" orient="auto">
+          <path d="M0,0 L6,2.5 L0,5" fill="#7c3aed"/>
+        </marker>
+      </defs>
+      <path d="M10,40 C20,20 50,10 70,8" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4 3" fill="none" marker-end="url(#anno-arrow)"/>
+    </svg>
+
+  </div>
+
+  <!-- AI Panel -->
+  <div class="ai-panel">
+    <div class="ai-panel__header">
+      <div class="ai-panel__icon">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1v3M8 12v3M1 8h3M12 8h3M3.05 3.05l2.12 2.12M10.83 10.83l2.12 2.12M3.05 12.95l2.12-2.12M10.83 5.17l2.12-2.12" stroke="#4f46e5" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      Edit wireframe
+    </div>
+    <div class="ai-panel__body">
+      <div class="ai-panel__msg ai-panel__msg--user">
+        Make a login page for the auth service
+      </div>
+      <div class="ai-panel__msg ai-panel__msg--ai">
+        Here's a login page wireframe with email/password fields, a sign-in button, Google OAuth option, and forgot password link.
+      </div>
+      <div class="ai-panel__msg ai-panel__msg--user">
+        Add a remember me checkbox
+      </div>
+      <div class="ai-panel__msg ai-panel__msg--ai">
+        Added a "Remember me" checkbox between the password field and the sign-in button.
+      </div>
+    </div>
+    <div class="ai-panel__input-area">
+      <input class="ai-panel__input" placeholder="Describe changes..." />
+      <button class="ai-panel__send">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
