@@ -6,24 +6,30 @@ interface Props {
   onClose: () => void
 }
 
-export function SettingsPanel({ open, onClose }: Props) {
-  const { session, signOut } = useAuth()
+interface KeySectionProps {
+  token: string | undefined
+  provider: string
+  label: string
+  placeholder: string
+  hint: string
+  open: boolean
+}
+
+function KeySection({ token, provider, label, placeholder, hint, open }: KeySectionProps) {
   const [apiKey, setApiKey] = useState('')
   const [hasKey, setHasKey] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const token = session?.access_token
-
   useEffect(() => {
     if (!open || !token) return
-    fetch('/api/keys/status', {
+    fetch(`/api/keys/status?provider=${provider}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
       .then((d) => setHasKey(d.hasKey))
       .catch(() => {})
-  }, [open, token])
+  }, [open, token, provider])
 
   const handleSave = async (e: FormEvent) => {
     e.preventDefault()
@@ -38,7 +44,7 @@ export function SettingsPanel({ open, onClose }: Props) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ key: apiKey.trim() }),
+        body: JSON.stringify({ key: apiKey.trim(), provider }),
       })
       if (!res.ok) {
         const text = await res.text()
@@ -58,7 +64,7 @@ export function SettingsPanel({ open, onClose }: Props) {
   const handleDelete = async () => {
     if (!token) return
     try {
-      await fetch('/api/keys', {
+      await fetch(`/api/keys?provider=${provider}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -67,6 +73,39 @@ export function SettingsPanel({ open, onClose }: Props) {
       setError('Failed to delete key')
     }
   }
+
+  return (
+    <div style={styles.section}>
+      <h3 style={styles.sectionTitle}>{label}</h3>
+      {hasKey ? (
+        <div style={styles.keyStatus}>
+          <span style={styles.keyDot} />
+          <span>Key saved</span>
+          <button onClick={handleDelete} style={styles.deleteBtn}>Remove</button>
+        </div>
+      ) : (
+        <p style={styles.hint}>{hint}</p>
+      )}
+      <form onSubmit={handleSave} style={styles.form}>
+        <input
+          type="password"
+          placeholder={hasKey ? 'Replace existing key...' : placeholder}
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          style={styles.input}
+        />
+        <button type="submit" disabled={saving || !apiKey.trim()} style={styles.saveBtn}>
+          {saving ? '...' : 'Save'}
+        </button>
+      </form>
+      {error && <p style={styles.error}>{error}</p>}
+    </div>
+  )
+}
+
+export function SettingsPanel({ open, onClose }: Props) {
+  const { session, signOut } = useAuth()
+  const token = session?.access_token
 
   if (!open) return null
 
@@ -82,31 +121,23 @@ export function SettingsPanel({ open, onClose }: Props) {
           </button>
         </div>
 
-        <div style={styles.section}>
-          <h3 style={styles.sectionTitle}>Anthropic API Key</h3>
-          {hasKey ? (
-            <div style={styles.keyStatus}>
-              <span style={styles.keyDot} />
-              <span>Key saved</span>
-              <button onClick={handleDelete} style={styles.deleteBtn}>Remove</button>
-            </div>
-          ) : (
-            <p style={styles.hint}>Required for AI features</p>
-          )}
-          <form onSubmit={handleSave} style={styles.form}>
-            <input
-              type="password"
-              placeholder={hasKey ? 'Replace existing key...' : 'sk-ant-...'}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              style={styles.input}
-            />
-            <button type="submit" disabled={saving || !apiKey.trim()} style={styles.saveBtn}>
-              {saving ? '...' : 'Save'}
-            </button>
-          </form>
-          {error && <p style={styles.error}>{error}</p>}
-        </div>
+        <KeySection
+          token={token}
+          provider="anthropic"
+          label="Anthropic API Key"
+          placeholder="sk-ant-..."
+          hint="Required for AI features"
+          open={open}
+        />
+
+        <KeySection
+          token={token}
+          provider="openai"
+          label="OpenAI API Key"
+          placeholder="sk-..."
+          hint="Required for image generation"
+          open={open}
+        />
 
         <div style={styles.section}>
           <h3 style={styles.sectionTitle}>Account</h3>

@@ -608,4 +608,130 @@ describe('binary tree scenario — shapes then lines via returned IDs', () => {
     assert.ok(node1Targets.has(ids['2']), 'Node 1 should connect to node 2')
     assert.ok(node1Targets.has(ids['3']), 'Node 1 should connect to node 3')
   })
+
+  describe('generate_image', () => {
+    it('creates an image element at specified position', async () => {
+      const store = createStore()
+      store.actions.addImage = (x, y, w, h, src) => {
+        const id = `img-0`
+        store.all.push({ id, type: 'image', x, y, width: w, height: h, src })
+        return id
+      }
+      const mockGenerateImage = async (prompt: string, size?: string) => ({
+        url: 'https://example.com/generated.png',
+        revised_prompt: 'A detailed cat image',
+      })
+
+      const data = parse(await executeToolCall(
+        call('generate_image', { prompt: 'a cat', x: 200, y: 300, width: 400, height: 400 }),
+        store.actions,
+        undefined,
+        undefined,
+        mockGenerateImage,
+      ))
+      assert.ok(data.success)
+      assert.equal(data.id, 'img-0')
+      assert.equal(data.url, 'https://example.com/generated.png')
+      assert.equal(data.revised_prompt, 'A detailed cat image')
+
+      const el = store.find('img-0')!
+      assert.equal(el.type, 'image')
+      assert.equal(el.x, 200)
+      assert.equal(el.y, 300)
+      assert.equal(el.width, 400)
+      assert.equal(el.height, 400)
+      assert.equal(el.src, 'https://example.com/generated.png')
+    })
+
+    it('uses default position and size when not specified', async () => {
+      const store = createStore()
+      store.actions.addImage = (x, y, w, h, src) => {
+        const id = `img-0`
+        store.all.push({ id, type: 'image', x, y, width: w, height: h, src })
+        return id
+      }
+      const mockGenerateImage = async () => ({
+        url: 'https://example.com/img.png',
+      })
+
+      const data = parse(await executeToolCall(
+        call('generate_image', { prompt: 'a sunset' }),
+        store.actions,
+        undefined,
+        undefined,
+        mockGenerateImage,
+      ))
+      assert.ok(data.success)
+      const el = store.find('img-0')!
+      assert.equal(el.x, 100)
+      assert.equal(el.y, 100)
+      assert.equal(el.width, 512)
+      assert.equal(el.height, 512)
+    })
+
+    it('passes size through to the generation function', async () => {
+      const store = createStore()
+      store.actions.addImage = (x, y, w, h, src) => {
+        store.all.push({ id: 'img-0', type: 'image', x, y, width: w, height: h, src })
+        return 'img-0'
+      }
+      let capturedSize: string | undefined
+      const mockGenerateImage = async (_prompt: string, size?: string) => {
+        capturedSize = size
+        return { url: 'https://example.com/img.png' }
+      }
+
+      await executeToolCall(
+        call('generate_image', { prompt: 'landscape', size: '1792x1024' }),
+        store.actions,
+        undefined,
+        undefined,
+        mockGenerateImage,
+      )
+      assert.equal(capturedSize, '1792x1024')
+    })
+
+    it('returns error when generateImage is not available', async () => {
+      const store = createStore()
+      const data = parse(await executeToolCall(
+        call('generate_image', { prompt: 'a cat' }),
+        store.actions,
+      ))
+      assert.ok(data.error)
+      assert.ok(data.error.includes('not available'))
+    })
+
+    it('returns error when addImage is not available', async () => {
+      const store = createStore()
+      // Provide generateImage but not addImage
+      const mockGenerateImage = async () => ({ url: 'https://example.com/img.png' })
+      const data = parse(await executeToolCall(
+        call('generate_image', { prompt: 'a cat' }),
+        store.actions,
+        undefined,
+        undefined,
+        mockGenerateImage,
+      ))
+      assert.ok(data.error)
+      assert.ok(data.error.includes('not available'))
+    })
+
+    it('returns error when image generation fails', async () => {
+      const store = createStore()
+      store.actions.addImage = () => 'img-0'
+      const mockGenerateImage = async () => {
+        throw new Error('Content policy violation')
+      }
+
+      const data = parse(await executeToolCall(
+        call('generate_image', { prompt: 'bad prompt' }),
+        store.actions,
+        undefined,
+        undefined,
+        mockGenerateImage,
+      ))
+      assert.ok(data.error)
+      assert.ok(data.error.includes('Content policy violation'))
+    })
+  })
 })

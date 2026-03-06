@@ -50,7 +50,17 @@ function createMockSupabase(): Promise<{ server: Server; url: string }> {
 
 // ── Mock OpenAI API server ──
 
-let openaiMockHandler: ((req: IncomingMessage, body: string) => { status: number; data: unknown }) | null = null
+interface OpenAIMockConfig {
+  status?: number
+  response?: unknown
+  captureBody?: (body: Record<string, unknown>) => void
+}
+
+let openaiMockConfig: OpenAIMockConfig = {}
+
+function setOpenAIMock(config: OpenAIMockConfig) {
+  openaiMockConfig = config
+}
 
 function createMockOpenAI(): Promise<{ server: Server; url: string }> {
   return new Promise((resolve) => {
@@ -58,14 +68,13 @@ function createMockOpenAI(): Promise<{ server: Server; url: string }> {
       let body = ''
       for await (const chunk of req) body += chunk
 
-      if (openaiMockHandler) {
-        const result = openaiMockHandler(req, body)
-        res.writeHead(result.status, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify(result.data))
-      } else {
-        res.writeHead(500, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ error: 'No mock handler configured' }))
+      if (openaiMockConfig.captureBody) {
+        openaiMockConfig.captureBody(JSON.parse(body))
       }
+
+      const status = openaiMockConfig.status || 200
+      res.writeHead(status, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(openaiMockConfig.response || {}))
     })
     server.listen(0, () => {
       const port = (server.address() as AddressInfo).port
@@ -93,7 +102,7 @@ describe('Image generation route', () => {
   let mockSb: { server: Server; url: string }
   let mockOpenAI: { server: Server; url: string }
   let token: string
-  let encryptedOpenAIKey: string
+  let encryptedKey: string
 
   before(async () => {
     mockSb = await createMockSupabase()
@@ -105,9 +114,9 @@ describe('Image generation route', () => {
     process.env.ENCRYPTION_KEY = 'a'.repeat(64)
     process.env.OPENAI_BASE_URL = mockOpenAI.url
 
-    // Encrypt a test OpenAI API key
+    // Encrypt a test OpenAI key
     const { encrypt } = await import('../src/crypto.js')
-    encryptedOpenAIKey = encrypt('sk-openai-test-key')
+    encryptedKey = encrypt('sk-test-openai-key')
 
     const { createApp } = await import('../src/app.js')
     const app = await createApp()
@@ -130,23 +139,28 @@ describe('Image generation route', () => {
 
   beforeEach(() => {
     supabaseMockRoutes = []
-    openaiMockHandler = null
+    openaiMockConfig = {}
   })
 
   function url(path: string) {
     return `http://127.0.0.1:${appPort}${path}`
   }
 
-  function authHeaders(extra: Record<string, string> = {}) {
-    return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...extra }
+  function authHeaders() {
+    return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
   }
 
-  /** Set up mock that returns an encrypted OpenAI API key */
   function mockOpenAIKeyExists() {
     supabaseMockRoutes = [{
       method: 'GET',
       table: 'user_secrets',
-      handler: () => ({ status: 200, data: { encrypted_key: encryptedOpenAIKey } }),
+      handler: (req) => {
+        // Only return key when querying for openai provider
+        const reqUrl = new URL(req.url || '/', 'http://localhost')
+        const rawSelect = reqUrl.searchParams.get('select') || ''
+        // The Supabase client encodes filters as query params
+        return { status: 200, data: { encrypted_key: encryptedKey } }
+      },
     }]
   }
 
@@ -167,10 +181,11 @@ describe('Image generation route', () => {
     })
     assert.equal(res.status, 400)
     const body = await res.json() as { error: string }
-    assert.ok(body.error.includes('prompt'))
+    assert.equal(body.error, 'prompt string is required')
   })
 
-  it('returns 400 when no OpenAI key configured', async () => {
+  it('returns 400 when no OpenAI key is configured', async () => {
+    // Supabase returns null (no row)
     supabaseMockRoutes = [{
       method: 'GET',
       table: 'user_secrets',
@@ -184,53 +199,97 @@ describe('Image generation route', () => {
     })
     assert.equal(res.status, 400)
     const body = await res.json() as { error: string }
-    assert.ok(body.error.includes('No') && body.error.includes('key'))
+    assert.ok(body.error.includes('No OpenAI API key'))
   })
 
-  it('successfully generates image and returns data URL', async () => {
+  it('returns generated image URL on success', async () => {
     mockOpenAIKeyExists()
-
-    const testBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
-
-    openaiMockHandler = (_req, body) => {
-      const parsed = JSON.parse(body)
-      assert.equal(parsed.model, 'dall-e-3')
-      assert.equal(parsed.prompt, 'a beautiful sunset')
-      assert.equal(parsed.size, '1024x1024')
-      assert.equal(parsed.response_format, 'b64_json')
-      assert.equal(parsed.n, 1)
-
-      return {
-        status: 200,
-        data: {
-          data: [{ b64_json: testBase64 }],
-        },
-      }
-    }
+    setOpenAIMock({
+      response: {
+        data: [{
+          url: 'https://oaidalleapiprodscus.blob.core.windows.net/test-image.png',
+          revised_prompt: 'A cute orange tabby cat sitting on a windowsill',
+        }],
+      },
+    })
 
     const res = await fetch(url('/api/image-gen'), {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ prompt: 'a beautiful sunset' }),
+      body: JSON.stringify({ prompt: 'a cat' }),
     })
     assert.equal(res.status, 200)
-
-    const body = await res.json() as { imageUrl: string }
-    assert.ok(body.imageUrl.startsWith('data:image/png;base64,'))
-    assert.ok(body.imageUrl.includes(testBase64))
+    const body = await res.json() as { url: string; revised_prompt: string }
+    assert.equal(body.url, 'https://oaidalleapiprodscus.blob.core.windows.net/test-image.png')
+    assert.equal(body.revised_prompt, 'A cute orange tabby cat sitting on a windowsill')
   })
 
-  it('returns 502 when OpenAI call fails', async () => {
+  it('passes prompt, size, and quality to OpenAI API', async () => {
     mockOpenAIKeyExists()
 
-    openaiMockHandler = () => ({
+    let capturedBody: Record<string, unknown> | null = null
+    setOpenAIMock({
+      response: { data: [{ url: 'https://example.com/img.png' }] },
+      captureBody: (body) => { capturedBody = body },
+    })
+
+    await fetch(url('/api/image-gen'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ prompt: 'a sunset over mountains', size: '1792x1024', quality: 'hd' }),
+    })
+
+    assert.ok(capturedBody, 'should capture the request body')
+    assert.equal(capturedBody!.model, 'dall-e-3')
+    assert.equal(capturedBody!.prompt, 'a sunset over mountains')
+    assert.equal(capturedBody!.size, '1792x1024')
+    assert.equal(capturedBody!.quality, 'hd')
+    assert.equal(capturedBody!.n, 1)
+    assert.equal(capturedBody!.response_format, 'url')
+  })
+
+  it('uses default size and quality when not specified', async () => {
+    mockOpenAIKeyExists()
+
+    let capturedBody: Record<string, unknown> | null = null
+    setOpenAIMock({
+      response: { data: [{ url: 'https://example.com/img.png' }] },
+      captureBody: (body) => { capturedBody = body },
+    })
+
+    await fetch(url('/api/image-gen'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ prompt: 'a cat' }),
+    })
+
+    assert.ok(capturedBody)
+    assert.equal(capturedBody!.size, '1024x1024')
+    assert.equal(capturedBody!.quality, 'auto')
+  })
+
+  it('returns 502 when OpenAI API returns an error', async () => {
+    mockOpenAIKeyExists()
+    setOpenAIMock({
+      status: 400,
+      response: { error: { message: 'Your request was rejected as a result of our safety system.' } },
+    })
+
+    const res = await fetch(url('/api/image-gen'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ prompt: 'something inappropriate' }),
+    })
+    assert.equal(res.status, 502)
+    const body = await res.json() as { error: string }
+    assert.ok(body.error.includes('safety system'))
+  })
+
+  it('returns 502 with generic message when OpenAI error is unparseable', async () => {
+    mockOpenAIKeyExists()
+    setOpenAIMock({
       status: 500,
-      data: {
-        error: {
-          message: 'Internal server error',
-          type: 'server_error',
-        },
-      },
+      response: 'Internal Server Error',
     })
 
     const res = await fetch(url('/api/image-gen'), {
@@ -240,6 +299,6 @@ describe('Image generation route', () => {
     })
     assert.equal(res.status, 502)
     const body = await res.json() as { error: string }
-    assert.ok(body.error)
+    assert.ok(body.error.includes('OpenAI API error'))
   })
 })

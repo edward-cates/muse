@@ -1,6 +1,6 @@
 import type { AgentConfig } from './types'
 import type { CanvasElement } from '../../types'
-import { CANVAS_TOOLS, DOCUMENT_TOOLS, RESEARCH_TOOLS } from '../tools'
+import { CANVAS_TOOLS, DOCUMENT_TOOLS, RESEARCH_TOOLS, IMAGE_TOOLS } from '../tools'
 import { buildSystemPrompt } from '../systemPrompt'
 import { isWebCard } from '../../types'
 import type { ToolDefinition } from '../tools'
@@ -48,7 +48,7 @@ For mixed requests (e.g. "research X and create a diagram"):
   return {
     name: 'composer',
     systemPrompt: basePrompt + composerAddendum,
-    tools: dedupeTools([...CANVAS_TOOLS, ...DOCUMENT_TOOLS, ...RESEARCH_TOOLS]),
+    tools: dedupeTools([...CANVAS_TOOLS, ...DOCUMENT_TOOLS, ...RESEARCH_TOOLS, ...IMAGE_TOOLS]),
     nativeTools: [
       { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
     ],

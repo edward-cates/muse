@@ -7,9 +7,9 @@ import keysRouter from './routes/keys.js'
 import aiRouter from './routes/ai.js'
 import documentsRouter from './routes/documents.js'
 import fetchRouter from './routes/fetch.js'
+import imageGenRouter from './routes/image-gen.js'
 import ailogRouter from './routes/ailog.js'
 import decomposeRouter from './routes/decompose.js'
-import imageGenRouter from './routes/image-gen.js'
 import { setupPersistence } from './persistence.js'
 
 // ── Express types augmentation ──
@@ -102,9 +102,9 @@ export async function createApp(): Promise<AppInstance> {
   app.use('/api/documents', authMiddleware, documentsRouter)
   app.use('/api/drawings', authMiddleware, documentsRouter) // backward compat alias
   app.use('/api/fetch', authMiddleware, fetchRouter)
+  app.use('/api/image-gen', authMiddleware, imageGenRouter)
   app.use('/api/ailog', authMiddleware, ailogRouter)
   app.use('/api/decompose', authMiddleware, decomposeRouter)
-  app.use('/api/image-gen', authMiddleware, imageGenRouter)
 
   // ── HTTP + WS ──
   const server = createHttpServer(app)

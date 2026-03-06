@@ -13,10 +13,10 @@ export interface ElementActions {
   addLine: (startShapeId: string, endShapeId: string, lineType?: LineType) => string
   addArrow: (startShapeId: string, endShapeId: string, startX: number, startY: number, endX: number, endY: number, lineType?: LineType) => string
   addText: (x: number, y: number) => string
+  addImage?: (x: number, y: number, w: number, h: number, src: string) => string
   addWebCard?: (x: number, y: number, w: number, h: number, url: string, title: string, snippet: string) => string
   addDocumentCard?: (x: number, y: number, w: number, h: number, documentId: string, documentType: string, title: string) => string
   addDecompositionCard?: (x: number, y: number, w: number, h: number, topic: string, summary: string, lineRanges: number[], color: string, documentId: string) => string
-  addImage?: (x: number, y: number, w: number, h: number, src: string) => string
   updateElement: (id: string, updates: Record<string, unknown>) => void
   deleteElement: (id: string) => void
   getElements: () => CanvasElement[]
@@ -36,7 +36,7 @@ export interface DecomposeTextFn {
 }
 
 export interface GenerateImageFn {
-  (prompt: string): Promise<{ imageUrl: string }>
+  (prompt: string, size?: string): Promise<{ url: string; revised_prompt?: string }>
 }
 
 function findElement(elements: CanvasElement[], id: string): CanvasElement | undefined {
@@ -388,12 +388,18 @@ export async function executeToolCall(
         if (!generateImage || !actions.addImage) {
           return { tool_use_id: call.id, content: JSON.stringify({ error: 'Image generation not available' }) }
         }
-        const { prompt, x = 100, y = 100, width = 400, height = 400 } = call.input as {
-          prompt: string; x?: number; y?: number; width?: number; height?: number
+        const { prompt, x = 100, y = 100, width = 512, height = 512, size } = call.input as {
+          prompt: string; x?: number; y?: number; width?: number; height?: number; size?: string
         }
-        const result = await generateImage(prompt)
-        const id = actions.addImage(x, y, width, height, result.imageUrl)
-        return { tool_use_id: call.id, content: JSON.stringify({ id, success: true, message: `Generated image for "${prompt.slice(0, 50)}"` }) }
+        const result = await generateImage(prompt, size)
+        const id = actions.addImage(x, y, width, height, result.url)
+        return {
+          tool_use_id: call.id,
+          content: JSON.stringify({
+            id, url: result.url, revised_prompt: result.revised_prompt,
+            success: true, message: `Generated image at (${x}, ${y}) ${width}×${height}`,
+          }),
+        }
       }
 
       default:

@@ -8,16 +8,7 @@ function getSupabase() {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
-router.post('/', async (req, res) => {
-  const userId = req.userId!
-  const { prompt, size } = req.body
-
-  if (!prompt || typeof prompt !== 'string') {
-    res.status(400).json({ error: 'prompt is required' })
-    return
-  }
-
-  // Get the user's OpenAI API key
+async function decryptOpenAIKey(userId: string): Promise<string> {
   const supabase = getSupabase()
   const { data: secret } = await supabase
     .from('user_secrets')
@@ -27,51 +18,75 @@ router.post('/', async (req, res) => {
     .maybeSingle()
 
   if (!secret) {
-    res.status(400).json({ error: 'No OpenAI key configured. Add one in Settings.' })
+    throw Object.assign(new Error('No OpenAI API key configured. Add one in Settings.'), { status: 400 })
+  }
+
+  try {
+    return decrypt(secret.encrypted_key)
+  } catch {
+    throw Object.assign(new Error('Failed to decrypt OpenAI API key'), { status: 500 })
+  }
+}
+
+// POST /api/image-gen — generate an image via OpenAI DALL-E
+router.post('/', async (req, res) => {
+  const userId = req.userId!
+  const { prompt, size = '1024x1024', quality = 'auto' } = req.body
+
+  if (!prompt || typeof prompt !== 'string') {
+    res.status(400).json({ error: 'prompt string is required' })
     return
   }
 
   let apiKey: string
   try {
-    apiKey = decrypt(secret.encrypted_key)
-  } catch {
-    res.status(500).json({ error: 'Failed to decrypt API key' })
+    apiKey = await decryptOpenAIKey(userId)
+  } catch (err: unknown) {
+    const status = (err as { status?: number }).status || 500
+    const message = err instanceof Error ? err.message : 'Failed to get API key'
+    res.status(status).json({ error: message })
     return
   }
 
-  // Call OpenAI image generation API
-  const baseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com'
   try {
+    const baseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com'
     const response = await fetch(`${baseUrl}/v1/images/generations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: 'dall-e-3',
         prompt,
-        size: size || '1024x1024',
-        response_format: 'b64_json',
         n: 1,
+        size,
+        quality,
+        response_format: 'url',
       }),
     })
 
     if (!response.ok) {
-      const errorBody = await response.text()
-      console.error('OpenAI API error:', response.status, errorBody)
-      res.status(502).json({ error: `OpenAI API error: ${response.status}` })
+      const body = await response.text()
+      let message = `OpenAI API error (${response.status})`
+      try {
+        const parsed = JSON.parse(body)
+        message = parsed.error?.message || message
+      } catch {}
+      res.status(502).json({ error: message })
       return
     }
 
-    const data = await response.json() as { data: Array<{ b64_json: string }> }
-    const b64 = data.data[0].b64_json
-    const imageUrl = `data:image/png;base64,${b64}`
+    const data = (await response.json()) as { data: Array<{ url: string; revised_prompt?: string }> }
+    const image = data.data[0]
 
-    res.json({ imageUrl })
+    res.json({
+      url: image.url,
+      revised_prompt: image.revised_prompt,
+    })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Image generation failed'
-    res.status(502).json({ error: message })
+    res.status(500).json({ error: message })
   }
 })
 
