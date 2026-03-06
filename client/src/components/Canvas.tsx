@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect, useImperativeHandle, forwardRef, type MouseEvent, type Ref } from 'react'
+import { useRef, useState, useCallback, useEffect, useImperativeHandle, useMemo, forwardRef, type MouseEvent, type Ref } from 'react'
 import { useCursors } from '../hooks/useCursors'
 import { useCollab } from '../collab/CollabContext'
 import { ShapeRenderer } from './ShapeRenderer'
@@ -8,7 +8,7 @@ import { FrameRenderer } from './FrameRenderer'
 import { WebCardRenderer } from './WebCardRenderer'
 import { DocumentCardRenderer } from './DocumentCardRenderer'
 import { PathLayer } from './PathLayer'
-import { LineLayer, edgeIntersection } from './LineLayer'
+import { LineLayer, edgeIntersection, type ConnectableElement } from './LineLayer'
 import { Cursors } from './Cursors'
 import { PropertyPanel } from './PropertyPanel'
 import { AlignmentToolbar } from './AlignmentToolbar'
@@ -169,6 +169,21 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
   const frames = elements.filter(isFrame)
   const webCards = elements.filter(isWebCard)
   const documentCards = elements.filter(isDocumentCard)
+  // Elements that can be connector endpoints (shapes + text with resolved bounds)
+  const connectables: ConnectableElement[] = useMemo(() => {
+    const resolved = texts.map(t => {
+      if (t.width > 0 && t.height > 0) return t as ConnectableElement
+      // Auto-sized text: read DOM for actual size
+      const domEl = canvasRef.current?.querySelector(`[data-shape-id="${t.id}"]`) as HTMLElement | null
+      if (domEl) {
+        const w = domEl.offsetWidth
+        const h = domEl.offsetHeight
+        return { ...t, width: w || 20, height: h || 20 } as ConnectableElement
+      }
+      return { ...t, width: 20, height: 20 } as ConnectableElement
+    })
+    return [...shapes, ...resolved]
+  }, [shapes, texts])
   shapesRef.current = shapes
   pathsRef.current = paths
   linesRef.current = lines
@@ -326,10 +341,31 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
     }
   }
 
-  function hitTestShape(world: { x: number; y: number }): ShapeElement | undefined {
+  /** Get the rendered bounding box for an element (handles auto-sized text elements with width=0). */
+  function getElementBounds(el: { id: string; x: number; y: number; width: number; height: number }) {
+    if (el.width > 0 && el.height > 0) return el
+    // Auto-sized element — read from DOM
+    const domEl = canvasRef.current?.querySelector(`[data-shape-id="${el.id}"]`) as HTMLElement | null
+    if (!domEl) return el
+    const w = domEl.offsetWidth / scale
+    const h = domEl.offsetHeight / scale
+    return { ...el, width: w || 20, height: h || 20 }
+  }
+
+  function hitTestShape(world: { x: number; y: number }): ConnectableElement | undefined {
+    // Check shapes
     for (let i = shapesRef.current.length - 1; i >= 0; i--) {
       const s = shapesRef.current[i]
       if (pointInShape(s, world.x, world.y)) return s
+    }
+    // Check text elements
+    for (let i = texts.length - 1; i >= 0; i--) {
+      const t = texts[i]
+      const bounds = getElementBounds(t)
+      if (world.x >= bounds.x && world.x <= bounds.x + bounds.width &&
+          world.y >= bounds.y && world.y <= bounds.y + bounds.height) {
+        return { ...t, width: bounds.width, height: bounds.height } as ConnectableElement
+      }
     }
     return undefined
   }
@@ -348,7 +384,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
           if (dx * dx + dy * dy < HIT_DIST * HIT_DIST) return el
         }
       } else if ('width' in el && 'height' in el && 'x' in el && 'y' in el) {
-        const s = el as { x: number; y: number; width: number; height: number }
+        const s = getElementBounds(el as { id: string; x: number; y: number; width: number; height: number })
         if (world.x >= s.x && world.x <= s.x + s.width && world.y >= s.y && world.y <= s.y + s.height) {
           return el
         }
@@ -1042,7 +1078,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
           drawingPath={drawingPath}
         />
         <LineLayer
-          shapes={shapes}
+          shapes={connectables}
           lines={lines}
           selectedIds={selectedIds}
           onSelect={handleSelect}
@@ -1267,18 +1303,22 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
           if (selectedLines.length === 0) return null
 
           return selectedLines.map((selectedLine) => {
+            const findConnectable = (id: string) => {
+              const el = connectables.find(c => c.id === id)
+              return el ? getElementBounds(el) as ConnectableElement : undefined
+            }
             const otherEndTarget = selectedLine.endShapeId
-              ? (() => { const s = shapes.find(sh => sh.id === selectedLine.endShapeId); return s ? { x: s.x + s.width / 2, y: s.y + s.height / 2 } : null })()
+              ? (() => { const s = findConnectable(selectedLine.endShapeId); return s ? { x: s.x + s.width / 2, y: s.y + s.height / 2 } : null })()
               : { x: selectedLine.endX, y: selectedLine.endY }
             const otherStartTarget = selectedLine.startShapeId
-              ? (() => { const s = shapes.find(sh => sh.id === selectedLine.startShapeId); return s ? { x: s.x + s.width / 2, y: s.y + s.height / 2 } : null })()
+              ? (() => { const s = findConnectable(selectedLine.startShapeId); return s ? { x: s.x + s.width / 2, y: s.y + s.height / 2 } : null })()
               : { x: selectedLine.startX, y: selectedLine.startY }
 
             const startPt = selectedLine.startShapeId
-              ? (() => { const s = shapes.find(sh => sh.id === selectedLine.startShapeId); return s && otherEndTarget ? edgeIntersection(s, otherEndTarget) : null })()
+              ? (() => { const s = findConnectable(selectedLine.startShapeId); return s && otherEndTarget ? edgeIntersection(s, otherEndTarget) : null })()
               : { x: selectedLine.startX, y: selectedLine.startY }
             const endPt = selectedLine.endShapeId
-              ? (() => { const s = shapes.find(sh => sh.id === selectedLine.endShapeId); return s && otherStartTarget ? edgeIntersection(s, otherStartTarget) : null })()
+              ? (() => { const s = findConnectable(selectedLine.endShapeId); return s && otherStartTarget ? edgeIntersection(s, otherStartTarget) : null })()
               : { x: selectedLine.endX, y: selectedLine.endY }
 
             return (
