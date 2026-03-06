@@ -88,15 +88,27 @@ interface Props {
 // Module-level persistent state — survives component remounts during navigation
 let _persistedChat: ChatMessage[] = []
 let _persistedApi: ApiMessage[] = []
+let _persistedChatId: string | null = null
+
+interface ChatListItem {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
+}
 
 export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMinimap, onToggleDarkMode }: Props) {
   const { session } = useAuth()
   const connectionStatus = useConnection()
   const [chatMessages, _setChatMessages] = useState<ChatMessage[]>(_persistedChat)
   const [apiMessages, _setApiMessages] = useState<ApiMessage[]>(_persistedApi)
+  const [chatId, _setChatId] = useState<string | null>(_persistedChatId)
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
+  const [chatList, setChatList] = useState<ChatListItem[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -114,6 +126,74 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
     _persistedApi = next
     _setApiMessages(next)
   }, [])
+
+  const setChatId = useCallback((id: string | null) => {
+    _persistedChatId = id
+    _setChatId(id)
+  }, [])
+
+  /** Save current chat to server */
+  async function saveChat(finalChatMessages: ChatMessage[], finalApiMessages: ApiMessage[]) {
+    if (!session?.access_token || finalChatMessages.length === 0) return
+    try {
+      const res = await fetch('/api/ai/chats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          ...(chatId ? { id: chatId } : {}),
+          messages: finalChatMessages.map(m => ({ role: m.role, content: m.content })),
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json() as { id: string }
+        if (!chatId) setChatId(data.id)
+      }
+    } catch { /* best-effort */ }
+  }
+
+  /** Load chat list from server */
+  async function loadChatList() {
+    if (!session?.access_token) return
+    setLoadingHistory(true)
+    try {
+      const res = await fetch('/api/ai/chats', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (res.ok) {
+        const data = await res.json() as { chats: ChatListItem[] }
+        setChatList(data.chats)
+      }
+    } catch { /* best-effort */ }
+    setLoadingHistory(false)
+  }
+
+  /** Load a specific chat by ID */
+  async function loadChat(id: string) {
+    if (!session?.access_token) return
+    try {
+      const res = await fetch(`/api/ai/chats/${id}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (res.ok) {
+        const data = await res.json() as { id: string; messages: ChatMessage[] }
+        setChatId(data.id)
+        setChatMessages(data.messages)
+        setApiMessages([]) // API messages not persisted — new turns start fresh context
+        setShowHistory(false)
+      }
+    } catch { /* best-effort */ }
+  }
+
+  /** Start a new chat */
+  function startNewChat() {
+    setChatId(null)
+    setChatMessages([])
+    setApiMessages([])
+    setShowHistory(false)
+  }
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -375,6 +455,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
     log(0, 'config.json', { agent: config.name, maxTurns: config.maxTurns, vqa: !!config.vqa, toolCount: allTools.length })
     log(0, 'system-prompt.txt', config.systemPrompt)
 
+    try {
     while (looping && turns < config.maxTurns) {
       turns++
 
@@ -550,6 +631,16 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
     })
 
     return currentApiMessages
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      const errStack = err instanceof Error ? err.stack : undefined
+      log(turns, 'error.json', {
+        error: errMsg,
+        stack: errStack,
+        timestamp: new Date().toISOString(),
+      })
+      throw err
+    }
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -626,6 +717,9 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
       // Save final API messages state for future conversation turns
       setApiMessages(finalMessages)
 
+      // Auto-save chat to DB (best-effort, after agent loop completes)
+      saveChat(_persistedChat, finalMessages)
+
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         setChatMessages((prev) => {
@@ -637,6 +731,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         return
       }
       const errMsg = err instanceof Error ? err.message : 'Something went wrong'
+      console.error('[AI agent loop error]', err)
       setChatMessages((prev) => {
         const updated = [...prev]
         const last = updated[updated.length - 1]
@@ -662,6 +757,18 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
           <h2 style={styles.title}>AI</h2>
         </div>
         <div style={styles.headerActions}>
+          <button
+            className="statusbar__btn"
+            data-testid="chat-history-btn"
+            onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadChatList() }}
+            title="Chat History"
+            style={showHistory ? { background: 'rgba(79, 70, 229, 0.1)', color: '#4f46e5' } : {}}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          </button>
           <button className="statusbar__btn" data-testid="toggle-minimap" onClick={onToggleMinimap} title="Minimap">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -682,6 +789,35 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         </div>
       </div>
 
+      {showHistory ? (
+        <div style={styles.messages}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Chat History</span>
+            <button
+              onClick={startNewChat}
+              data-testid="new-chat-btn"
+              style={styles.newChatBtn}
+            >
+              + New Chat
+            </button>
+          </div>
+          {loadingHistory && <p style={styles.empty}>Loading...</p>}
+          {!loadingHistory && chatList.length === 0 && <p style={styles.empty}>No saved chats yet.</p>}
+          {chatList.map(chat => (
+            <button
+              key={chat.id}
+              data-testid="chat-list-item"
+              onClick={() => loadChat(chat.id)}
+              style={styles.chatListItem}
+            >
+              <span style={styles.chatListTitle}>{chat.title}</span>
+              <span style={styles.chatListDate}>
+                {new Date(chat.updated_at).toLocaleDateString()}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (<>
       <div style={styles.messages}>
         {chatMessages.length === 0 && (
           <p style={styles.empty}>Ask me to create diagrams, research topics, or chat...</p>
@@ -793,6 +929,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
           </button>
         )}
       </form>
+      </>)}
     </div>
   )
 }
@@ -968,5 +1105,43 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: 10,
     cursor: 'pointer',
+  },
+  newChatBtn: {
+    fontSize: 12,
+    fontWeight: 500,
+    color: '#4f46e5',
+    background: 'rgba(79, 70, 229, 0.08)',
+    border: 'none',
+    borderRadius: 6,
+    padding: '4px 10px',
+    cursor: 'pointer',
+  },
+  chatListItem: {
+    width: '100%',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '10px 12px',
+    background: '#f9fafb',
+    border: '1px solid rgba(0,0,0,0.06)',
+    borderRadius: 8,
+    cursor: 'pointer',
+    textAlign: 'left' as const,
+    gap: 8,
+  },
+  chatListTitle: {
+    fontSize: 13,
+    fontWeight: 500,
+    color: '#111',
+    overflow: 'hidden' as const,
+    textOverflow: 'ellipsis' as const,
+    whiteSpace: 'nowrap' as const,
+    flex: 1,
+  },
+  chatListDate: {
+    fontSize: 11,
+    color: '#9ca3af',
+    whiteSpace: 'nowrap' as const,
+    flexShrink: 0,
   },
 }
