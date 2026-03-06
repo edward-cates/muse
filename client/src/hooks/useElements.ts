@@ -121,6 +121,8 @@ export function readElement(m: Y.Map<YMapVal>): CanvasElement {
       topicLabels: (m.get('topicLabels') as string) || '',
       topicColors: (m.get('topicColors') as string) || '',
       contentVersion: (m.get('contentVersion') as number) || 0,
+      jobId: (m.get('jobId') as string) || '',
+      jobStatus: (m.get('jobStatus') as string) || '',
       opacity: (m.get('opacity') as number) ?? 100,
     }
   }

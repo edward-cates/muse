@@ -10,6 +10,8 @@ import fetchRouter from './routes/fetch.js'
 import imageGenRouter from './routes/image-gen.js'
 import ailogRouter from './routes/ailog.js'
 import decomposeRouter from './routes/decompose.js'
+import chatsRouter from './routes/chats.js'
+import jobsRouter from './routes/jobs.js'
 import { setupPersistence } from './persistence.js'
 
 // ── Express types augmentation ──
@@ -105,6 +107,8 @@ export async function createApp(): Promise<AppInstance> {
   app.use('/api/image-gen', authMiddleware, imageGenRouter)
   app.use('/api/ailog', authMiddleware, ailogRouter)
   app.use('/api/decompose', authMiddleware, decomposeRouter)
+  app.use('/api/ai/chats', authMiddleware, chatsRouter)
+  app.use('/api/jobs', authMiddleware, jobsRouter)
 
   // ── HTTP + WS ──
   const server = createHttpServer(app)

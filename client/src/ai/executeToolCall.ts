@@ -77,10 +77,24 @@ export async function executeToolCall(
 
     switch (call.name) {
       case 'add_shape': {
-        const { shape_type, x, y, width, height, text, fill, stroke, strokeWidth } = call.input as {
+        const { shape_type, x, y, width, height, text, fill, stroke, strokeWidth, target_document_id } = call.input as {
           shape_type: string; x: number; y: number; width: number; height: number
-          text?: string; fill?: string; stroke?: string; strokeWidth?: number
+          text?: string; fill?: string; stroke?: string; strokeWidth?: number; target_document_id?: string
         }
+
+        // If targeting a child canvas, write remotely via server API
+        if (target_document_id && actions.addRemoteElements) {
+          const elData: Record<string, string | number | number[]> = {
+            type: shape_type, x, y, width: Math.max(20, width), height: Math.max(20, height), opacity: 100,
+          }
+          if (text !== undefined) elData.text = text
+          if (fill !== undefined) elData.fill = fill
+          if (stroke !== undefined) elData.stroke = stroke
+          if (strokeWidth !== undefined) elData.strokeWidth = strokeWidth
+          const result = await actions.addRemoteElements(target_document_id, [elData])
+          return { tool_use_id: call.id, content: JSON.stringify({ id: result.ids[0], target_document_id, success: true, message: `Created ${shape_type} in child canvas` }) }
+        }
+
         const warnings: string[] = []
 
         const dims = clampDimensions(width, height)
@@ -197,11 +211,32 @@ export async function executeToolCall(
           start_shape_id, end_shape_id,
           start_x, start_y, end_x, end_y,
           arrowStart, arrowEnd, lineType, stroke, strokeWidth,
+          target_document_id,
         } = call.input as {
           start_shape_id?: string; end_shape_id?: string
           start_x?: number; start_y?: number; end_x?: number; end_y?: number
           arrowStart?: boolean; arrowEnd?: boolean
           lineType?: string; stroke?: string; strokeWidth?: number
+          target_document_id?: string
+        }
+
+        // If targeting a child canvas, write remotely via server API
+        if (target_document_id && actions.addRemoteElements) {
+          const elData: Record<string, string | number | number[]> = {
+            type: 'line',
+            startShapeId: start_shape_id || '', endShapeId: end_shape_id || '',
+            startAnchor: 'right', endAnchor: 'left',
+            startX: start_x ?? 0, startY: start_y ?? 0,
+            endX: end_x ?? 0, endY: end_y ?? 0,
+            lineType: lineType || 'straight',
+            arrowStart: arrowStart ? 1 : 0,
+            arrowEnd: arrowEnd !== false ? 1 : 0,
+            opacity: 100,
+          }
+          if (stroke !== undefined) elData.stroke = stroke
+          if (strokeWidth !== undefined) elData.strokeWidth = strokeWidth
+          const result = await actions.addRemoteElements(target_document_id, [elData])
+          return { tool_use_id: call.id, content: JSON.stringify({ id: result.ids[0], target_document_id, success: true }) }
         }
 
         const startResolved = start_shape_id ? resolveShape(elements, start_shape_id) : undefined

@@ -1151,6 +1151,68 @@ body {
   pointer-events: none;
 }
 
+/* ── Job status indicator on document cards ── */
+.document-card__job-status {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+}
+.document-card__job-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.document-card__job-dot--pending {
+  background: #94a3b8;
+  animation: job-pulse 1.8s ease-in-out infinite;
+}
+.document-card__job-dot--running {
+  background: #6366f1;
+  animation: job-pulse 1.2s ease-in-out infinite;
+}
+.document-card__job-status--failed .document-card__job-dot,
+.document-card__job-status--stalled .document-card__job-dot {
+  display: none;
+}
+.document-card__job-status--failed {
+  color: #dc2626;
+}
+.document-card__job-status--stalled {
+  color: #d97706;
+}
+.document-card__job-status--failed svg,
+.document-card__job-status--stalled svg {
+  flex-shrink: 0;
+}
+.document-card__job-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #64748b;
+}
+.document-card__job-status--failed .document-card__job-label {
+  color: #dc2626;
+}
+.document-card__job-status--stalled .document-card__job-label {
+  color: #d97706;
+}
+@keyframes job-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
 /* ── Drill-in button ── */
 .drill-in-btn {
   position: absolute;

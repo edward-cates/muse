@@ -11,7 +11,7 @@ export interface ToolDefinition {
 export const CANVAS_TOOLS: ToolDefinition[] = [
   {
     name: 'add_shape',
-    description: 'Add a shape to the canvas. Returns the new shape ID.',
+    description: 'Add a shape to the canvas. Returns the new shape ID. Use target_document_id to add to a child canvas.',
     input_schema: {
       type: 'object',
       properties: {
@@ -28,6 +28,7 @@ export const CANVAS_TOOLS: ToolDefinition[] = [
         fill: { type: 'string', description: 'Fill color as hex, e.g. #e8edfc' },
         stroke: { type: 'string', description: 'Stroke color as hex, e.g. #4465e9' },
         strokeWidth: { type: 'number', description: 'Stroke width in pixels (default 2.5)' },
+        target_document_id: { type: 'string', description: 'Add shape to this child canvas instead of the current one' },
       },
       required: ['shape_type', 'x', 'y', 'width', 'height'],
     },
@@ -100,7 +101,7 @@ export const CANVAS_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'add_arrow',
-    description: 'Add an arrow connector. Either or both endpoints can attach to shapes (via ID) or be free-floating (via x,y coordinates). Routing is automatic.',
+    description: 'Add an arrow connector. Either or both endpoints can attach to shapes (via ID) or be free-floating (via x,y coordinates). Routing is automatic. Use target_document_id for child canvas.',
     input_schema: {
       type: 'object',
       properties: {
@@ -119,6 +120,7 @@ export const CANVAS_TOOLS: ToolDefinition[] = [
         },
         stroke: { type: 'string', description: 'Arrow color as hex' },
         strokeWidth: { type: 'number', description: 'Arrow width in pixels' },
+        target_document_id: { type: 'string', description: 'Add arrow to this child canvas instead of the current one' },
       },
       required: [],
     },

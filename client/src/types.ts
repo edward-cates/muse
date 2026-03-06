@@ -141,6 +141,8 @@ export interface DocumentCardElement {
   topicLabels: string    // pipe-separated topic titles (e.g. "AI Trends|Data Infra|Hiring")
   topicColors: string    // pipe-separated hex colors (e.g. "#3b82f6|#22c55e|#a855f7")
   contentVersion: number // re-fetch preview when this changes
+  jobId: string          // agent job ID — card shows status indicator while job runs
+  jobStatus: string      // 'pending' | 'running' | 'completed' | 'failed' | 'stalled' | ''
   opacity: number
 }
 

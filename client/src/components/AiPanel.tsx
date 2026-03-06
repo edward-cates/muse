@@ -10,6 +10,7 @@ import { buildResearcherConfig } from '../ai/agents/researcher'
 import { buildComposerConfig } from '../ai/agents/composer'
 import type { AgentConfig } from '../ai/agents/types'
 import type { CanvasElement } from '../types'
+import { useJobStatus, createJob } from '../hooks/useJobStatus'
 
 // ── AI interaction logger ──
 
@@ -109,8 +110,12 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
   const [showHistory, setShowHistory] = useState(false)
   const [chatList, setChatList] = useState<ChatListItem[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Poll job status when a server-side job is active
+  const jobStatus = useJobStatus(activeJobId, session?.access_token || null)
 
   // Wrap setState to persist across remounts.
   // Update the module-level variable FIRST (always works), then call setState
@@ -131,6 +136,41 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
     _persistedChatId = id
     _setChatId(id)
   }, [])
+
+  // Update chat UI when job status changes
+  useEffect(() => {
+    if (!jobStatus || !activeJobId) return
+
+    if (jobStatus.status === 'running') {
+      const step = jobStatus.progress?.step as string || 'working'
+      const tool = jobStatus.progress?.tool as string || ''
+      const desc = tool ? `${step}: ${tool}` : step
+      setStatus(desc.replace(/_/g, ' '))
+    } else if (jobStatus.status === 'completed') {
+      const resultText = (jobStatus.result as { textContent?: string })?.textContent || 'Research complete.'
+      setChatMessages(prev => {
+        const filtered = prev.filter((m, i) => !(m.role === 'assistant' && m.content === '' && i === prev.length - 1))
+        return [...filtered, { role: 'assistant', content: resultText }]
+      })
+      setStreaming(false)
+      setStatus(null)
+      setActiveJobId(null)
+    } else if (jobStatus.status === 'failed' || jobStatus.status === 'stalled') {
+      const errMsg = jobStatus.error || 'Job failed'
+      setChatMessages(prev => {
+        const filtered = prev.filter((m, i) => !(m.role === 'assistant' && m.content === '' && i === prev.length - 1))
+        return [...filtered, { role: 'assistant', content: `Error: ${errMsg}` }]
+      })
+      setStreaming(false)
+      setStatus(null)
+      setActiveJobId(null)
+    } else if (jobStatus.status === 'cancelled') {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Research cancelled.' }])
+      setStreaming(false)
+      setStatus(null)
+      setActiveJobId(null)
+    }
+  }, [jobStatus, activeJobId, setChatMessages])
 
   /** Save current chat to server */
   async function saveChat(finalChatMessages: ChatMessage[], finalApiMessages: ApiMessage[]) {
@@ -688,6 +728,28 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         : agentConfig.name === 'composer' ? 'Composing'
         : 'Editing canvas'
       setChatMessages((prev) => [...prev, { role: 'status', content: agentLabel }])
+    }
+
+    // Route research to server-side job system
+    if (agentConfig.name === 'researcher') {
+      try {
+        // Get the current document ID from the URL hash
+        const hashMatch = window.location.hash.match(/#\/d\/(.+)/)
+        const documentId = hashMatch?.[1]
+        if (!documentId) throw new Error('No active document — navigate to a canvas first')
+
+        const jobId = await createJob(session.access_token, 'research', { message: text }, documentId)
+        setActiveJobId(jobId)
+        setStatus('Starting research...')
+        // Don't call runAgentLoop — the server handles it
+        return
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Failed to start research job'
+        setChatMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${errMsg}` }])
+        setStreaming(false)
+        setStatus(null)
+        return
+      }
     }
 
     // Build user content: screenshot + text

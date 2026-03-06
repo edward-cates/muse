@@ -196,6 +196,24 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
     >
+      {element.jobStatus && element.jobStatus !== 'completed' && (
+        <div className={`document-card__job-status document-card__job-status--${element.jobStatus}`}>
+          {element.jobStatus === 'pending' && (
+            <span className="document-card__job-dot document-card__job-dot--pending" />
+          )}
+          {element.jobStatus === 'running' && (
+            <span className="document-card__job-dot document-card__job-dot--running" />
+          )}
+          {(element.jobStatus === 'failed' || element.jobStatus === 'stalled') && (
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          )}
+          <span className="document-card__job-label">
+            {element.jobStatus === 'pending' ? 'Queued' : element.jobStatus === 'running' ? 'Working...' : element.jobStatus === 'failed' ? 'Failed' : 'Stalled'}
+          </span>
+        </div>
+      )}
       {isHtml && (
         <div className="document-card__chrome">
           <span className="document-card__chrome-dot document-card__chrome-dot--r" />

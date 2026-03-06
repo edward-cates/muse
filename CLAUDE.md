@@ -63,8 +63,8 @@ e2e/
   integration/          Full-stack tests (real Supabase + server)
 
 supabase/migrations/
-  001_init.sql    drawings + user_secrets tables with RLS
-  002_drawing_content.sql  bytea column for Yjs doc content
+  001_core.sql    documents + user_secrets tables with RLS
+  002_ai.sql      ai_chats + agent_jobs tables
 ```
 
 ## Testing
