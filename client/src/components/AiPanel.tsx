@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../auth/AuthContext'
+import { useConnection } from '../hooks/useConnection'
 import { executeToolCall, type ToolCall, type ElementActions } from '../ai/executeToolCall'
 import { captureCanvas, computeBounds } from '../ai/canvasCapture'
 import { classifyIntent, type AgentIntent } from '../ai/router'
@@ -76,14 +77,16 @@ type SseEvent = SseTextDelta | SseToolUseStart | SseInputJsonDelta | SseContentB
 // ── Component ──
 
 interface Props {
-  open: boolean
-  onClose: () => void
   elements: CanvasElement[]
   elementActions: ElementActions
+  onSettingsClick: () => void
+  onToggleMinimap: () => void
+  onToggleDarkMode: () => void
 }
 
-export function AiPanel({ open, onClose, elements, elementActions }: Props) {
+export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMinimap, onToggleDarkMode }: Props) {
   const { session } = useAuth()
+  const connectionStatus = useConnection()
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [apiMessages, setApiMessages] = useState<ApiMessage[]>([])
   const [input, setInput] = useState('')
@@ -581,17 +584,32 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
     }
   }
 
-  if (!open) return null
-
   return (
     <div style={styles.panel}>
       <div style={styles.header}>
-        <h2 style={styles.title}>AI</h2>
-        <button onClick={onClose} style={styles.closeBtn}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
+        <div style={styles.headerLeft}>
+          <span className={`statusbar__dot statusbar__dot--${connectionStatus}`} />
+          <h2 style={styles.title}>AI</h2>
+        </div>
+        <div style={styles.headerActions}>
+          <button className="statusbar__btn" onClick={onToggleMinimap} title="Minimap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <rect x="7" y="7" width="10" height="10" rx="1" />
+            </svg>
+          </button>
+          <button className="statusbar__btn" onClick={onToggleDarkMode} title="Dark Mode">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          </button>
+          <button className="statusbar__btn" onClick={onSettingsClick} title="Settings">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div style={styles.messages}>
@@ -711,37 +729,36 @@ export function AiPanel({ open, onClose, elements, elementActions }: Props) {
 
 const styles: Record<string, React.CSSProperties> = {
   panel: {
-    position: 'fixed',
-    top: 0,
-    right: 0,
     width: 380,
-    height: '100vh',
+    height: '100%',
     background: '#fff',
     borderLeft: '1px solid rgba(0,0,0,0.08)',
-    boxShadow: '-4px 0 24px rgba(0,0,0,0.06)',
     display: 'flex',
     flexDirection: 'column',
-    zIndex: 900,
+    flexShrink: 0,
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '16px 20px',
+    padding: '12px 16px',
     borderBottom: '1px solid rgba(0,0,0,0.06)',
   },
+  headerLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 2,
+  },
   title: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 700,
     color: '#111',
     margin: 0,
-  },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: '#6b7280',
-    padding: 4,
   },
   messages: {
     flex: 1,

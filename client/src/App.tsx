@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Canvas, type CanvasHandle } from './components/Canvas'
 import { Toolbar } from './components/Toolbar'
-import { StatusBar } from './components/StatusBar'
 import { SettingsPanel } from './components/SettingsPanel'
 import { AiPanel } from './components/AiPanel'
 import { DocumentsList } from './components/DocumentsList'
@@ -16,7 +15,6 @@ export function App({ drawingId }: { drawingId: string }) {
   const [activeLineType, setActiveLineType] = useState<LineType>('straight')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [aiOpen, setAiOpen] = useState(false)
   const [gridEnabled, setGridEnabled] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
   const [minimapVisible, setMinimapVisible] = useState(false)
@@ -399,53 +397,52 @@ export function App({ drawingId }: { drawingId: string }) {
 
   return (
     <div className="app">
-      <Canvas
-        ref={canvasRef}
-        activeTool={activeTool}
-        activeLineType={activeLineType}
-        selectedIds={selectedIds}
-        onSelectedIdsChange={setSelectedIds}
-        onToolChange={setActiveTool}
-        onShapeCreated={switchToSelect}
-        elements={elements}
-        addShape={addShape}
-        addPath={addPath}
-        addLine={addLine}
-        addArrow={addArrow}
-        addText={addText}
-        addImage={addImage}
-        addFrame={addFrame}
-        updateElement={updateElement}
-        deleteElement={deleteElement}
-        gridEnabled={gridEnabled}
-        darkMode={darkMode}
-        minimapVisible={minimapVisible}
-        setLastUsedStyle={setLastUsedStyle}
-        groupElements={groupElements}
-        ungroupElements={ungroupElements}
-        stopCapturing={stopCapturing}
-      />
-      <Toolbar
-        activeTool={activeTool}
-        activeLineType={activeLineType}
-        onToolChange={handleToolChange}
-        onLineTypeChange={setActiveLineType}
-        onInsertImage={(src, w, h) => {
-          const id = addImage(200, 200, w, h, src)
-          setSelectedIds([id])
-        }}
-      />
-      <StatusBar
-        onSettingsClick={() => setSettingsOpen(true)}
-        onAiClick={() => setAiOpen(true)}
-        onToggleMinimap={() => setMinimapVisible(prev => !prev)}
-        onToggleDarkMode={() => setDarkMode(prev => !prev)}
-      />
+      <div className="app__canvas-area">
+        <Canvas
+          ref={canvasRef}
+          activeTool={activeTool}
+          activeLineType={activeLineType}
+          selectedIds={selectedIds}
+          onSelectedIdsChange={setSelectedIds}
+          onToolChange={setActiveTool}
+          onShapeCreated={switchToSelect}
+          elements={elements}
+          addShape={addShape}
+          addPath={addPath}
+          addLine={addLine}
+          addArrow={addArrow}
+          addText={addText}
+          addImage={addImage}
+          addFrame={addFrame}
+          updateElement={updateElement}
+          deleteElement={deleteElement}
+          gridEnabled={gridEnabled}
+          darkMode={darkMode}
+          minimapVisible={minimapVisible}
+          setLastUsedStyle={setLastUsedStyle}
+          groupElements={groupElements}
+          ungroupElements={ungroupElements}
+          stopCapturing={stopCapturing}
+        />
+        <Toolbar
+          activeTool={activeTool}
+          activeLineType={activeLineType}
+          onToolChange={handleToolChange}
+          onLineTypeChange={setActiveLineType}
+          onInsertImage={(src, w, h) => {
+            const id = addImage(200, 200, w, h, src)
+            setSelectedIds([id])
+          }}
+        />
+        <DocumentTitle documentId={drawingId} />
+        <DocumentsList currentDocumentId={drawingId} />
+      </div>
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <AiPanel
-        open={aiOpen}
-        onClose={() => setAiOpen(false)}
         elements={elements}
+        onSettingsClick={() => setSettingsOpen(true)}
+        onToggleMinimap={() => setMinimapVisible(prev => !prev)}
+        onToggleDarkMode={() => setDarkMode(prev => !prev)}
         elementActions={{
           addShape, addLine, addArrow, addText, addWebCard, addDocumentCard,
           updateElement, deleteElement,
@@ -459,8 +456,6 @@ export function App({ drawingId }: { drawingId: string }) {
           updateDocumentContent,
         }}
       />
-      <DocumentTitle documentId={drawingId} />
-      <DocumentsList currentDocumentId={drawingId} />
     </div>
   )
 }

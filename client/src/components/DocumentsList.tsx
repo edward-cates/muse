@@ -214,7 +214,7 @@ export function DocumentsList({ currentDocumentId }: Props) {
 
 const s: Record<string, React.CSSProperties> = {
   container: {
-    position: 'fixed',
+    position: 'absolute',
     bottom: 20,
     left: 20,
     zIndex: 500,
