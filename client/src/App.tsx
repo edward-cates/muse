@@ -205,8 +205,10 @@ export function App({ drawingId }: { drawingId: string }) {
         if (isTextInput || !meta) return
       }
 
-      // Copy
+      // Copy — let browser handle native text copy if user has text selected
       if (meta && e.key.toLowerCase() === 'c' && !e.shiftKey) {
+        const selection = window.getSelection()
+        if (selection && selection.toString().length > 0) return
         e.preventDefault()
         const selected = elements.filter(el => selectedIds.includes(el.id))
         if (selected.length > 0) {

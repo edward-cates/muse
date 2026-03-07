@@ -81,7 +81,7 @@ export async function runAgentLoop(
 
     // Call Anthropic
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-5-20250514',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 16384,
       system: systemPrompt,
       messages: messages as Anthropic.MessageParam[],
