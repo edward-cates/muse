@@ -827,7 +827,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
     if (screenshotBase64) {
       userContent.push({
         type: 'image',
-        source: { type: 'base64', media_type: 'image/png', data: screenshotBase64 },
+        source: { type: 'base64', media_type: 'image/jpeg', data: screenshotBase64 },
       } as unknown as ContentBlock)
     }
     userContent.push({ type: 'text', text })

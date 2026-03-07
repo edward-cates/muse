@@ -3,6 +3,7 @@ import type { CanvasElement } from '../types'
 
 const SCALE = 0.5
 const PADDING = 60
+const MAX_DIMENSION = 768
 
 /** Wait for React to flush DOM updates after Yjs mutations */
 function waitForPaint(): Promise<void> {
@@ -125,5 +126,19 @@ export async function captureCanvas(element: HTMLElement): Promise<string> {
       }
     },
   })
+  // Downscale to MAX_DIMENSION on the longest side to reduce token cost
+  const { width: cw, height: ch } = canvas
+  if (cw > MAX_DIMENSION || ch > MAX_DIMENSION) {
+    const ratio = MAX_DIMENSION / Math.max(cw, ch)
+    const tw = Math.round(cw * ratio)
+    const th = Math.round(ch * ratio)
+    const small = document.createElement('canvas')
+    small.width = tw
+    small.height = th
+    const sCtx = small.getContext('2d')!
+    sCtx.drawImage(canvas, 0, 0, tw, th)
+    return small.toDataURL('image/jpeg', 0.6).replace('data:image/jpeg;base64,', '')
+  }
+
   return canvas.toDataURL('image/jpeg', 0.6).replace('data:image/jpeg;base64,', '')
 }
