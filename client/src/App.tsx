@@ -7,9 +7,8 @@ import { SourceTextPanel } from './components/SourceTextPanel'
 import { DocumentsList } from './components/DocumentsList'
 import { DocumentTitle } from './components/DocumentTitle'
 import { NodePicker } from './components/NodePicker'
-import { HistoryBreadcrumb } from './components/HistoryBreadcrumb'
+import { BacklinksPanel } from './components/BacklinksPanel'
 import { useElements, readElement } from './hooks/useElements'
-import { recordNavigation, useNavigationHistory, useNavigate } from './hooks/useNavigationHistory'
 import { useDocumentApi } from './hooks/useDocument'
 import { useAuth } from './auth/AuthContext'
 import type { Tool, LineType, CanvasElement } from './types'
@@ -31,26 +30,6 @@ export function App({ drawingId }: { drawingId: string }) {
   const [nodePickerOpen, setNodePickerOpen] = useState(false)
 
   const { session } = useAuth()
-  const historyTrail = useNavigationHistory(drawingId)
-  const navigate = useNavigate()
-
-  // Record this page in navigation history
-  useEffect(() => {
-    if (!session?.access_token || !drawingId) return
-    // Fetch the document title to record in history
-    fetch(`/api/documents/${drawingId}`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.document) {
-          recordNavigation(drawingId, data.document.title || 'Untitled')
-        }
-      })
-      .catch(() => {
-        recordNavigation(drawingId, 'Untitled')
-      })
-  }, [drawingId, session?.access_token])
 
   // Canvas handle for viewport control
   const canvasRef = useRef<CanvasHandle>(null)
@@ -584,9 +563,7 @@ export function App({ drawingId }: { drawingId: string }) {
           />
         )}
         <DocumentTitle documentId={drawingId} />
-        {historyTrail.length > 0 && (
-          <HistoryBreadcrumb items={historyTrail} onNavigate={navigate} />
-        )}
+        <BacklinksPanel documentId={drawingId} />
         <DocumentsList currentDocumentId={drawingId} />
       </div>
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />

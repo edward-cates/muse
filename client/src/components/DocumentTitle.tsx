@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../auth/AuthContext'
-import { updateHistoryTitle } from '../hooks/useNavigationHistory'
 
 interface Props {
   documentId: string
@@ -43,8 +42,6 @@ export function DocumentTitle({ documentId }: Props) {
     const trimmed = draft.trim() || 'Untitled'
     if (trimmed === title) return
     setTitle(trimmed)
-    updateHistoryTitle(documentId, trimmed)
-
     if (!session?.access_token) return
     fetch(`/api/documents/${documentId}`, {
       method: 'PATCH',

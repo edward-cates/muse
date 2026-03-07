@@ -94,6 +94,53 @@ router.post('/', async (req, res) => {
   res.json({ document: data })
 })
 
+// Get backlinks — other documents whose canvas contains an element pointing to this document
+router.get('/:id/backlinks', async (req, res) => {
+  const userId = req.userId!
+  const { id } = req.params
+  const supabase = getSupabase()
+
+  const { data, error } = await supabase
+    .from('documents')
+    .select('id, title, content')
+    .eq('owner_id', userId)
+    .eq('type', 'canvas')
+    .neq('id', id)
+
+  if (error) {
+    res.status(500).json({ error: 'Failed to get backlinks' })
+    return
+  }
+
+  const backlinks: Array<{ id: string; title: string }> = []
+
+  for (const doc of data || []) {
+    if (!doc.content) continue
+    try {
+      const ydoc = new Y.Doc()
+      const bytes = Buffer.from(doc.content, 'base64')
+      Y.applyUpdate(ydoc, new Uint8Array(bytes))
+      const yElements = ydoc.getArray('elements')
+      let found = false
+      for (let i = 0; i < yElements.length; i++) {
+        const yEl = yElements.get(i) as ReturnType<typeof Y.Doc.prototype.getMap>
+        if (yEl.get('documentId') === id) {
+          found = true
+          break
+        }
+      }
+      ydoc.destroy()
+      if (found) {
+        backlinks.push({ id: doc.id, title: doc.title || 'Untitled' })
+      }
+    } catch {
+      // skip corrupt docs
+    }
+  }
+
+  res.json({ backlinks })
+})
+
 // Get a single document (metadata + source_text)
 router.get('/:id', async (req, res) => {
   const userId = req.userId!
