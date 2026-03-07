@@ -1040,3 +1040,152 @@ test.describe('H: Selection persists during drag', () => {
     await expect(page.locator('svg.canvas__lines path[opacity="0.25"]')).toHaveCount(1)
   })
 })
+
+// ──────────────────────────────────────────────────────────────────────
+// Group H: Multi-drag initiated from non-shape elements
+// ──────────────────────────────────────────────────────────────────────
+
+test.describe('H: Multi-drag initiated from non-shape elements', () => {
+  let canvas: CanvasPage
+
+  test.beforeEach(async ({ page }) => {
+    canvas = new CanvasPage(page)
+    await canvas.goto()
+  })
+
+  test('drag initiated from text element moves co-selected shape', async ({ page }) => {
+    // Create both elements via Yjs at known world coordinates
+    await page.evaluate(() => {
+      const Y = (window as any).__testY
+      const doc = (window as any).__testDoc
+      if (!doc || !Y) throw new Error('__testDoc or __testY not found')
+      const elements = doc.getArray('elements')
+
+      const rect = new Y.Map()
+      rect.set('id', 'test-rect-1')
+      rect.set('type', 'rectangle')
+      rect.set('x', 50)
+      rect.set('y', 50)
+      rect.set('width', 120)
+      rect.set('height', 80)
+      rect.set('fill', '#ffffff')
+      rect.set('stroke', '#4f46e5')
+      rect.set('strokeWidth', 1.5)
+      elements.push([rect])
+
+      const text = new Y.Map()
+      text.set('id', 'test-text-1')
+      text.set('type', 'text')
+      text.set('x', 50)
+      text.set('y', 180)
+      text.set('width', 100)
+      text.set('height', 30)
+      text.set('text', 'Drag me')
+      text.set('fontSize', 20)
+      text.set('fill', 'transparent')
+      text.set('stroke', '#1a1a1a')
+      text.set('strokeWidth', 0)
+      elements.push([text])
+    })
+
+    // Select all
+    await canvas.selectTool('select')
+    const textEl = page.locator('[data-testid="text-element"]')
+    const rectEl = page.locator('[data-testid="shape-rectangle"]')
+    await expect(textEl).toHaveCount(1)
+    await expect(rectEl).toHaveCount(1)
+    await page.keyboard.press('Meta+a')
+    await expect(page.locator('.shape--selected')).toHaveCount(1, { timeout: 2000 })
+    await expect(page.locator('.text-element--selected')).toHaveCount(1, { timeout: 2000 })
+
+    // Record positions
+    const rectBefore = await rectEl.boundingBox()
+    const textBefore = await textEl.boundingBox()
+    if (!rectBefore || !textBefore) throw new Error('No bounding boxes')
+
+    // Drag from the TEXT element (not the shape)
+    await page.mouse.move(textBefore.x + 50, textBefore.y + 15)
+    await page.mouse.down()
+    await page.mouse.move(textBefore.x + 150, textBefore.y + 115, { steps: 5 })
+    await page.mouse.up()
+
+    const rectAfter = await rectEl.boundingBox()
+    const textAfter = await textEl.boundingBox()
+    if (!rectAfter || !textAfter) throw new Error('No bounding boxes after drag')
+
+    const dx = textAfter.x - textBefore.x
+    const dy = textAfter.y - textBefore.y
+    expect(dx).toBeGreaterThan(50)
+
+    // Shape should have moved by the same delta
+    expect(Math.abs((rectAfter.x - rectBefore.x) - dx)).toBeLessThan(5)
+    expect(Math.abs((rectAfter.y - rectBefore.y) - dy)).toBeLessThan(5)
+  })
+
+  test('drag initiated from document card moves co-selected shape', async ({ page }) => {
+    // Create both elements via Yjs at known world coordinates
+    await page.evaluate(() => {
+      const Y = (window as any).__testY
+      const doc = (window as any).__testDoc
+      if (!doc || !Y) throw new Error('__testDoc or __testY not found')
+      const elements = doc.getArray('elements')
+
+      const rect = new Y.Map()
+      rect.set('id', 'test-rect-2')
+      rect.set('type', 'rectangle')
+      rect.set('x', 50)
+      rect.set('y', 50)
+      rect.set('width', 120)
+      rect.set('height', 80)
+      rect.set('fill', '#ffffff')
+      rect.set('stroke', '#4f46e5')
+      rect.set('strokeWidth', 1.5)
+      elements.push([rect])
+
+      const card = new Y.Map()
+      card.set('id', 'test-doc-card')
+      card.set('type', 'document_card')
+      card.set('x', 50)
+      card.set('y', 180)
+      card.set('width', 200)
+      card.set('height', 120)
+      card.set('documentId', 'fake-doc-id')
+      card.set('documentType', 'canvas')
+      card.set('title', 'Research Node')
+      card.set('contentVersion', 0)
+      elements.push([card])
+    })
+
+    // Select all
+    await canvas.selectTool('select')
+    const docCard = page.locator('[data-testid="document-card"]')
+    const rectEl = page.locator('[data-testid="shape-rectangle"]')
+    await expect(docCard).toHaveCount(1)
+    await expect(rectEl).toHaveCount(1)
+    await page.keyboard.press('Meta+a')
+    await expect(page.locator('.shape--selected')).toHaveCount(2, { timeout: 2000 })
+
+    // Record positions
+    const rectBefore = await rectEl.boundingBox()
+    const docBefore = await docCard.boundingBox()
+    if (!rectBefore || !docBefore) throw new Error('No bounding boxes')
+
+    // Drag from the DOCUMENT CARD (not the shape)
+    await page.mouse.move(docBefore.x + 100, docBefore.y + 60)
+    await page.mouse.down()
+    await page.mouse.move(docBefore.x + 200, docBefore.y + 160, { steps: 5 })
+    await page.mouse.up()
+
+    const rectAfter = await rectEl.boundingBox()
+    const docAfter = await docCard.boundingBox()
+    if (!rectAfter || !docAfter) throw new Error('No bounding boxes after drag')
+
+    const dx = docAfter.x - docBefore.x
+    const dy = docAfter.y - docBefore.y
+    expect(dx).toBeGreaterThan(50)
+
+    // Shape should have moved by the same delta
+    expect(Math.abs((rectAfter.x - rectBefore.x) - dx)).toBeLessThan(5)
+    expect(Math.abs((rectAfter.y - rectBefore.y) - dy)).toBeLessThan(5)
+  })
+})

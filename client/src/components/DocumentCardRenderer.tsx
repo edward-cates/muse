@@ -10,6 +10,8 @@ interface Props {
   onUpdate: (id: string, updates: Record<string, unknown>) => void
   scale: number
   activeTool: Tool
+  onDragMove?: (id: string, x: number, y: number) => void
+  onDragEnd?: () => void
 }
 
 const HANDLES: { dir: string; x: number; y: number; cursor: string }[] = [
@@ -62,7 +64,7 @@ const typeIcons: Record<string, React.ReactNode> = {
 /** Thumbnail scale: render HTML at 800px wide, scale to fit card */
 const THUMBNAIL_RENDER_WIDTH = 800
 
-export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, scale, activeTool }: Props) {
+export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, scale, activeTool, onDragMove, onDragEnd }: Props) {
   const { session } = useAuth()
   const dragStart = useRef({ x: 0, y: 0 })
   const elStart = useRef({ x: 0, y: 0 })
@@ -132,18 +134,22 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
       const handleMove = (ev: globalThis.MouseEvent) => {
         const dx = (ev.clientX - dragStart.current.x) / scale
         const dy = (ev.clientY - dragStart.current.y) / scale
-        onUpdate(element.id, { x: elStart.current.x + dx, y: elStart.current.y + dy })
+        const newX = elStart.current.x + dx
+        const newY = elStart.current.y + dy
+        onUpdate(element.id, { x: newX, y: newY })
+        onDragMove?.(element.id, newX, newY)
       }
 
       const handleUp = () => {
         window.removeEventListener('mousemove', handleMove)
         window.removeEventListener('mouseup', handleUp)
+        onDragEnd?.()
       }
 
       window.addEventListener('mousemove', handleMove)
       window.addEventListener('mouseup', handleUp)
     },
-    [element.id, element.x, element.y, scale, onSelect, onUpdate, activeTool],
+    [element.id, element.x, element.y, scale, onSelect, onUpdate, activeTool, onDragMove, onDragEnd],
   )
 
   const handleDoubleClick = useCallback(

@@ -133,6 +133,17 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
     lines: { id: string; startX: number; startY: number; endX: number; endY: number }[]
   } | null>(null)
 
+  // Track generic element-initiated drag (text, cards, images) starting positions
+  const genericDragOrigins = useRef<{
+    draggedId: string
+    startX: number
+    startY: number
+    shapes: { id: string; x: number; y: number }[]
+    lines: { id: string; startX: number; startY: number; endX: number; endY: number }[]
+    paths: { id: string; x: number; y: number; points: number[] }[]
+    others: { id: string; x: number; y: number }[]
+  } | null>(null)
+
   // Connector label editing state
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null)
 
@@ -916,6 +927,56 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
     lineDragOrigins.current = null
   }, [])
 
+  // Generic drag handler for non-shape elements (text, document cards, images, etc.)
+  // The dragged element moves itself; this moves all OTHER selected siblings.
+  const handleGenericDragMove = useCallback(
+    (id: string, x: number, y: number) => {
+      if (!genericDragOrigins.current) {
+        const allIds = new Set(selectedIdsRef.current)
+        allIds.delete(id) // The dragged element moves itself
+        const curShapes = shapesRef.current
+        const curLines = linesRef.current
+        const curPaths = pathsRef.current
+        // Find the dragged element's original position
+        const allEls = [...curShapes, ...curLines, ...curPaths, ...elements.filter(e => !curShapes.some(s => s.id === e.id) && !curLines.some(l => l.id === e.id) && !curPaths.some(p => p.id === e.id))]
+        const draggedEl = allEls.find(e => e.id === id) || elements.find(e => e.id === id)
+        genericDragOrigins.current = {
+          draggedId: id,
+          startX: draggedEl && 'x' in draggedEl ? (draggedEl as { x: number }).x : x,
+          startY: draggedEl && 'y' in draggedEl ? (draggedEl as { y: number }).y : y,
+          shapes: curShapes.filter(s => allIds.has(s.id)).map(s => ({ id: s.id, x: s.x, y: s.y })),
+          lines: curLines.filter(l => allIds.has(l.id) && !l.startShapeId && !l.endShapeId).map(l => ({ id: l.id, startX: l.startX, startY: l.startY, endX: l.endX, endY: l.endY })),
+          paths: curPaths.filter(p => allIds.has(p.id)).map(p => ({ id: p.id, x: p.x, y: p.y, points: [...p.points] })),
+          others: elements.filter(e => allIds.has(e.id) && 'x' in e && 'y' in e && !curShapes.some(s => s.id === e.id) && !curLines.some(l => l.id === e.id) && !curPaths.some(p => p.id === e.id))
+            .map(e => ({ id: e.id, x: (e as { x: number }).x, y: (e as { y: number }).y })),
+        }
+      }
+      const dx = x - genericDragOrigins.current.startX
+      const dy = y - genericDragOrigins.current.startY
+      for (const ss of genericDragOrigins.current.shapes) {
+        updateElement(ss.id, { x: ss.x + dx, y: ss.y + dy })
+      }
+      for (const ls of genericDragOrigins.current.lines) {
+        updateElement(ls.id, {
+          startX: ls.startX + dx, startY: ls.startY + dy,
+          endX: ls.endX + dx, endY: ls.endY + dy,
+        })
+      }
+      for (const ps of genericDragOrigins.current.paths) {
+        const newPoints = ps.points.map((v: number, i: number) => v + (i % 2 === 0 ? dx : dy))
+        updateElement(ps.id, { x: ps.x + dx, y: ps.y + dy, points: newPoints })
+      }
+      for (const os of genericDragOrigins.current.others) {
+        updateElement(os.id, { x: os.x + dx, y: os.y + dy })
+      }
+    },
+    [updateElement, elements],
+  )
+
+  const handleGenericDragEnd = useCallback(() => {
+    genericDragOrigins.current = null
+  }, [])
+
   const handleEndpointDrag = useCallback(
     (lineId: string, endpoint: 'start' | 'end', e: MouseEvent) => {
       const handleMove = (ev: globalThis.MouseEvent) => {
@@ -1290,6 +1351,8 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
             onDelete={deleteElement}
             scale={scale}
             activeTool={activeTool}
+            onDragMove={handleGenericDragMove}
+            onDragEnd={handleGenericDragEnd}
           />
         ))}
         {/* Image elements */}
@@ -1324,6 +1387,8 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
             onUpdate={updateElement}
             scale={scale}
             activeTool={activeTool}
+            onDragMove={handleGenericDragMove}
+            onDragEnd={handleGenericDragEnd}
           />
         ))}
         {decompositionCards.map((dc) => (
