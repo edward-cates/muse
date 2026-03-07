@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { claimNextJob, completeJob, failJob, reapStalledJobs, updateJobProgress } from './jobs.js'
+import { layoutCanvas } from './layout.js'
 import { runAgentLoop, type AgentConfig, type StreamCallback } from './agent-runner.js'
 import { type ToolContext } from './agent-tools.js'
 import { updateLiveElement } from './live-docs.js'
@@ -279,6 +280,14 @@ async function processNextJob(): Promise<boolean> {
     }
 
     const result = await runAgentLoop(job.id, config, apiKey, toolCtx, userMessage, streamCallback)
+
+    // Apply force-directed layout to space out nodes
+    try {
+      await layoutCanvas(documentId, parentDocId, parentCardId)
+      console.log(`[worker] Applied layout to document ${documentId}`)
+    } catch (layoutErr) {
+      console.error(`[worker] Layout failed (non-fatal):`, layoutErr)
+    }
 
     await completeJob(job.id, {
       textContent: result.textContent,
