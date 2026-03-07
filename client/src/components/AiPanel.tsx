@@ -215,25 +215,30 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
   }, [session?.access_token])
 
   /** Save current chat to server */
-  async function saveChat(finalChatMessages: ChatMessage[], finalApiMessages: ApiMessage[]) {
-    if (!session?.access_token || finalChatMessages.length === 0) return
+  async function saveChat() {
+    const token = session?.access_token
+    if (!token || _persistedChat.length === 0) return
     try {
       const res = await fetch('/api/ai/chats', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          ...(chatId ? { id: chatId } : {}),
-          messages: finalChatMessages.map(m => ({ role: m.role, content: m.content })),
+          ...(_persistedChatId ? { id: _persistedChatId } : {}),
+          messages: _persistedChat.map(m => ({ role: m.role, content: m.content })),
         }),
       })
       if (res.ok) {
         const data = await res.json() as { id: string }
-        if (!chatId) setChatId(data.id)
+        if (!_persistedChatId) setChatId(data.id)
+      } else {
+        console.error('[saveChat] server returned', res.status, await res.text().catch(() => ''))
       }
-    } catch { /* best-effort */ }
+    } catch (err) {
+      console.error('[saveChat] failed', err)
+    }
   }
 
   /** Load chat list from server */
@@ -812,6 +817,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         setActiveJobCardId(cardId)
         setStatus('Starting research...')
         // Don't call runAgentLoop — the server handles it
+        saveChat()
         return
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Failed to start research job'
@@ -849,9 +855,6 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
       // Save final API messages state for future conversation turns
       setApiMessages(finalMessages)
 
-      // Auto-save chat to DB (best-effort, after agent loop completes)
-      saveChat(_persistedChat, finalMessages)
-
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         setChatMessages((prev) => {
@@ -878,6 +881,8 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
       setStreaming(false)
       setStatus(null)
       abortRef.current = null
+      // Auto-save chat to DB (best-effort, after agent loop completes or errors)
+      saveChat()
     }
   }
 
