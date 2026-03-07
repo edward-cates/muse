@@ -125,5 +125,5 @@ export async function captureCanvas(element: HTMLElement): Promise<string> {
       }
     },
   })
-  return canvas.toDataURL('image/png').replace('data:image/png;base64,', '')
+  return canvas.toDataURL('image/jpeg', 0.6).replace('data:image/jpeg;base64,', '')
 }

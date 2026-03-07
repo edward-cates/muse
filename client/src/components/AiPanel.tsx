@@ -639,6 +639,17 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
           content: r.content,
         }))
 
+        // VQA: strip old screenshots from previous messages to avoid accumulating costs
+        if (config.vqa) {
+          currentApiMessages = currentApiMessages.map(msg => {
+            if (msg.role !== 'user' || typeof msg.content === 'string') return msg
+            const filtered = (msg.content as ContentBlock[]).filter(
+              b => !('source' in (b as Record<string, unknown>))
+            )
+            return { ...msg, content: filtered }
+          })
+        }
+
         // VQA: capture post-execution screenshot for canvas editor
         if (config.vqa) {
           const canvasEl = document.querySelector<HTMLDivElement>('[data-testid="canvas"]')
@@ -667,7 +678,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
               } as unknown as ContentBlock)
               toolResultBlocks.push({
                 type: 'image',
-                source: { type: 'base64', media_type: 'image/png', data: vqaScreenshot },
+                source: { type: 'base64', media_type: 'image/jpeg', data: vqaScreenshot },
               } as unknown as ContentBlock)
               log(turns, 'vqa-screenshot.txt', { boundsText, captured: true })
             } catch { /* best-effort */ }

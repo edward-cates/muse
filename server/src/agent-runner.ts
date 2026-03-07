@@ -10,6 +10,9 @@ export interface AgentConfig {
   tools: ToolDefinition[]
   nativeTools?: Array<Record<string, unknown>>
   maxTurns: number
+  model?: string
+  /** Upgrade to this model once synthesis tools (add_shape, add_arrow) are first called */
+  synthesisModel?: string
 }
 
 /** Callback for streaming text and status updates to a UI element */
@@ -71,6 +74,8 @@ export async function runAgentLoop(
   let messages: ApiMessage[] = [{ role: 'user', content: userMessage }]
   let turns = 0
   let finalText = ''
+  const SYNTHESIS_TOOLS = new Set(['add_shape', 'add_arrow'])
+  let currentModel = config.model || 'claude-opus-4-6'
 
   while (turns < config.maxTurns) {
     turns++
@@ -89,7 +94,7 @@ export async function runAgentLoop(
     })
 
     const requestParams = {
-      model: 'claude-opus-4-6',
+      model: currentModel,
       max_tokens: 16384,
       system: systemPrompt,
       messages: messages as Anthropic.MessageParam[],
@@ -177,6 +182,11 @@ export async function runAgentLoop(
       }
 
       messages = [...messages, { role: 'user', content: toolResults }]
+
+      // Upgrade to synthesis model when the agent starts creating themes/arrows
+      if (config.synthesisModel && toolUseBlocks.some(tc => SYNTHESIS_TOOLS.has(tc.name))) {
+        currentModel = config.synthesisModel
+      }
     } else {
       // Final response — no more tool calls
       if (finalText) {

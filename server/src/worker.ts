@@ -52,6 +52,8 @@ Always respond conversationally after researching — summarize what you found a
     nativeTools: [
       { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
     ],
+    model: 'claude-sonnet-4-6',
+    synthesisModel: 'claude-opus-4-6',
     maxTurns: 15,
   }
 }
