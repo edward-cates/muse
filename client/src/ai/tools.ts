@@ -208,30 +208,46 @@ export const DOCUMENT_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'create_document',
-    description: 'Create an HTML artifact document and place a card on the canvas. The document can be edited by clicking into it. Returns { documentId, cardElementId }.',
+    description: 'Create an HTML artifact document and place a card on the canvas. Call this FIRST with just a title to show the card immediately, then use update_document_content to write the HTML. Returns { documentId, cardElementId }.',
     input_schema: {
       type: 'object',
       properties: {
         title: { type: 'string', description: 'Document title' },
-        html: { type: 'string', description: 'Initial HTML content (self-contained with inline styles/scripts)' },
+        html: { type: 'string', description: 'Optional initial HTML. Prefer omitting this and using update_document_content separately so the card appears instantly.' },
         x: { type: 'number', description: 'X position for the card on canvas (default 100)' },
         y: { type: 'number', description: 'Y position for the card on canvas (default 100)' },
         width: { type: 'number', description: 'Card width (default 280)' },
         height: { type: 'number', description: 'Card height (default 180)' },
       },
-      required: ['title', 'html'],
+      required: ['title'],
+    },
+  },
+  {
+    name: 'create_markdown',
+    description: 'Create a markdown document (README, notes, writeup) and place a card on the canvas. Call this FIRST with just a title to show the card immediately, then use update_document_content to write the markdown. Returns { documentId, cardElementId }.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Document title' },
+        x: { type: 'number', description: 'X position for the card on canvas (default 100)' },
+        y: { type: 'number', description: 'Y position for the card on canvas (default 100)' },
+        width: { type: 'number', description: 'Card width (default 280)' },
+        height: { type: 'number', description: 'Card height (default 180)' },
+      },
+      required: ['title'],
     },
   },
   {
     name: 'update_document_content',
-    description: 'Update the HTML content of an existing document. The document card on the canvas will refresh automatically.',
+    description: 'Update the content of an existing document (HTML or markdown). The document card on the canvas will refresh automatically.',
     input_schema: {
       type: 'object',
       properties: {
         document_id: { type: 'string', description: 'The document ID to update' },
-        html: { type: 'string', description: 'New HTML content (replaces existing)' },
+        html: { type: 'string', description: 'New HTML content (for html_artifact documents)' },
+        markdown: { type: 'string', description: 'New markdown content (for markdown documents)' },
       },
-      required: ['document_id', 'html'],
+      required: ['document_id'],
     },
   },
 ]

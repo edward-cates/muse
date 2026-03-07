@@ -104,11 +104,14 @@ ${elementLines}${connections}
 - When you create shapes, each tool result returns the new shape's ID. Use those IDs in subsequent add_line/add_arrow calls.
 - Create all shapes first, then add connections in the same turn using the returned IDs.
 
-## HTML Artifacts
-- Use create_document to create interactive HTML artifacts (dashboards, widgets, mini-apps) and place them as cards on the canvas.
+## Documents (HTML & Markdown)
+- IMPORTANT: Always use a two-step process so the user sees the card immediately:
+  1. Call create_document or create_markdown with just a title — this places the card on the canvas right away.
+  2. Call update_document_content with the document_id and content — the card updates to show the rendered preview.
+- Never pass html directly to create_document — it delays the card appearing until all HTML is generated.
+- Use create_document for interactive HTML artifacts (dashboards, widgets, wireframes). HTML must be self-contained (inline <style> and <script>).
+- Use create_markdown for text documents (READMEs, notes, writeups, plans). Pass markdown="..." to update_document_content.
 - Document cards can be double-clicked to open in a full-page editor.
-- Use update_document_content to modify existing artifacts by their document ID (shown in DocCard elements).
-- HTML must be self-contained (inline <style> and <script>).
 
 ## Decomposition Cards
 - DecompCard elements are topic cards created by decompose_text. They show a topic title, summary, and line references to the source document.

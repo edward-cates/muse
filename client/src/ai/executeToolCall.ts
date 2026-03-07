@@ -389,20 +389,38 @@ export async function executeToolCall(
           return { tool_use_id: call.id, content: JSON.stringify({ error: 'Document creation not available' }) }
         }
         const { title, html, x = 100, y = 100, width = 280, height = 180 } = call.input as {
-          title: string; html: string; x?: number; y?: number; width?: number; height?: number
+          title: string; html?: string; x?: number; y?: number; width?: number; height?: number
         }
         const doc = await actions.createDocument({ title, type: 'html_artifact' })
-        await actions.updateDocumentContent(doc.id, html)
+        if (html) {
+          await actions.updateDocumentContent(doc.id, html)
+        }
         const cardId = actions.addDocumentCard(x, y, width, height, doc.id, 'html_artifact', title)
-        return { tool_use_id: call.id, content: JSON.stringify({ documentId: doc.id, cardElementId: cardId, success: true, message: `Created HTML artifact "${title}"` }) }
+        return { tool_use_id: call.id, content: JSON.stringify({ documentId: doc.id, cardElementId: cardId, success: true, message: `Created HTML artifact "${title}". Use update_document_content with document_id="${doc.id}" to write the HTML content.` }) }
+      }
+
+      case 'create_markdown': {
+        if (!actions.createDocument || !actions.addDocumentCard) {
+          return { tool_use_id: call.id, content: JSON.stringify({ error: 'Document creation not available' }) }
+        }
+        const { title, x = 100, y = 100, width = 280, height = 180 } = call.input as {
+          title: string; x?: number; y?: number; width?: number; height?: number
+        }
+        const doc = await actions.createDocument({ title, type: 'markdown' })
+        const cardId = actions.addDocumentCard(x, y, width, height, doc.id, 'markdown', title)
+        return { tool_use_id: call.id, content: JSON.stringify({ documentId: doc.id, cardElementId: cardId, success: true, message: `Created markdown document "${title}". Use update_document_content with document_id="${doc.id}" and markdown="..." to write the content.` }) }
       }
 
       case 'update_document_content': {
         if (!actions.updateDocumentContent) {
           return { tool_use_id: call.id, content: JSON.stringify({ error: 'Document update not available' }) }
         }
-        const { document_id, html } = call.input as { document_id: string; html: string }
-        const newVersion = await actions.updateDocumentContent(document_id, html)
+        const { document_id, html, markdown } = call.input as { document_id: string; html?: string; markdown?: string }
+        const content = html || markdown
+        if (!content) {
+          return { tool_use_id: call.id, content: JSON.stringify({ error: 'Provide either html or markdown' }) }
+        }
+        const newVersion = await actions.updateDocumentContent(document_id, content)
         // Update the contentVersion on any matching canvas card
         for (const el of elements) {
           if (el.type === 'document_card' && (el as { documentId: string }).documentId === document_id) {
