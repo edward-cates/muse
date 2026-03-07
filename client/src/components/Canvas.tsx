@@ -317,10 +317,16 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
     })
   }, [])
 
-  // Auto-fit viewport to content on initial load
+  // Auto-fit viewport to content on initial load.
+  // Only fit if elements are already present on first render (loaded from persistence).
+  // Skip if elements appear later (user creating their first element on a blank canvas).
   const didAutoFit = useRef(false)
+  const hadElementsOnMount = useRef<boolean | null>(null)
   useEffect(() => {
-    if (!didAutoFit.current && elements.length > 0) {
+    if (hadElementsOnMount.current === null) {
+      hadElementsOnMount.current = elements.length > 0
+    }
+    if (!didAutoFit.current && hadElementsOnMount.current && elements.length > 0) {
       didAutoFit.current = true
       fitElements(elements)
     }
