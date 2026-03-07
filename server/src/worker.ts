@@ -1,50 +1,40 @@
 import { createClient } from '@supabase/supabase-js'
 import { claimNextJob, completeJob, failJob, reapStalledJobs, updateJobProgress } from './jobs.js'
-import { runAgentLoop, type AgentConfig } from './agent-runner.js'
+import { runAgentLoop, type AgentConfig, type StreamCallback } from './agent-runner.js'
 import { type ToolContext } from './agent-tools.js'
-import { readElementsFromDoc, updateElementInDoc } from './yjs-utils.js'
+import { updateLiveElement } from './live-docs.js'
 import { decrypt } from './crypto.js'
 import Anthropic from '@anthropic-ai/sdk'
 
 // ── Agent configs (server-side versions) ──
 
-import { RESEARCH_TOOLS, DOCUMENT_TOOLS, CANVAS_TOOLS } from './tools.js'
+import { RESEARCH_TOOLS, CANVAS_TOOLS } from './tools.js'
 
-function buildResearcherConfig(): AgentConfig {
+export function buildResearcherConfig(): AgentConfig {
   return {
     name: 'researcher',
-    systemPrompt: `You are a research assistant for Muse, a collaborative canvas. Your job is to find relevant information, create a concept map linking themes to sources, and organize everything into a dedicated research sub-canvas.
+    systemPrompt: `You are a research assistant for Muse, a collaborative canvas. The research canvas has already been created for you — all your tools write directly to it. Your output is a knowledge graph: theme nodes with brief summaries, source cards, and arrows showing which sources inform which themes.
 
 Start web_search calls immediately — don't preview what you'll search for.
 
 ## Workflow
-1. FIRST: Call add_node to create a research canvas on the parent board (title it based on the query). Save the documentId — you'll need it as target_document_id.
-2. Use web_search to find relevant sources (3-5 for a typical query)
-3. For EACH promising source:
-   a. Call fetch_url to get the full page text
-   b. Call decompose_text with the fetched text, a descriptive title, and target_document_id set to the research canvas documentId
-   This creates a source card (with colored topic pills) on the research canvas.
-4. After ALL sources are decomposed, create a concept map on the research canvas:
-   a. Identify 3-6 cross-cutting themes that span multiple sources
-   b. Create a shape (rectangle) for each theme on the research canvas using add_shape with target_document_id
-   c. Draw arrows from each theme shape to the source cards that contain that theme using add_arrow with target_document_id
-   d. Layout: place theme shapes on the LEFT (x=50-250), source cards on the RIGHT (x=400+), arrows connecting them
+1. Use web_search to find relevant sources (3-5 for a typical query)
+2. Use fetch_url to get the full page text for each promising result
+3. For EACH source, call add_web_card to place a source card on the canvas
+4. After adding all source cards, synthesize 3-6 cross-cutting themes
+5. Create a theme node (rectangle) for each theme using add_shape — include a 1-2 sentence summary of the key insight, not just a title label
+6. Draw arrows from each theme node to its related source cards using add_arrow
 
-## Concept map layout
-- Theme shapes: x=100, stacked vertically with 100px gaps, starting at y=80. Use width=180, height=60.
-- Use distinct fill colors for each theme shape from this palette: #fef3c7, #dbeafe, #dcfce7, #f3e8ff, #fee2e2, #f1f5f9
-- Source cards are placed by decompose_text. They'll be at x=100 by default — move them to x=450 using update_element after creation.
-- Use add_arrow with start_shape_id (theme shape) and end_shape_id (source card) to connect them.
+## Knowledge graph layout
+Build a hub-and-spoke graph. Place theme nodes in the CENTER column (x=350, stacked vertically). Place source cards in an ARC around the themes on the RIGHT (x=700+, spread out vertically). Arrows go left-to-right from themes to sources.
 
-## Decomposing sources
-- Always pass target_document_id so source cards appear on the research canvas
-- Give each decompose_text call a clear title (the article title)
-- If fetch_url returns very little text (< 100 chars), skip decomposition and use add_web_card instead
+- Theme nodes: width=260, height=100. Use distinct fill colors: #fef3c7, #dbeafe, #dcfce7, #f3e8ff, #fee2e2, #f1f5f9
+- Source cards: width=280, height=160. Spread vertically with 40px gaps starting at y=60.
+- Theme nodes: spread vertically with 40px gaps starting at y=60.
+- The text in each theme node should be: "Theme Title\\n\\nBrief 1-2 sentence summary of the key finding or insight."
 
-## Finalizing
-After creating the concept map, update the top-level research card (the cardElementId from add_node) with:
-- title: a clear descriptive title
-- description: 1-2 sentence summary of key findings
+## CRITICAL: Draw arrows
+After creating theme nodes, you MUST draw arrows connecting each theme to its related source cards using add_arrow. This is the most important visual element — it creates the knowledge graph. Use start_shape_id (theme node ID) and end_shape_id (web card ID). Each theme should connect to at least one source, and each source should have at least one arrow. Call multiple add_arrow in a SINGLE tool call batch.
 
 ## Source evaluation
 - Prefer primary sources and authoritative references
@@ -52,13 +42,16 @@ After creating the concept map, update the top-level research card (the cardElem
 - Note when sources disagree
 
 Always respond conversationally after researching — summarize what you found and the key themes.`,
-    tools: [...RESEARCH_TOOLS, ...DOCUMENT_TOOLS, ...CANVAS_TOOLS.filter(t =>
-      ['add_shape', 'add_arrow', 'update_element', 'arrange_grid'].includes(t.name),
-    )],
+    tools: [
+      ...RESEARCH_TOOLS.filter(t => t.name !== 'decompose_text'),
+      ...CANVAS_TOOLS.filter(t =>
+        ['add_shape', 'add_arrow', 'update_element'].includes(t.name),
+      ),
+    ],
     nativeTools: [
       { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
     ],
-    maxTurns: 12,
+    maxTurns: 15,
   }
 }
 
@@ -213,15 +206,6 @@ Rules:
   return { documentId: doc.id, topics }
 }
 
-/** Find the document card with this jobId on the parent canvas and update its status. */
-async function updateDocumentCardStatus(parentDocId: string, jobId: string, newStatus: string) {
-  const elements = await readElementsFromDoc(parentDocId)
-  for (const el of elements) {
-    if (el.type === 'document_card' && el.jobId === jobId) {
-      await updateElementInDoc(parentDocId, el.id as string, { jobStatus: newStatus })
-    }
-  }
-}
 
 // ── Worker loop ──
 
@@ -239,10 +223,13 @@ async function processNextJob(): Promise<boolean> {
   console.log(`[worker] Claimed job ${job.id} (${job.type})`)
 
   const documentId = job.document_id || ''
+  const jobInput = job.input as { message?: string; parentDocumentId?: string; parentCardId?: string }
+  const parentDocId = jobInput.parentDocumentId || ''
+  const parentCardId = jobInput.parentCardId || ''
 
   try {
     const apiKey = await decryptUserApiKey(job.user_id)
-    const userMessage = (job.input as { message?: string }).message || ''
+    const userMessage = jobInput.message || ''
 
     if (!documentId) throw new Error('Job has no document_id')
     if (!userMessage) throw new Error('Job has no message')
@@ -264,23 +251,54 @@ async function processNextJob(): Promise<boolean> {
       decomposeText: (text, title) => decomposeText(apiKey, job.user_id, text, title),
     }
 
-    const result = await runAgentLoop(job.id, config, apiKey, toolCtx, userMessage)
+    // Build stream callback: push text/tool status to the parent card's description via live Yjs
+    let streamCallback: StreamCallback | undefined
+    if (parentDocId && parentCardId) {
+      const updateCard = (desc: string) => {
+        updateLiveElement(parentDocId, parentCardId, { description: desc })
+      }
+      streamCallback = {
+        onText: (text) => {
+          // Show a truncated preview of the streaming text
+          const preview = text.length > 200 ? '...' + text.slice(-197) : text
+          updateCard(preview)
+        },
+        onToolStart: (toolName) => {
+          const label = toolName === 'web_search' ? 'Searching the web...'
+            : toolName === 'fetch_url' ? 'Reading article...'
+            : toolName === 'add_web_card' ? 'Adding source card...'
+            : toolName === 'add_shape' ? 'Creating theme...'
+            : toolName === 'add_arrow' ? 'Connecting themes to sources...'
+            : `Running ${toolName}...`
+          updateCard(label)
+        },
+        onTurnStart: (turn, maxTurns) => {
+          if (turn === 1) updateCard('Starting research...')
+        },
+      }
+    }
+
+    const result = await runAgentLoop(job.id, config, apiKey, toolCtx, userMessage, streamCallback)
 
     await completeJob(job.id, {
       textContent: result.textContent,
       turns: result.turns,
     })
 
-    // Update document card jobStatus to 'completed'
-    await updateDocumentCardStatus(documentId, job.id, 'completed')
+    // Clear the description and mark completed on the parent card
+    if (parentDocId && parentCardId) {
+      updateLiveElement(parentDocId, parentCardId, { jobStatus: 'completed', description: '' })
+    }
 
     console.log(`[worker] Completed job ${job.id} in ${result.turns} turns`)
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'
     console.error(`[worker] Failed job ${job.id}:`, errMsg)
     await failJob(job.id, errMsg)
-    // Update document card jobStatus to 'failed'
-    await updateDocumentCardStatus(documentId, job.id, 'failed').catch(() => {})
+    // Update document card jobStatus on the parent canvas
+    if (parentDocId && parentCardId) {
+      updateLiveElement(parentDocId, parentCardId, { jobStatus: 'failed', description: errMsg })
+    }
   }
 
   return true

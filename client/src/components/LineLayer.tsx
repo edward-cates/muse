@@ -56,6 +56,30 @@ export function edgeIntersection(
   }
 }
 
+/** For elbow/curve lines between two shapes, exit/enter from side edge midpoints. */
+function sideEdgeMidpoints(
+  startShape: ConnectableElement,
+  endShape: ConnectableElement,
+): { start: { x: number; y: number }; end: { x: number; y: number } } {
+  const sCx = startShape.x + startShape.width / 2
+  const sCy = startShape.y + startShape.height / 2
+  const eCx = endShape.x + endShape.width / 2
+  const eCy = endShape.y + endShape.height / 2
+
+  // Start exits from the side closest to the end shape
+  const startRight = sCx < eCx
+  const start = {
+    x: startRight ? startShape.x + startShape.width : startShape.x,
+    y: sCy,
+  }
+  // End enters from the side closest to the start shape
+  const end = {
+    x: startRight ? endShape.x : endShape.x + endShape.width,
+    y: eCy,
+  }
+  return { start, end }
+}
+
 function resolveLineEndpoints(
   line: LineElement,
   shapeMap: Map<string, ConnectableElement>,
@@ -71,6 +95,10 @@ function resolveLineEndpoints(
   const freeEnd = { x: line.endX, y: line.endY }
 
   if (startShape && endShape) {
+    // Elbow and curve lines should exit/enter from side edge midpoints
+    if (line.lineType === 'elbow' || line.lineType === 'curve') {
+      return sideEdgeMidpoints(startShape, endShape)
+    }
     const endCenter = { x: endShape.x + endShape.width / 2, y: endShape.y + endShape.height / 2 }
     const startCenter = { x: startShape.x + startShape.width / 2, y: startShape.y + startShape.height / 2 }
     return {

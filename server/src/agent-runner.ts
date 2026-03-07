@@ -12,6 +12,13 @@ export interface AgentConfig {
   maxTurns: number
 }
 
+/** Callback for streaming text and status updates to a UI element */
+export interface StreamCallback {
+  onText: (text: string) => void
+  onToolStart: (toolName: string) => void
+  onTurnStart: (turn: number, maxTurns: number) => void
+}
+
 interface ContentBlock {
   type: string
   [key: string]: unknown
@@ -50,6 +57,7 @@ export async function runAgentLoop(
   apiKey: string,
   ctx: ToolContext,
   userMessage: string,
+  stream?: StreamCallback,
 ): Promise<{ textContent: string; turns: number }> {
   const client = new Anthropic({ apiKey })
   const allTools: unknown[] = [...config.tools]
@@ -73,36 +81,69 @@ export async function runAgentLoop(
       return { textContent: 'Job was cancelled.', turns }
     }
 
+    stream?.onTurnStart(turns, config.maxTurns)
     await updateJobProgress(jobId, {
       step: 'calling_model',
       turn: turns,
       maxTurns: config.maxTurns,
     })
 
-    // Call Anthropic
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+    const requestParams = {
+      model: 'claude-opus-4-6',
       max_tokens: 16384,
       system: systemPrompt,
       messages: messages as Anthropic.MessageParam[],
       ...(allTools.length > 0 ? { tools: allTools as Anthropic.Tool[] } : {}),
-    })
+    }
 
-    // Process response content blocks
-    const textBlocks: string[] = []
-    const toolUseBlocks: Array<{ id: string; name: string; input: Record<string, unknown> }> = []
+    // Use streaming if a stream callback is provided, non-streaming otherwise
+    let textBlocks: string[]
+    let toolUseBlocks: Array<{ id: string; name: string; input: Record<string, unknown> }>
+    let stopReason: string
 
-    for (const block of response.content) {
-      if (block.type === 'text') {
-        textBlocks.push(block.text)
-      } else if (block.type === 'tool_use') {
-        toolUseBlocks.push({ id: block.id, name: block.name, input: block.input as Record<string, unknown> })
+    if (stream) {
+      // Streaming mode — push text deltas to the callback
+      textBlocks = []
+      toolUseBlocks = []
+      let currentText = ''
+
+      const response = client.messages.stream(requestParams)
+
+      response.on('text', (delta) => {
+        currentText += delta
+        stream.onText(currentText)
+      })
+
+      const finalMessage = await response.finalMessage()
+      stopReason = finalMessage.stop_reason || 'end_turn'
+
+      for (const block of finalMessage.content) {
+        if (block.type === 'text') {
+          textBlocks.push(block.text)
+        } else if (block.type === 'tool_use') {
+          toolUseBlocks.push({ id: block.id, name: block.name, input: block.input as Record<string, unknown> })
+        }
+      }
+    } else {
+      // Non-streaming mode (tests, simple runs)
+      textBlocks = []
+      toolUseBlocks = []
+
+      const response = await client.messages.create(requestParams)
+      stopReason = response.stop_reason || 'end_turn'
+
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          textBlocks.push(block.text)
+        } else if (block.type === 'tool_use') {
+          toolUseBlocks.push({ id: block.id, name: block.name, input: block.input as Record<string, unknown> })
+        }
       }
     }
 
     finalText = textBlocks.join('')
 
-    if (response.stop_reason === 'tool_use' && toolUseBlocks.length > 0) {
+    if (stopReason === 'tool_use' && toolUseBlocks.length > 0) {
       // Build assistant message
       const assistantBlocks: ContentBlock[] = []
       if (finalText) assistantBlocks.push({ type: 'text', text: finalText })
@@ -115,6 +156,7 @@ export async function runAgentLoop(
       const toolResults: ContentBlock[] = []
       for (let i = 0; i < toolUseBlocks.length; i++) {
         const tc = toolUseBlocks[i]
+        stream?.onToolStart(tc.name)
         await updateJobProgress(jobId, {
           step: 'executing_tool',
           turn: turns,

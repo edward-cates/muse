@@ -14,4 +14,6 @@ declare module 'y-websocket/bin/utils' {
     bindState: (docName: string, ydoc: Doc) => Promise<void>
     writeState: (docName: string, ydoc: Doc) => Promise<void>
   }): void
+
+  export function getYDoc(docName: string, gc?: boolean): Doc
 }

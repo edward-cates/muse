@@ -111,6 +111,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
   const [chatList, setChatList] = useState<ChatListItem[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
+  const [activeJobCardId, setActiveJobCardId] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -137,7 +138,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
     _setChatId(id)
   }, [])
 
-  // Update chat UI when job status changes
+  // Update chat UI and card status when job status changes
   useEffect(() => {
     if (!jobStatus || !activeJobId) return
 
@@ -146,31 +147,72 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
       const tool = jobStatus.progress?.tool as string || ''
       const desc = tool ? `${step}: ${tool}` : step
       setStatus(desc.replace(/_/g, ' '))
+      // Card description is updated in real-time via live Yjs from the worker
     } else if (jobStatus.status === 'completed') {
       const resultText = (jobStatus.result as { textContent?: string })?.textContent || 'Research complete.'
       setChatMessages(prev => {
         const filtered = prev.filter((m, i) => !(m.role === 'assistant' && m.content === '' && i === prev.length - 1))
         return [...filtered, { role: 'assistant', content: resultText }]
       })
+      if (activeJobCardId) {
+        elementActions.updateElement(activeJobCardId, { jobStatus: 'completed', description: '' })
+      }
       setStreaming(false)
       setStatus(null)
       setActiveJobId(null)
+      setActiveJobCardId(null)
     } else if (jobStatus.status === 'failed' || jobStatus.status === 'stalled') {
       const errMsg = jobStatus.error || 'Job failed'
       setChatMessages(prev => {
         const filtered = prev.filter((m, i) => !(m.role === 'assistant' && m.content === '' && i === prev.length - 1))
         return [...filtered, { role: 'assistant', content: `Error: ${errMsg}` }]
       })
+      if (activeJobCardId) {
+        elementActions.updateElement(activeJobCardId, { jobStatus: 'failed', description: errMsg })
+      }
       setStreaming(false)
       setStatus(null)
       setActiveJobId(null)
+      setActiveJobCardId(null)
     } else if (jobStatus.status === 'cancelled') {
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Research cancelled.' }])
+      if (activeJobCardId) {
+        elementActions.updateElement(activeJobCardId, { jobStatus: 'cancelled', description: '' })
+      }
       setStreaming(false)
       setStatus(null)
       setActiveJobId(null)
+      setActiveJobCardId(null)
     }
-  }, [jobStatus, activeJobId, setChatMessages])
+  }, [jobStatus, activeJobId, activeJobCardId, elementActions, setChatMessages])
+
+  // On mount: reconcile any cards stuck with jobStatus='running'/'pending' against actual job status
+  useEffect(() => {
+    if (!session?.access_token) return
+    const staleCards = elements.filter(
+      (el): el is import('../types').DocumentCardElement =>
+        el.type === 'document_card' &&
+        'jobId' in el && !!(el as any).jobId &&
+        'jobStatus' in el && ((el as any).jobStatus === 'running' || (el as any).jobStatus === 'pending'),
+    )
+    if (staleCards.length === 0) return
+
+    for (const card of staleCards) {
+      fetch(`/api/jobs/${card.jobId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then((job: { status: string } | null) => {
+          if (!job) return
+          if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled' || job.status === 'stalled') {
+            elementActions.updateElement(card.id, { jobStatus: job.status, description: '' })
+          }
+        })
+        .catch(() => {})
+    }
+    // Only run once on mount — elements ref intentionally excluded
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.access_token])
 
   /** Save current chat to server */
   async function saveChat(finalChatMessages: ChatMessage[], finalApiMessages: ApiMessage[]) {
@@ -733,13 +775,30 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
     // Route research to server-side job system
     if (agentConfig.name === 'researcher') {
       try {
-        // Get the current document ID from the URL hash
-        const hashMatch = window.location.hash.match(/#\/d\/(.+)/)
-        const documentId = hashMatch?.[1]
-        if (!documentId) throw new Error('No active document — navigate to a canvas first')
+        if (!elementActions.createDocument || !elementActions.addDocumentCard) {
+          throw new Error('Document actions not available')
+        }
 
-        const jobId = await createJob(session.access_token, 'research', { message: text }, documentId)
+        // 1. Create the research canvas upfront so it appears on the board immediately
+        const researchDoc = await elementActions.createDocument({ title: text.slice(0, 60), type: 'canvas' })
+
+        // 2. Place a document card on the current canvas
+        const cardId = elementActions.addDocumentCard(100, 100, 280, 200, researchDoc.id, 'canvas', text.slice(0, 60))
+
+        // 3. Create the job, passing the research canvas ID and parent info
+        const hashMatch = window.location.hash.match(/#\/d\/(.+)/)
+        const parentDocId = hashMatch?.[1] || ''
+        const jobId = await createJob(session.access_token, 'research', {
+          message: text,
+          parentDocumentId: parentDocId,
+          parentCardId: cardId,
+        }, researchDoc.id)
+
+        // 4. Stamp the jobId and running status on the card so it shows progress
+        elementActions.updateElement(cardId, { jobId, jobStatus: 'running' })
+
         setActiveJobId(jobId)
+        setActiveJobCardId(cardId)
         setStatus('Starting research...')
         // Don't call runAgentLoop — the server handles it
         return

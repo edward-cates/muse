@@ -210,7 +210,9 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
             </svg>
           )}
           <span className="document-card__job-label">
-            {element.jobStatus === 'pending' ? 'Queued' : element.jobStatus === 'running' ? 'Working...' : element.jobStatus === 'failed' ? 'Failed' : 'Stalled'}
+            {element.jobStatus === 'pending' ? 'Queued'
+              : element.jobStatus === 'running' ? (element.description || 'Working...')
+              : element.jobStatus === 'failed' ? 'Failed' : 'Stalled'}
           </span>
         </div>
       )}
