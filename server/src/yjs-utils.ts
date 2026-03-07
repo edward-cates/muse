@@ -189,3 +189,34 @@ export async function createDocument(
   if (error) throw new Error(`Failed to create document: ${error.message}`)
   return data
 }
+
+/** Update a document's content (HTML artifacts, etc.) and bump content_version. */
+export async function updateDocumentContent(
+  documentId: string,
+  content: string,
+): Promise<number> {
+  const supabase = getSupabase()
+
+  const { data: current, error: fetchError } = await supabase
+    .from('documents')
+    .select('content_version')
+    .eq('id', documentId)
+    .maybeSingle()
+
+  if (fetchError) throw new Error(`Failed to fetch document: ${fetchError.message}`)
+  if (!current) throw new Error('Document not found')
+
+  const newVersion = current.content_version + 1
+
+  const { error } = await supabase
+    .from('documents')
+    .update({
+      content,
+      content_version: newVersion,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', documentId)
+
+  if (error) throw new Error(`Failed to update content: ${error.message}`)
+  return newVersion
+}
