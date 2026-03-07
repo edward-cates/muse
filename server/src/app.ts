@@ -73,7 +73,8 @@ export async function createApp(): Promise<AppInstance> {
   const utils = await import('y-websocket/bin/utils')
   const { setupWSConnection, setPersistence, getYDoc } = utils
 
-  setPersistence(setupPersistence())
+  const persistence = setupPersistence()
+  setPersistence(persistence)
   setGetYDoc(getYDoc)
 
   // ── Express ──
@@ -116,7 +117,14 @@ export async function createApp(): Promise<AppInstance> {
   const server = createHttpServer(app)
   const wss = new WebSocketServer({ noServer: true })
 
-  wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+  wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
+    // Extract docName the same way y-websocket does internally
+    const docName = (req.url || '').slice(1).split('?')[0]
+    // Pre-create doc (fires bindState internally, but y-websocket doesn't await it)
+    getYDoc(docName, true)
+    // Wait for DB content to load into the Yjs doc before starting sync,
+    // so the client receives the full state in the first sync message
+    await persistence.waitForBind(docName)
     setupWSConnection(ws, req, { gc: true })
   })
 

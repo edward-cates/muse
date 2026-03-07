@@ -20,6 +20,7 @@ const EMPTY_STATE_SIZE = 2
 
 export function setupPersistence() {
   const writeTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  const bindPromises = new Map<string, Promise<void>>()
 
   function drawingId(docName: string) {
     return docName.replace(/^muse-/, '')
@@ -45,28 +46,34 @@ export function setupPersistence() {
   return {
     provider: null,
     bindState: async (docName: string, ydoc: Doc) => {
-      const { data } = await getSupabase()
-        .from('documents')
-        .select('content, type')
-        .eq('id', drawingId(docName))
-        .maybeSingle()
+      const promise = (async () => {
+        const { data } = await getSupabase()
+          .from('documents')
+          .select('content, type')
+          .eq('id', drawingId(docName))
+          .maybeSingle()
 
-      // Only load Yjs state for canvas documents. HTML artifacts store
-      // raw HTML in content, not Yjs binary, so skip them.
-      if (data?.content && data.type === 'canvas') {
-        try {
-          const bytes = Buffer.from(data.content, 'base64')
-          Y.applyUpdate(ydoc, new Uint8Array(bytes))
-        } catch {
-          // Content is corrupt or not valid Yjs data — skip
+        // Only load Yjs state for canvas documents. HTML artifacts store
+        // raw HTML in content, not Yjs binary, so skip them.
+        if (data?.content && data.type === 'canvas') {
+          try {
+            const bytes = Buffer.from(data.content, 'base64')
+            Y.applyUpdate(ydoc, new Uint8Array(bytes))
+          } catch {
+            // Content is corrupt or not valid Yjs data — skip
+          }
         }
-      }
 
-      // Only persist Yjs updates for canvas documents
-      if (!data || data.type === 'canvas') {
-        ydoc.on('update', () => persistDoc(docName, ydoc))
-      }
+        // Only persist Yjs updates for canvas documents
+        if (!data || data.type === 'canvas') {
+          ydoc.on('update', () => persistDoc(docName, ydoc))
+        }
+      })()
+      bindPromises.set(docName, promise)
+      await promise
     },
+    /** Wait for a doc's DB content to finish loading into Yjs. */
+    waitForBind: (docName: string) => bindPromises.get(docName) ?? Promise.resolve(),
     writeState: async (docName: string, ydoc: Doc) => {
       const existing = writeTimers.get(docName)
       if (existing) clearTimeout(existing)

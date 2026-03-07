@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react'
 import * as Y from 'yjs'
 import { useCollab } from '../collab/CollabContext'
 import type { CanvasElement, ShapeType, ShapeElement, PathElement, LineElement, LineType, WebCardElement, DocumentCardElement, DecompositionCardElement } from '../types'
@@ -183,7 +183,7 @@ export function useElements() {
   // Track last-used fill/stroke for new shapes
   const lastUsedStyleRef = useRef<{ fill: string; stroke: string }>({ fill: '#e8edfc', stroke: '#4465e9' })
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const sync = () => {
       setElements(yElements.toArray().map(readElement))
     }

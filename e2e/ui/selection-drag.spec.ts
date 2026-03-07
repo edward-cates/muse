@@ -838,6 +838,80 @@ test.describe('G: Delete across element types', () => {
 })
 
 // ──────────────────────────────────────────────────────────────────────
+// Group G½: Connected shapes + arrow move together with equal delta
+// ──────────────────────────────────────────────────────────────────────
+
+test.describe('G½: Connected diagram multi-drag', () => {
+  let canvas: CanvasPage
+
+  test.beforeEach(async ({ page }) => {
+    canvas = new CanvasPage(page)
+    await canvas.goto()
+  })
+
+  test('two boxes joined by arrow all translate equally on multi-drag', async ({ page }) => {
+    // Create two rectangles
+    await canvas.selectTool('rectangle')
+    await canvas.drawShape(100, 200, 120, 80)
+    await canvas.selectTool('rectangle')
+    await canvas.drawShape(400, 200, 120, 80)
+
+    // Connect them with an arrow (drag from center of shape1 to center of shape2)
+    await canvas.selectTool('arrow')
+    const s1 = await canvas.shapes.first().boundingBox()
+    const s2 = await canvas.shapes.last().boundingBox()
+    if (!s1 || !s2) throw new Error('Shapes have no bounding boxes')
+    await page.mouse.move(s1.x + s1.width / 2, s1.y + s1.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(s2.x + s2.width / 2, s2.y + s2.height / 2, { steps: 10 })
+    await page.mouse.up()
+    await expect(canvas.connectors).toHaveCount(1)
+
+    // Select all (2 shapes + 1 arrow)
+    await canvas.selectTool('select')
+    await page.keyboard.press('Meta+a')
+    await expect(page.locator('.shape--selected')).toHaveCount(2)
+
+    // Record positions before drag
+    const rect1Before = await canvas.shapes.first().boundingBox()
+    const rect2Before = await canvas.shapes.last().boundingBox()
+    const connectorPath = page.locator('.canvas__lines path.connector').first()
+    const connBefore = await connectorPath.boundingBox()
+    if (!rect1Before || !rect2Before || !connBefore) throw new Error('No bounding boxes')
+
+    // Drag from first shape by (+100, +100)
+    await page.mouse.move(rect1Before.x + 60, rect1Before.y + 40)
+    await page.mouse.down()
+    await page.mouse.move(rect1Before.x + 160, rect1Before.y + 140, { steps: 5 })
+    await page.mouse.up()
+
+    // Record positions after drag
+    const rect1After = await canvas.shapes.first().boundingBox()
+    const rect2After = await canvas.shapes.last().boundingBox()
+    const connAfter = await connectorPath.boundingBox()
+    if (!rect1After || !rect2After || !connAfter) throw new Error('No bounding boxes after drag')
+
+    // Calculate deltas
+    const dx1 = rect1After.x - rect1Before.x
+    const dy1 = rect1After.y - rect1Before.y
+    const dx2 = rect2After.x - rect2Before.x
+    const dy2 = rect2After.y - rect2Before.y
+    const dxConn = connAfter.x - connBefore.x
+    const dyConn = connAfter.y - connBefore.y
+
+    // Verify meaningful movement happened
+    expect(dx1).toBeGreaterThan(50)
+    expect(dy1).toBeGreaterThan(50)
+
+    // All three elements should have moved by the same delta
+    expect(Math.abs(dx2 - dx1)).toBeLessThan(5)
+    expect(Math.abs(dy2 - dy1)).toBeLessThan(5)
+    expect(Math.abs(dxConn - dx1)).toBeLessThan(5)
+    expect(Math.abs(dyConn - dy1)).toBeLessThan(5)
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────
 // Group H: Selection persists during drag operations
 // ──────────────────────────────────────────────────────────────────────
 
