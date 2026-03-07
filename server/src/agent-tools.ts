@@ -4,6 +4,7 @@ import {
   deleteElementFromDoc,
   readElementsFromDoc,
   createDocument,
+  updateDocumentContent,
   type YMapVal,
 } from './yjs-utils.js'
 import crypto from 'node:crypto'
@@ -23,6 +24,7 @@ export interface ToolContext {
     documentId: string
     topics: Array<{ title: string; summary: string; color: string; lineRanges: Array<{ start: number; end: number }> }>
   }>
+  generateImage: (prompt: string, size?: string) => Promise<{ url: string; revised_prompt?: string }>
 }
 
 type ElementRecord = Record<string, YMapVal>
@@ -277,6 +279,48 @@ export async function executeServerToolCall(
           success: true, documentId: result.documentId, topicCount: result.topics.length, cardIds,
           message: `Decomposed "${title || 'text'}" into ${result.topics.length} topics`,
         }) }
+      }
+
+      case 'create_document': {
+        const { title, html, x = 100, y = 100, width = 280, height = 180 } = call.input as {
+          title: string; html: string; x?: number; y?: number; width?: number; height?: number
+        }
+        const doc = await createDocument(ctx.userId, { title, type: 'html_artifact' })
+        await updateDocumentContent(doc.id, html)
+        const cardEl: ElementRecord = {
+          type: 'document_card', x, y, width, height,
+          documentId: doc.id, documentType: 'html_artifact',
+          title, description: '', contentVersion: doc.content_version + 1, opacity: 100,
+          jobId: ctx.jobId || '', jobStatus: ctx.jobId ? 'running' : '',
+        }
+        const [cardId] = await addElementsToDoc(ctx.documentId, [cardEl])
+        return { tool_use_id: call.id, content: JSON.stringify({ documentId: doc.id, cardElementId: cardId, success: true, message: `Created HTML artifact "${title}"` }) }
+      }
+
+      case 'update_document_content': {
+        const { document_id, html } = call.input as { document_id: string; html: string }
+        const newVersion = await updateDocumentContent(document_id, html)
+        // Update contentVersion on any matching canvas card
+        const elements = await readElementsFromDoc(ctx.documentId)
+        for (const el of elements) {
+          if (el.type === 'document_card' && el.documentId === document_id) {
+            await updateElementInDoc(ctx.documentId, el.id as string, { contentVersion: newVersion })
+          }
+        }
+        return { tool_use_id: call.id, content: JSON.stringify({ success: true, content_version: newVersion }) }
+      }
+
+      case 'generate_image': {
+        const { prompt, x = 100, y = 100, width = 512, height = 512, size = '1024x1024' } = call.input as {
+          prompt: string; x?: number; y?: number; width?: number; height?: number; size?: string
+        }
+        const result = await ctx.generateImage(prompt, size)
+        const el: ElementRecord = {
+          id: crypto.randomUUID(), type: 'image',
+          x, y, width, height, src: result.url,
+        }
+        const [id] = await addElementsToDoc(ctx.documentId, [el])
+        return { tool_use_id: call.id, content: JSON.stringify({ id, url: result.url, revised_prompt: result.revised_prompt, success: true }) }
       }
 
       case 'arrange_grid': {

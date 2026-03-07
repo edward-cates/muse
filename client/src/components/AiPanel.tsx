@@ -783,38 +783,40 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
       setChatMessages((prev) => [...prev, { role: 'status', content: agentLabel }])
     }
 
-    // Route research to server-side job system
-    if (agentConfig.name === 'researcher') {
+    // Route research and compose to server-side job system
+    if (agentConfig.name === 'researcher' || agentConfig.name === 'composer') {
       try {
         if (!elementActions.createDocument || !elementActions.addDocumentCard) {
           throw new Error('Document actions not available')
         }
 
-        // 1. Create the research canvas upfront so it appears on the board immediately
-        const researchDoc = await elementActions.createDocument({ title: text.slice(0, 60), type: 'canvas' })
+        const jobType = agentConfig.name === 'researcher' ? 'research' : 'compose'
+
+        // 1. Create a workspace document so it appears on the board immediately
+        const workspaceDoc = await elementActions.createDocument({ title: text.slice(0, 60), type: 'canvas' })
 
         // 2. Place a document card on the current canvas
-        const cardId = elementActions.addDocumentCard(100, 100, 280, 200, researchDoc.id, 'canvas', text.slice(0, 60))
+        const cardId = elementActions.addDocumentCard(100, 100, 280, 200, workspaceDoc.id, 'canvas', text.slice(0, 60))
 
-        // 3. Create the job, passing the research canvas ID and parent info
+        // 3. Create the job, passing the workspace ID and parent info
         const hashMatch = window.location.hash.match(/#\/d\/(.+)/)
         const parentDocId = hashMatch?.[1] || ''
-        const jobId = await createJob(session.access_token, 'research', {
+        const jobId = await createJob(session.access_token, jobType, {
           message: text,
           parentDocumentId: parentDocId,
           parentCardId: cardId,
-        }, researchDoc.id)
+        }, workspaceDoc.id)
 
         // 4. Stamp the jobId and running status on the card so it shows progress
         elementActions.updateElement(cardId, { jobId, jobStatus: 'running' })
 
         setActiveJobId(jobId)
         setActiveJobCardId(cardId)
-        setStatus('Starting research...')
+        setStatus(jobType === 'compose' ? 'Composing...' : 'Starting research...')
         // Don't call runAgentLoop — the server handles it
         return
       } catch (err) {
-        const errMsg = err instanceof Error ? err.message : 'Failed to start research job'
+        const errMsg = err instanceof Error ? err.message : `Failed to start ${agentConfig.name} job`
         setChatMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${errMsg}` }])
         setStreaming(false)
         setStatus(null)

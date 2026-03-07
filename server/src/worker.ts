@@ -9,7 +9,7 @@ import Anthropic from '@anthropic-ai/sdk'
 
 // ── Agent configs (server-side versions) ──
 
-import { RESEARCH_TOOLS, CANVAS_TOOLS } from './tools.js'
+import { RESEARCH_TOOLS, CANVAS_TOOLS, DOCUMENT_TOOLS, IMAGE_TOOLS, type ToolDefinition } from './tools.js'
 
 export function buildResearcherConfig(): AgentConfig {
   return {
@@ -58,6 +58,51 @@ Always respond conversationally after researching — summarize what you found a
   }
 }
 
+/** Deduplicate tools by name */
+function dedupeTools(tools: ToolDefinition[]): ToolDefinition[] {
+  const seen = new Set<string>()
+  return tools.filter(t => {
+    if (seen.has(t.name)) return false
+    seen.add(t.name)
+    return true
+  })
+}
+
+export function buildComposerConfig(): AgentConfig {
+  return {
+    name: 'composer',
+    systemPrompt: `You are a versatile AI assistant for Muse, a collaborative canvas app. You can create HTML documents, README files, research the web, add shapes, and generate images — all in one conversation.
+
+## HTML artifacts
+When asked to create a wireframe, prototype, README, or any HTML document:
+- Use create_document with a title and self-contained HTML (inline styles/scripts)
+- For iterative edits, use update_document_content with the document_id
+- Make the HTML visually polished and production-quality
+
+## Research capabilities
+- Use web_search to find relevant sources
+- Use fetch_url to read specific pages
+- Use add_web_card to place source cards on the canvas
+
+## Canvas editing
+- Use add_shape to create rectangles, ellipses, diamonds with text labels
+- Use add_arrow to connect shapes
+- Use update_element to modify existing elements
+- Use arrange_grid to lay out elements neatly
+
+## Workflow
+1. Plan what you need to create
+2. Execute — create documents, shapes, or research as needed
+3. Arrange the canvas neatly
+4. Summarize what you built`,
+    tools: dedupeTools([...CANVAS_TOOLS, ...DOCUMENT_TOOLS, ...RESEARCH_TOOLS, ...IMAGE_TOOLS]),
+    nativeTools: [
+      { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
+    ],
+    maxTurns: 10,
+  }
+}
+
 // ── Helpers ──
 
 function getSupabase() {
@@ -75,6 +120,30 @@ async function decryptUserApiKey(userId: string): Promise<string> {
 
   if (!data) throw new Error('No API key configured')
   return decrypt(data.encrypted_key)
+}
+
+async function generateImage(userId: string, prompt: string, size = '1024x1024'): Promise<{ url: string; revised_prompt?: string }> {
+  const supabase = getSupabase()
+  const { data: secret } = await supabase
+    .from('user_secrets')
+    .select('encrypted_key')
+    .eq('user_id', userId)
+    .eq('provider', 'openai')
+    .maybeSingle()
+
+  if (!secret) throw new Error('No OpenAI API key configured')
+  const apiKey = decrypt(secret.encrypted_key)
+
+  const baseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com'
+  const response = await fetch(`${baseUrl}/v1/images/generations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({ model: 'dall-e-3', prompt, n: 1, size, quality: 'standard', response_format: 'b64_json' }),
+  })
+  if (!response.ok) throw new Error(`OpenAI API error (${response.status})`)
+  const data = (await response.json()) as { data: Array<{ b64_json: string; revised_prompt?: string }> }
+  const image = data.data[0]
+  return { url: `data:image/png;base64,${image.b64_json}`, revised_prompt: image.revised_prompt }
 }
 
 const MAX_TEXT_LENGTH = 5000
@@ -220,7 +289,7 @@ const POLL_INTERVAL_MS = 2000
 const REAPER_INTERVAL_MS = 30_000
 
 async function processNextJob(): Promise<boolean> {
-  const job = await claimNextJob(['research'])
+  const job = await claimNextJob(['research', 'compose'])
   if (!job) return false
 
   console.log(`[worker] Claimed job ${job.id} (${job.type})`)
@@ -242,6 +311,9 @@ async function processNextJob(): Promise<boolean> {
       case 'research':
         config = buildResearcherConfig()
         break
+      case 'compose':
+        config = buildComposerConfig()
+        break
       default:
         throw new Error(`Unsupported job type: ${job.type}`)
     }
@@ -252,6 +324,7 @@ async function processNextJob(): Promise<boolean> {
       jobId: job.id,
       fetchUrl,
       decomposeText: (text, title) => decomposeText(apiKey, job.user_id, text, title),
+      generateImage: (prompt, size) => generateImage(job.user_id, prompt, size),
     }
 
     // Build stream callback: push text/tool status to the parent card's description via live Yjs
@@ -270,25 +343,35 @@ async function processNextJob(): Promise<boolean> {
           const label = toolName === 'web_search' ? 'Searching the web...'
             : toolName === 'fetch_url' ? 'Reading article...'
             : toolName === 'add_web_card' ? 'Adding source card...'
-            : toolName === 'add_shape' ? 'Creating theme...'
-            : toolName === 'add_arrow' ? 'Connecting themes to sources...'
+            : toolName === 'add_shape' ? 'Creating shape...'
+            : toolName === 'add_arrow' ? 'Connecting elements...'
+            : toolName === 'create_document' ? 'Creating document...'
+            : toolName === 'update_document_content' ? 'Writing content...'
+            : toolName === 'generate_image' ? 'Generating image...'
+            : toolName === 'decompose_text' ? 'Analyzing text...'
+            : toolName === 'arrange_grid' ? 'Arranging layout...'
             : `Running ${toolName}...`
           updateCard(label)
         },
         onTurnStart: (turn, maxTurns) => {
-          if (turn === 1) updateCard('Starting research...')
+          if (turn === 1) {
+            const label = job.type === 'compose' ? 'Composing...' : 'Starting research...'
+            updateCard(label)
+          }
         },
       }
     }
 
     const result = await runAgentLoop(job.id, config, apiKey, toolCtx, userMessage, streamCallback)
 
-    // Apply force-directed layout to space out nodes
-    try {
-      await layoutCanvas(documentId, parentDocId, parentCardId)
-      console.log(`[worker] Applied layout to document ${documentId}`)
-    } catch (layoutErr) {
-      console.error(`[worker] Layout failed (non-fatal):`, layoutErr)
+    // Apply force-directed layout to space out nodes (research canvases only)
+    if (job.type === 'research') {
+      try {
+        await layoutCanvas(documentId, parentDocId, parentCardId)
+        console.log(`[worker] Applied layout to document ${documentId}`)
+      } catch (layoutErr) {
+        console.error(`[worker] Layout failed (non-fatal):`, layoutErr)
+      }
     }
 
     await completeJob(job.id, {
