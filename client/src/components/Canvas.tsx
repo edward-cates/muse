@@ -116,6 +116,9 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
   // Track selected paths' start positions for multi-drag (from ShapeRenderer drag)
   const dragPathStarts = useRef<{ id: string; x: number; y: number; points: number[] }[]>([])
 
+  // Track selected non-shape/non-line/non-path elements for multi-drag (text, images, cards)
+  const dragOtherStarts = useRef<{ id: string; x: number; y: number }[]>([])
+
   // Track path-initiated drag starting positions (for direct path dragging)
   const pathDragOrigins = useRef<{
     paths: { id: string; x: number; y: number; points: number[] }[]
@@ -1253,8 +1256,23 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
                     updateElement(ps.id, { x: ps.x + dx, y: ps.y + dy, points: newPoints })
                   }
                 }
+
+                // Move selected text, images, and cards by the same delta
+                if (dragOtherStarts.current.length === 0) {
+                  const shapeLinePathIds = new Set([
+                    ...shapesRef.current.map(s => s.id),
+                    ...linesRef.current.map(l => l.id),
+                    ...pathsRef.current.map(p => p.id),
+                  ])
+                  dragOtherStarts.current = elements
+                    .filter(e => selectedIdsRef.current.includes(e.id) && !shapeLinePathIds.has(e.id) && 'x' in e && 'y' in e)
+                    .map(e => ({ id: e.id, x: (e as { x: number }).x, y: (e as { y: number }).y }))
+                }
+                for (const os of dragOtherStarts.current) {
+                  updateElement(os.id, { x: os.x + dx, y: os.y + dy })
+                }
               }}
-              onDragEnd={() => { setAlignmentGuides([]); dragLineStarts.current = []; dragPathStarts.current = [] }}
+              onDragEnd={() => { setAlignmentGuides([]); dragLineStarts.current = []; dragPathStarts.current = []; dragOtherStarts.current = [] }}
             />
           )
         })}

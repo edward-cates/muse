@@ -849,6 +849,63 @@ test.describe('G½: Connected diagram multi-drag', () => {
     await canvas.goto()
   })
 
+  test('shape + text element move together on multi-drag', async ({ page }) => {
+    // Create a rectangle
+    await canvas.selectTool('rectangle')
+    await canvas.drawShape(100, 200, 120, 80)
+
+    // Create a text element via Yjs (easiest way to place one at known coords)
+    await page.evaluate(() => {
+      const Y = (window as any).__testY
+      const doc = (window as any).__testDoc
+      if (!doc || !Y) throw new Error('__testDoc or __testY not found')
+      const elements = doc.getArray('elements')
+      const yEl = new Y.Map()
+      yEl.set('id', 'test-text-1')
+      yEl.set('type', 'text')
+      yEl.set('x', 400)
+      yEl.set('y', 200)
+      yEl.set('width', 100)
+      yEl.set('height', 30)
+      yEl.set('text', 'Hello')
+      yEl.set('fontSize', 20)
+      yEl.set('fill', 'transparent')
+      yEl.set('stroke', '#1a1a1a')
+      yEl.set('strokeWidth', 0)
+      elements.push([yEl])
+    })
+
+    // Select all
+    await canvas.selectTool('select')
+    await page.keyboard.press('Meta+a')
+    await expect(page.locator('.shape--selected')).toHaveCount(1)
+    const textEl = page.locator('[data-testid="text-element"]')
+    await expect(textEl).toHaveCount(1)
+
+    // Record positions
+    const rectBefore = await canvas.shapes.first().boundingBox()
+    const textBefore = await textEl.boundingBox()
+    if (!rectBefore || !textBefore) throw new Error('No bounding boxes')
+
+    // Drag from the rect
+    await page.mouse.move(rectBefore.x + 60, rectBefore.y + 40)
+    await page.mouse.down()
+    await page.mouse.move(rectBefore.x + 160, rectBefore.y + 140, { steps: 5 })
+    await page.mouse.up()
+
+    const rectAfter = await canvas.shapes.first().boundingBox()
+    const textAfter = await textEl.boundingBox()
+    if (!rectAfter || !textAfter) throw new Error('No bounding boxes after drag')
+
+    const dx = rectAfter.x - rectBefore.x
+    const dy = rectAfter.y - rectBefore.y
+    expect(dx).toBeGreaterThan(50)
+
+    // Text element should have moved by the same delta
+    expect(Math.abs((textAfter.x - textBefore.x) - dx)).toBeLessThan(5)
+    expect(Math.abs((textAfter.y - textBefore.y) - dy)).toBeLessThan(5)
+  })
+
   test('two boxes joined by arrow all translate equally on multi-drag', async ({ page }) => {
     // Create two rectangles
     await canvas.selectTool('rectangle')
