@@ -14,6 +14,7 @@ import { useDocumentApi } from './hooks/useDocument'
 import { useAuth } from './auth/AuthContext'
 import type { Tool, LineType, CanvasElement } from './types'
 import { isShape, isLine, isText } from './types'
+import { computeLayout } from './lib/layout'
 
 export function App({ drawingId }: { drawingId: string }) {
   const [activeTool, setActiveTool] = useState<Tool>('select')
@@ -547,6 +548,12 @@ export function App({ drawingId }: { drawingId: string }) {
             setSelectedIds([id])
           }}
           onInsertNode={() => setNodePickerOpen(prev => !prev)}
+          onAutoLayout={() => {
+            const positions = computeLayout(elements)
+            for (const [id, pos] of positions) {
+              updateElement(id, { x: pos.x, y: pos.y })
+            }
+          }}
         />
         {nodePickerOpen && (
           <NodePicker

@@ -8,11 +8,12 @@ interface Props {
   onLineTypeChange: (lineType: LineType) => void
   onInsertImage?: (src: string, w: number, h: number) => void
   onInsertNode?: () => void
+  onAutoLayout?: () => void
 }
 
 const LINE_TOOLS: Tool[] = ['line', 'arrow']
 
-export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeChange, onInsertImage, onInsertNode }: Props) {
+export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeChange, onInsertImage, onInsertNode, onAutoLayout }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleInsertImage = () => {
@@ -217,6 +218,24 @@ export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeCh
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="3" />
             <path d="M12 8v8M8 12h8" />
+          </svg>
+        </button>
+      )}
+
+      {/* Auto layout */}
+      {onAutoLayout && (
+        <button
+          data-testid="auto-layout"
+          className="toolbar__btn"
+          onClick={onAutoLayout}
+          title="Auto Layout"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="5" cy="6" r="3" />
+            <circle cx="19" cy="6" r="3" />
+            <circle cx="12" cy="18" r="3" />
+            <line x1="7.5" y1="7.5" x2="10" y2="16" />
+            <line x1="16.5" y1="7.5" x2="14" y2="16" />
           </svg>
         </button>
       )}

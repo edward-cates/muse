@@ -73,8 +73,8 @@ export async function layoutCanvas(
   for (let i = 0; i < themes.length; i++) {
     const id = themes[i].id as string
     graph.addNode(id, {
-      x: THEME_X,
-      y: Y_START + i * Y_GAP,
+      x: THEME_X + Math.random() * 20,
+      y: Y_START + i * Y_GAP + Math.random() * 20,
       size: nodeSize(themes[i]),
     })
   }
@@ -82,8 +82,8 @@ export async function layoutCanvas(
   for (let i = 0; i < sources.length; i++) {
     const id = sources[i].id as string
     graph.addNode(id, {
-      x: SOURCE_X,
-      y: Y_START + i * Y_GAP,
+      x: SOURCE_X + Math.random() * 20,
+      y: Y_START + i * Y_GAP + Math.random() * 20,
       size: nodeSize(sources[i]),
     })
   }
@@ -101,23 +101,26 @@ export async function layoutCanvas(
     }
   }
 
-  // Run ForceAtlas2
-  const settings = forceAtlas2.inferSettings(graph)
+  // Run ForceAtlas2: topology-aware positioning
   forceAtlas2.assign(graph, {
-    iterations: 100,
+    iterations: 300,
     settings: {
-      ...settings,
-      gravity: 5,
+      gravity: 0.1,
+      scalingRatio: 200,
       barnesHutOptimize: false,
+      adjustSizes: true,
+      strongGravityMode: false,
+      slowDown: 2,
     },
   })
 
   // Run Noverlap to remove any remaining overlaps
   noverlap.assign(graph, {
-    maxIterations: 100,
+    maxIterations: 200,
     settings: {
       margin: 40,
-      ratio: 1.5,
+      ratio: 1.0,
+      speed: 3,
     },
   })
 
