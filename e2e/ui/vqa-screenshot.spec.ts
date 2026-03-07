@@ -33,7 +33,7 @@ test.describe('VQA screenshot pipeline', () => {
     await canvas.goto()
   })
 
-  test('captureCanvas produces a valid PNG containing the drawn shapes', async ({ page }) => {
+  test('captureCanvas produces a valid JPEG containing the drawn shapes', async ({ page }) => {
     // Draw a bright red rectangle at a known position
     await createShape(page, {
       id: 'red-box', x: 200, y: 200, w: 200, h: 150, fill: '#ff0000', text: 'Hello',
@@ -47,7 +47,7 @@ test.describe('VQA screenshot pipeline', () => {
     // Wait for shapes to render
     await expect(canvas.shapes).toHaveCount(2)
 
-    // Call captureCanvas from the browser and get the base64 PNG
+    // Call captureCanvas from the browser and get the base64 JPEG
     const base64 = await page.evaluate(async () => {
       // Import the capture function dynamically (Vite bundles it)
       const { captureCanvas } = await import('/src/ai/canvasCapture.ts')
@@ -59,18 +59,17 @@ test.describe('VQA screenshot pipeline', () => {
     // 1. Must be a non-empty base64 string (no data:... prefix — captureCanvas strips it)
     expect(base64).toBeTruthy()
     expect(base64).not.toContain('data:')
-    expect(base64.length).toBeGreaterThan(1000) // A real PNG is not tiny
+    expect(base64.length).toBeGreaterThan(1000)
 
-    // 2. Must be valid base64 that decodes to a PNG
+    // 2. Must be valid base64 that decodes to a JPEG
     const isValidBase64 = /^[A-Za-z0-9+/]+=*$/.test(base64)
     expect(isValidBase64).toBe(true)
 
-    // Decode and check PNG magic bytes
+    // Decode and check JPEG magic bytes (FFD8FF)
     const binary = Buffer.from(base64, 'base64')
-    const pngMagic = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
-    for (let i = 0; i < pngMagic.length; i++) {
-      expect(binary[i]).toBe(pngMagic[i])
-    }
+    expect(binary[0]).toBe(0xff)
+    expect(binary[1]).toBe(0xd8)
+    expect(binary[2]).toBe(0xff)
   })
 
   test('screenshot contains pixels from drawn shapes, not a blank image', async ({ page }) => {
@@ -109,8 +108,8 @@ test.describe('VQA screenshot pipeline', () => {
           }
           resolve({ width: img.width, height: img.height, greenPixels, totalPixels })
         }
-        img.onerror = () => reject(new Error('Failed to load screenshot PNG'))
-        img.src = `data:image/png;base64,${base64}`
+        img.onerror = () => reject(new Error('Failed to load screenshot'))
+        img.src = `data:image/jpeg;base64,${base64}`
       })
     })
 
@@ -165,7 +164,7 @@ test.describe('VQA screenshot pipeline', () => {
         return ctx.getImageData(0, 0, w, h).data
       }
 
-      const aiImg = await loadImage(`data:image/png;base64,${aiB64}`)
+      const aiImg = await loadImage(`data:image/jpeg;base64,${aiB64}`)
       const pwImg = await loadImage(`data:image/png;base64,${pwB64}`)
 
       // Use the AI screenshot dimensions as the comparison size
@@ -263,7 +262,7 @@ test.describe('VQA screenshot pipeline', () => {
           resolve({ redPixels, bluePixels, width: img.width, height: img.height })
         }
         img.onerror = () => reject(new Error('Failed to load'))
-        img.src = `data:image/png;base64,${base64}`
+        img.src = `data:image/jpeg;base64,${base64}`
       })
     })
 
@@ -311,14 +310,13 @@ test.describe('VQA screenshot pipeline', () => {
           elHeight: canvasEl.clientHeight,
         })
         img.onerror = () => reject(new Error('Failed to load'))
-        img.src = `data:image/png;base64,${base64}`
+        img.src = `data:image/jpeg;base64,${base64}`
       })
     })
 
-    // captureCanvas uses SCALE = 0.5, so the image should be half the element size
-    // (allow ±2px for rounding)
-    expect(dims.imgWidth).toBeCloseTo(dims.elWidth * 0.5, -1)
-    expect(dims.imgHeight).toBeCloseTo(dims.elHeight * 0.5, -1)
+    // captureCanvas uses SCALE = 0.5 then caps at 768px max dimension
+    // The image should be at most 768px on the longest side
+    expect(Math.max(dims.imgWidth, dims.imgHeight)).toBeLessThanOrEqual(768)
 
     // The image width should match the canvas area, NOT the full viewport
     // Full viewport includes the 380px AI panel
@@ -349,7 +347,7 @@ test.describe('VQA screenshot pipeline', () => {
       const toolResultBlocks: unknown[] = [
         { type: 'tool_result', tool_use_id: 'test-tool-123', content: '{"success": true}' },
         { type: 'text', text: `[Screenshot of canvas after your changes. ${boundsText}. Verify the layout looks correct — fix overlaps or missing connections.]` },
-        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64 } },
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
       ]
 
       const userMessage = { role: 'user', content: toolResultBlocks }
@@ -376,7 +374,7 @@ test.describe('VQA screenshot pipeline', () => {
     // Block 2: image block with correct structure
     expect(blocks[2].type).toBe('image')
     expect(blocks[2].source.type).toBe('base64')
-    expect(blocks[2].source.media_type).toBe('image/png')
+    expect(blocks[2].source.media_type).toBe('image/jpeg')
     expect(typeof blocks[2].source.data).toBe('string')
     expect(blocks[2].source.data.length).toBeGreaterThan(1000)
 
@@ -439,7 +437,7 @@ test.describe('VQA screenshot pipeline', () => {
           resolve({ redPixels })
         }
         img.onerror = () => reject(new Error('Failed to load'))
-        img.src = `data:image/png;base64,${base64}`
+        img.src = `data:image/jpeg;base64,${base64}`
       })
     })
 
@@ -487,7 +485,7 @@ test.describe('VQA screenshot pipeline', () => {
           resolve({ hasNonWhitePixels: nonWhite > 20 })
         }
         img.onerror = () => reject(new Error('Failed to load'))
-        img.src = `data:image/png;base64,${base64}`
+        img.src = `data:image/jpeg;base64,${base64}`
       })
     })
 
@@ -553,7 +551,7 @@ test.describe('VQA screenshot pipeline', () => {
           resolve({ width: img.width, height: img.height, hasNonWhitePixels: nonWhite > 20 })
         }
         img.onerror = () => reject(new Error('Failed to load'))
-        img.src = `data:image/png;base64,${base64}`
+        img.src = `data:image/jpeg;base64,${base64}`
       })
     })
 
