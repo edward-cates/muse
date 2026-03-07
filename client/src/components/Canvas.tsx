@@ -753,7 +753,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
       if (e.ctrlKey || e.metaKey) {
         // Pinch-to-zoom (trackpad) or Ctrl+scroll (mouse wheel)
         const s = scaleRef.current
-        const factor = e.deltaY > 0 ? 0.92 : 1.08
+        const factor = e.deltaY > 0 ? 0.96 : 1.04
         const newScale = Math.min(Math.max(s * factor, 0.1), 10)
         const cx = e.clientX
         const cy = e.clientY
