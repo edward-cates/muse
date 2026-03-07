@@ -1461,8 +1461,14 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
         </div>
       )}
 
-      {/* Zoom indicator */}
-      <div className="zoom-indicator" data-testid="zoom-level">
+      {/* Zoom indicator — click to reset to 100% centered on origin */}
+      <div className="zoom-indicator" data-testid="zoom-level" onClick={() => {
+        const el = canvasRef.current
+        const vw = el ? el.clientWidth : window.innerWidth
+        const vh = el ? el.clientHeight : window.innerHeight
+        setScale(1)
+        setOffset({ x: vw / 2, y: vh / 2 })
+      }}>
         {Math.round(scale * 100)}%
       </div>
 
