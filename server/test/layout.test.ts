@@ -60,7 +60,7 @@ function createMockSupabase(): Promise<{ server: Server; url: string }> {
   })
 }
 
-describe('Force-directed layout', () => {
+describe('Hierarchical layout (dagre)', () => {
   let sbMock: { server: Server; url: string }
 
   before(async () => {
