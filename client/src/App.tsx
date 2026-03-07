@@ -548,6 +548,7 @@ export function App({ drawingId }: { drawingId: string }) {
             setSelectedIds([id])
           }}
           onInsertNode={() => setNodePickerOpen(prev => !prev)}
+          onFitToContent={() => canvasRef.current?.fitToContent()}
           onAutoLayout={() => {
             const positions = computeLayout(elements)
             for (const [id, pos] of positions) {
