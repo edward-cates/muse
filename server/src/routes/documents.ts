@@ -70,6 +70,18 @@ router.post('/', async (req, res) => {
     .single()
 
   if (error) {
+    // Race condition: another request inserted the same ID between our check and insert
+    if (error.code === '23505' && id) {
+      const { data: existing } = await supabase
+        .from('documents')
+        .select('id, title, type, content_version, created_at, updated_at')
+        .eq('id', id)
+        .maybeSingle()
+      if (existing) {
+        res.json({ document: existing })
+        return
+      }
+    }
     console.error('POST /api/documents insert error:', error)
     if (error.code === '23503') {
       res.status(401).json({ error: 'User account not found. Please sign out and sign back in.' })
