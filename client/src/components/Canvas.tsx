@@ -303,6 +303,15 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
     })
   }, [])
 
+  // Auto-fit viewport to content on initial load
+  const didAutoFit = useRef(false)
+  useEffect(() => {
+    if (!didAutoFit.current && elements.length > 0) {
+      didAutoFit.current = true
+      fitElements(elements)
+    }
+  }, [elements, fitElements])
+
   useImperativeHandle(ref, () => ({
     fitToContent() {
       if (elements.length > 0) fitElements(elements)
