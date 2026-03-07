@@ -203,4 +203,88 @@ test.describe('AI research with server-side element writes', () => {
     // 12. Chat history should still be visible (persisted across navigation)
     await expect(page.locator('.ai-chat-markdown')).toContainText('Research complete!')
   })
+
+  test('AI sets description on root-level document card after research', async ({ page }) => {
+    // 1. Navigate to the parent canvas
+    await page.goto('/')
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    await page.waitForTimeout(1500)
+
+    // 2. Mock AI endpoints
+    let aiCallCount = 0
+    let cardElementId = ''
+
+    await page.route('**/api/ai/classify', route => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ intent: 'compose' }),
+      })
+    })
+
+    await page.route('**/api/ai/message', async route => {
+      aiCallCount++
+
+      if (aiCallCount === 1) {
+        // Turn 1: AI creates a sub-canvas node (adds document card to parent canvas)
+        route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          body: sseToolUse('t1', 'add_node', {
+            title: 'AI Research Results',
+            x: 200, y: 200, width: 280, height: 180,
+          }) + sseEnd('tool_use'),
+        })
+      } else if (aiCallCount === 2) {
+        // Extract the cardElementId from the tool result
+        const body = JSON.parse(route.request().postData()!)
+        const lastUserMsg = body.messages[body.messages.length - 1]
+        for (const block of lastUserMsg.content) {
+          if (block.type === 'tool_result') {
+            try {
+              const parsed = JSON.parse(block.content)
+              if (parsed.cardElementId) cardElementId = parsed.cardElementId
+            } catch { /* skip non-JSON results */ }
+          }
+        }
+
+        // Turn 2: AI sets description on the document card
+        route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          body: sseToolUse('t2', 'update_element', {
+            id: cardElementId,
+            description: 'Key findings on AI adoption, safety trends, and emerging regulations.',
+          }) + sseEnd('tool_use'),
+        })
+      } else {
+        // Turn 3: final summary
+        route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          body: sseText('Research complete with summary.') + sseEnd('end_turn'),
+        })
+      }
+    })
+
+    await page.route('**/api/ailog/**', route => {
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
+    })
+
+    // 3. Send the research request
+    const input = page.locator('input[placeholder*="Draw a flowchart"]')
+    await input.fill('research AI trends')
+    await input.press('Enter')
+
+    // 4. Wait for agent to finish (final text turn)
+    await expect(page.locator('.ai-chat-markdown')).toContainText('Research complete', { timeout: 30_000 })
+
+    // 5. Verify the document card on the parent canvas shows the description
+    const docCard = page.locator('[data-testid="document-card"]')
+    await expect(docCard).toHaveCount(1, { timeout: 10_000 })
+    await expect(docCard.locator('.document-card__description')).toContainText(
+      'Key findings on AI adoption',
+      { timeout: 5000 },
+    )
+  })
 })
