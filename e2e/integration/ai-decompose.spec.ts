@@ -2,7 +2,18 @@ import { test, expect, type Page } from '@playwright/test'
 
 test.setTimeout(90_000)
 
+const MOCK_URL = 'http://localhost:4999'
+
 // ── Helpers ──
+
+async function configureMock(responses: unknown[]) {
+  await fetch(`${MOCK_URL}/__reset`, { method: 'POST' })
+  await fetch(`${MOCK_URL}/__configure`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ responses }),
+  })
+}
 
 async function apiCall(
   page: Page,
@@ -36,24 +47,7 @@ async function apiCall(
   )
 }
 
-function sseToolUse(toolId: string, toolName: string, input: Record<string, unknown>): string {
-  const inputJson = JSON.stringify(input)
-  return [
-    `data: {"type":"tool_use_start","id":"${toolId}","name":"${toolName}"}\n\n`,
-    `data: {"type":"input_json_delta","partial_json":${JSON.stringify(inputJson)}}\n\n`,
-    `data: {"type":"content_block_stop"}\n\n`,
-  ].join('')
-}
-
-function sseText(text: string): string {
-  return `data: {"type":"text_delta","text":${JSON.stringify(text)}}\n\n`
-}
-
-function sseEnd(stopReason: string): string {
-  return `data: {"type":"message_delta","stop_reason":"${stopReason}"}\n\n` + `data: [DONE]\n\n`
-}
-
-// Mock decompose response
+// Mock decompose response (returned by mock Anthropic for the report_topics tool)
 const MOCK_TOPICS = [
   {
     title: 'Cost Optimization',
@@ -78,26 +72,44 @@ const MOCK_TOPICS = [
 // ── Tests ──
 
 test.describe('AI research decomposition flow', () => {
-  test('decompose_text creates source canvas with decomposition cards and places document card with topic pills', async ({ page }) => {
+  test('decompose_text creates decomposition cards on workspace canvas', async ({ page }) => {
+    // The mock Anthropic response queue:
+    // 1. Agent turn 1 (streaming): decompose_text tool call
+    // 2. decomposeText internal call (non-streaming): report_topics with mock topics
+    // 3. Agent turn 2 (streaming): final text
+    await configureMock([
+      // Turn 1: decompose_text (no target_document_id — cards go directly on workspace)
+      {
+        content: [{
+          type: 'tool_use', id: 'dt1', name: 'decompose_text',
+          input: {
+            text: 'Line 1: Cloud cost optimization strategies\nLine 2: Right-sizing instances\nLine 3: Reserved capacity planning\nLine 4: Spot instance usage\nLine 5: Cost monitoring dashboards\nLine 6: Budget alerts and governance\nLine 7: FinOps team structure\nLine 8: Chargeback models\nLine 9: Auto-scaling fundamentals\nLine 10: Horizontal vs vertical scaling\nLine 11: Load-based triggers\nLine 12: Predictive scaling\nLine 13: Scale-to-zero patterns\nLine 14: Container orchestration\nLine 15: Serverless scaling\nLine 16: Database read replicas\nLine 17: CDN and edge caching\nLine 18: Queue-based load leveling\nLine 19: Zero-trust networking\nLine 20: Secrets management\nLine 21: Key rotation automation\nLine 22: Network segmentation\nLine 23: WAF configuration\nLine 24: DDoS mitigation\nLine 25: Compliance frameworks',
+            title: 'Cloud Architecture Best Practices',
+          },
+        }],
+        stop_reason: 'tool_use',
+      },
+      // decomposeText internal call → report_topics (non-streaming)
+      {
+        content: [{
+          type: 'tool_use', id: 'rt1', name: 'report_topics',
+          input: { topics: MOCK_TOPICS },
+        }],
+        stop_reason: 'tool_use',
+      },
+      // Turn 2: final text
+      {
+        content: [{ type: 'text', text: 'Research complete! Found 3 key themes across cloud architecture.' }],
+        stop_reason: 'end_turn',
+      },
+    ])
+
     // 1. Navigate to parent canvas
     await page.goto('/')
     await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
     await page.waitForTimeout(1500)
 
-    // 2. Create the research canvas (simulates what add_node produces)
-    const researchResult = await apiCall(page, 'POST', '/api/documents', {
-      title: 'Cloud Architecture Research',
-      type: 'canvas',
-    })
-    expect(researchResult.status).toBe(200)
-    const researchCanvasId = researchResult.data.document.id
-
-    // 3. Mock endpoints
-    let aiCallCount = 0
-    let decomposeCallCount = 0
-
-    // Use 'compose' intent — research now routes to server-side job system.
-    // Compose agent has the same tools and runs client-side for testing.
+    // 2. Mock classify at browser level
     await page.route('**/api/ai/classify', route => {
       route.fulfill({
         status: 200,
@@ -105,161 +117,27 @@ test.describe('AI research decomposition flow', () => {
         body: JSON.stringify({ intent: 'compose' }),
       })
     })
-
-    // Mock /api/decompose — return structured topics without calling Anthropic
-    await page.route('**/api/decompose', async route => {
-      decomposeCallCount++
-      // Create a real research document via the actual documents API
-      // (we intercept decompose but let document creation go through)
-      const reqBody = JSON.parse(route.request().postData()!)
-      const docResult = await apiCall(page, 'POST', '/api/documents', {
-        title: reqBody.title || 'Untitled Research',
-        type: 'canvas', // needs to be canvas for elements to be written
-      })
-      const docId = docResult.data.document.id
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ documentId: docId, topics: MOCK_TOPICS }),
-      })
-    })
-
     await page.route('**/api/ailog/**', route => {
       route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
     })
 
-    // The AI flow:
-    // Turn 1: add_node (create research canvas) — we pre-created it, so the AI
-    //         will call add_node and get a DIFFERENT canvas. To keep it simple,
-    //         we make the AI call decompose_text directly with our pre-created canvas.
-    // Turn 2: decompose_text with target_document_id
-    // Turn 3: update_element on the research card with cross-cutting themes
-    // Turn 4: final text summary
-
-    await page.route('**/api/ai/message', async route => {
-      aiCallCount++
-
-      if (aiCallCount === 1) {
-        // Turn 1: AI creates research canvas node
-        route.fulfill({
-          status: 200,
-          contentType: 'text/event-stream',
-          body: sseToolUse('t1', 'add_node', {
-            title: 'Cloud Architecture Research',
-            x: 100, y: 100, width: 300, height: 240,
-          }) + sseEnd('tool_use'),
-        })
-      } else if (aiCallCount === 2) {
-        // Extract the research canvas documentId from the add_node result
-        const body = JSON.parse(route.request().postData()!)
-        const lastMsg = body.messages[body.messages.length - 1]
-        let researchDocId = ''
-        for (const block of lastMsg.content) {
-          if (block.type === 'tool_result') {
-            try {
-              const parsed = JSON.parse(block.content)
-              if (parsed.documentId) researchDocId = parsed.documentId
-            } catch { /* skip */ }
-          }
-        }
-
-        // Turn 2: decompose_text targeting the research canvas
-        route.fulfill({
-          status: 200,
-          contentType: 'text/event-stream',
-          body: sseToolUse('t2', 'decompose_text', {
-            text: 'Line 1: Cloud cost optimization strategies\nLine 2: Right-sizing instances\nLine 3: Reserved capacity planning\nLine 4: Spot instance usage\nLine 5: Cost monitoring dashboards\nLine 6: Budget alerts and governance\nLine 7: FinOps team structure\nLine 8: Chargeback models\nLine 9: Auto-scaling fundamentals\nLine 10: Horizontal vs vertical scaling\nLine 11: Load-based triggers\nLine 12: Predictive scaling\nLine 13: Scale-to-zero patterns\nLine 14: Container orchestration\nLine 15: Serverless scaling\nLine 16: Database read replicas\nLine 17: CDN and edge caching\nLine 18: Queue-based load leveling\nLine 19: Zero-trust networking\nLine 20: Secrets management\nLine 21: Key rotation automation\nLine 22: Network segmentation\nLine 23: WAF configuration\nLine 24: DDoS mitigation\nLine 25: Compliance frameworks',
-            title: 'Cloud Architecture Best Practices',
-            x: 100,
-            y: 100,
-            target_document_id: researchDocId,
-          }) + sseEnd('tool_use'),
-        })
-      } else if (aiCallCount === 3) {
-        // Extract the cardElementId from decompose_text result to update it
-        const body = JSON.parse(route.request().postData()!)
-        const lastMsg = body.messages[body.messages.length - 1]
-        let cardElementId = ''
-        let researchDocId = ''
-        // Walk backward through messages to find add_node result (has cardElementId for the top-level node)
-        for (const msg of body.messages) {
-          if (msg.role !== 'user' || !Array.isArray(msg.content)) continue
-          for (const block of msg.content) {
-            if (block.type === 'tool_result') {
-              try {
-                const parsed = JSON.parse(block.content)
-                // add_node returns cardElementId
-                if (parsed.cardElementId && parsed.documentId) {
-                  cardElementId = parsed.cardElementId
-                  researchDocId = parsed.documentId
-                }
-              } catch { /* skip */ }
-            }
-          }
-        }
-
-        // Turn 3: update top-level card with cross-cutting themes
-        route.fulfill({
-          status: 200,
-          contentType: 'text/event-stream',
-          body: sseToolUse('t3', 'update_element', {
-            id: cardElementId,
-            title: 'Cloud Architecture Research',
-            topicLabels: 'Cost Optimization|Auto-Scaling|Security',
-            topicColors: '#f59e0b|#3b82f6|#ef4444',
-          }) + sseEnd('tool_use'),
-        })
-      } else {
-        // Turn 4: final summary
-        route.fulfill({
-          status: 200,
-          contentType: 'text/event-stream',
-          body: sseText('Research complete! Found 3 key themes across cloud architecture.') + sseEnd('end_turn'),
-        })
-      }
-    })
-
-    // 4. Trigger the research flow
+    // 3. Trigger the flow
     const input = page.locator('input[placeholder*="Draw a flowchart"]')
     await input.fill('research cloud architecture best practices')
     await input.press('Enter')
 
-    // 5. Wait for the agent to finish
-    await expect(page.locator('.ai-chat-markdown')).toContainText('Research complete', { timeout: 30_000 })
+    // 4. Workspace card appears on parent canvas immediately
+    const parentCard = page.locator('[data-testid="document-card"]').first()
+    await expect(parentCard).toBeVisible({ timeout: 10_000 })
 
-    // 6. Verify: /api/decompose was called
-    expect(decomposeCallCount).toBeGreaterThanOrEqual(1)
+    // 5. Wait for job completion
+    await expect(parentCard.locator('.document-card__job-status')).toBeHidden({ timeout: 45_000 })
 
-    // 7. Verify: the top-level research card is on the parent canvas with topic pills
-    const docCard = page.locator('[data-testid="document-card"]').first()
-    await expect(docCard).toBeVisible({ timeout: 10_000 })
-
-    // Check topic pills are rendered on the card
-    const topicDots = docCard.locator('.document-card__topic-dot')
-    await expect(topicDots).toHaveCount(3, { timeout: 5_000 })
-
-    const topicLabels = docCard.locator('.document-card__topic-label')
-    await expect(topicLabels.nth(0)).toContainText('Cost Optimization')
-    await expect(topicLabels.nth(1)).toContainText('Auto-Scaling')
-    await expect(topicLabels.nth(2)).toContainText('Security')
-
-    // 8. Double-click the research card to navigate into the research canvas
-    await docCard.dblclick()
+    // 6. Navigate into the workspace canvas
+    await parentCard.dblclick()
     await page.waitForTimeout(2000)
 
-    // 9. Verify: inside the research canvas, there's a source document card with topic pills
-    const sourceCard = page.locator('[data-testid="document-card"]').first()
-    await expect(sourceCard).toBeVisible({ timeout: 10_000 })
-
-    // Source card should have the 3 topic pills from decomposition
-    const sourceTopicDots = sourceCard.locator('.document-card__topic-dot')
-    await expect(sourceTopicDots).toHaveCount(3, { timeout: 5_000 })
-
-    // 10. Double-click the source card to navigate into the source canvas
-    await sourceCard.dblclick()
-    await page.waitForTimeout(2000)
-
-    // 11. Verify: inside the source canvas, there are decomposition cards
+    // 7. Verify: workspace canvas has 3 decomposition cards
     const decompCards = page.locator('[data-testid="decomposition-card"]')
     await expect(decompCards).toHaveCount(3, { timeout: 10_000 })
 

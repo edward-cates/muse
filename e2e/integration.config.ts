@@ -26,11 +26,19 @@ export default defineConfig({
 
   webServer: [
     {
+      command: 'npx tsx e2e/integration/mock-anthropic.ts',
+      cwd: '..',
+      url: 'http://localhost:4999',
+      reuseExistingServer: !process.env.CI,
+      timeout: 10_000,
+    },
+    {
       command: 'npm run dev -w server',
       cwd: '..',
       url: 'http://localhost:4444',
       reuseExistingServer: !process.env.CI,
       timeout: 15_000,
+      env: { ...process.env, ANTHROPIC_BASE_URL: 'http://localhost:4999' },
     },
     {
       command: 'npm run dev -w client -- --port 5175',
