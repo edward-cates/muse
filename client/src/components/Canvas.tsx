@@ -289,7 +289,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
       }
     }
     if (minX === Infinity) return
-    const padding = 50
+    const padding = 120
     const bw = maxX - minX + padding * 2
     const bh = maxY - minY + padding * 2
     const canvasEl = canvasRef.current
