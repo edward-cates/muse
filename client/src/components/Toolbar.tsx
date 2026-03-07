@@ -9,11 +9,12 @@ interface Props {
   onInsertImage?: (src: string, w: number, h: number) => void
   onInsertNode?: () => void
   onAutoLayout?: () => void
+  onFitToContent?: () => void
 }
 
 const LINE_TOOLS: Tool[] = ['line', 'arrow']
 
-export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeChange, onInsertImage, onInsertNode, onAutoLayout }: Props) {
+export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeChange, onInsertImage, onInsertNode, onAutoLayout, onFitToContent }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleInsertImage = () => {
@@ -236,6 +237,20 @@ export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeCh
             <circle cx="12" cy="18" r="3" />
             <line x1="7.5" y1="7.5" x2="10" y2="16" />
             <line x1="16.5" y1="7.5" x2="14" y2="16" />
+          </svg>
+        </button>
+      )}
+
+      {/* Zoom to fit */}
+      {onFitToContent && (
+        <button
+          data-testid="fit-to-content"
+          className="toolbar__btn"
+          onClick={onFitToContent}
+          title="Zoom to Fit (Shift+1)"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
           </svg>
         </button>
       )}
