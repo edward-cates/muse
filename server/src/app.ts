@@ -145,6 +145,12 @@ export async function createApp(): Promise<AppInstance> {
       return
     }
 
+    // Pre-create the Yjs doc and wait for DB content to load before
+    // completing the upgrade, so the sync starts with the full state
+    const docName = (req.url || '').slice(1).split('?')[0]
+    getYDoc(docName, true)
+    await persistence.waitForBind(docName)
+
     wss.handleUpgrade(req, socket, head, (ws) => {
       ;(ws as unknown as Record<string, string>).userId = userId
       wss.emit('connection', ws, req)
