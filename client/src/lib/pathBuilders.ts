@@ -17,9 +17,20 @@ export function buildElbowPath(start: Point, end: Point): string {
 
 export function buildCurvePath(start: Point, end: Point): string {
   const dx = end.x - start.x
-  const cp1x = start.x + dx * 0.4
-  const cp2x = end.x - dx * 0.4
-  return `M ${start.x} ${start.y} C ${cp1x} ${start.y}, ${cp2x} ${end.y}, ${end.x} ${end.y}`
+  const dy = end.y - start.y
+  const dist = Math.sqrt(dx * dx + dy * dy)
+  const offset = dist * 0.4
+
+  // Normalise direction; fall back to rightward if points overlap
+  const len = dist || 1
+  const nx = dx / len
+  const ny = dy / len
+
+  const cp1x = start.x + nx * offset
+  const cp1y = start.y + ny * offset
+  const cp2x = end.x - nx * offset
+  const cp2y = end.y - ny * offset
+  return `M ${start.x} ${start.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${end.x} ${end.y}`
 }
 
 export function buildPath(lineType: LineType, start: Point, end: Point): string {

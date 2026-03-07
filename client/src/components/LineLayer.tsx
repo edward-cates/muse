@@ -95,10 +95,11 @@ function resolveLineEndpoints(
   const freeEnd = { x: line.endX, y: line.endY }
 
   if (startShape && endShape) {
-    // Elbow and curve lines should exit/enter from side edge midpoints
-    if (line.lineType === 'elbow' || line.lineType === 'curve') {
+    // Elbow lines exit/enter from side edge midpoints (horizontal routing)
+    if (line.lineType === 'elbow') {
       return sideEdgeMidpoints(startShape, endShape)
     }
+    // Straight and curve lines use center-to-center edge intersection
     const endCenter = { x: endShape.x + endShape.width / 2, y: endShape.y + endShape.height / 2 }
     const startCenter = { x: startShape.x + startShape.width / 2, y: startShape.y + startShape.height / 2 }
     return {
