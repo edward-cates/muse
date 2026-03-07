@@ -1152,6 +1152,119 @@ body {
   pointer-events: none;
 }
 
+/* Markdown variant */
+.document-card--markdown {
+  background: #fefefe;
+  border-color: #e2e8f0;
+}
+.document-card--markdown .document-card__icon {
+  color: #475569;
+}
+.document-card__md-preview {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  padding: 12px 14px;
+  font-size: 8px;
+  line-height: 1.5;
+  color: #334155;
+  pointer-events: none;
+  border-radius: 10px;
+}
+.document-card__md-preview h1 { font-size: 13px; margin: 0 0 4px; }
+.document-card__md-preview h2 { font-size: 11px; margin: 0 0 3px; }
+.document-card__md-preview h3 { font-size: 10px; margin: 0 0 2px; }
+.document-card__md-preview p { margin: 0 0 4px; }
+.document-card__md-preview ul,
+.document-card__md-preview ol { margin: 0 0 4px; padding-left: 12px; }
+.document-card__md-preview code {
+  font-size: 7px;
+  background: #f1f5f9;
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+.document-card__md-preview pre {
+  font-size: 7px;
+  background: #f1f5f9;
+  padding: 4px 6px;
+  border-radius: 3px;
+  margin: 0 0 4px;
+  overflow: hidden;
+}
+
+/* Markdown viewer body typography */
+.markdown-viewer h1 { font-size: 2em; font-weight: 700; margin: 0 0 0.6em; border-bottom: 1px solid var(--border, #e0e0e0); padding-bottom: 0.3em; }
+.markdown-viewer h2 { font-size: 1.5em; font-weight: 600; margin: 1.2em 0 0.5em; }
+.markdown-viewer h3 { font-size: 1.25em; font-weight: 600; margin: 1em 0 0.4em; }
+.markdown-viewer h4 { font-size: 1.1em; font-weight: 600; margin: 0.8em 0 0.3em; }
+.markdown-viewer p { margin: 0 0 1em; }
+.markdown-viewer ul, .markdown-viewer ol { margin: 0 0 1em; padding-left: 1.5em; }
+.markdown-viewer li { margin: 0.25em 0; }
+.markdown-viewer code {
+  font-size: 0.9em;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+.markdown-viewer pre {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 16px 20px;
+  border-radius: 8px;
+  margin: 0 0 1em;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+.markdown-viewer pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.85em;
+  color: inherit;
+}
+.markdown-viewer blockquote {
+  border-left: 3px solid var(--accent, #4f46e5);
+  margin: 0 0 1em;
+  padding: 0.5em 1em;
+  color: var(--text-muted, #666);
+  background: var(--accent-light, rgba(79, 70, 229, 0.04));
+  border-radius: 0 6px 6px 0;
+}
+.markdown-viewer table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1em;
+}
+.markdown-viewer th, .markdown-viewer td {
+  border: 1px solid var(--border, #e0e0e0);
+  padding: 8px 12px;
+  text-align: left;
+}
+.markdown-viewer th {
+  background: #f8fafc;
+  font-weight: 600;
+}
+.markdown-viewer hr {
+  border: none;
+  border-top: 1px solid var(--border, #e0e0e0);
+  margin: 1.5em 0;
+}
+.markdown-viewer a {
+  color: var(--accent, #4f46e5);
+  text-decoration: none;
+}
+.markdown-viewer a:hover {
+  text-decoration: underline;
+}
+.markdown-viewer img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+.markdown-viewer strong { font-weight: 600; }
+
 /* ── Job status indicator on document cards ── */
 .document-card__job-status {
   position: absolute;

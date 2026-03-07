@@ -132,6 +132,127 @@ test.describe('Documents API (real DB)', () => {
     await expect(page.locator('iframe[title="HTML Artifact"]')).toBeVisible({ timeout: 10_000 })
   })
 
+  test('creating a markdown document via API and navigating to it shows the viewer', async ({ page }) => {
+    // First navigate to get auth session loaded
+    await page.goto('/')
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    await page.waitForTimeout(1500)
+
+    // Create a markdown document via API
+    const createResult = await apiCall(page, 'POST', '/api/documents', {
+      title: 'Test Markdown',
+      type: 'markdown',
+    })
+    expect(createResult.status).toBe(200)
+    const doc = (createResult.data as { document: { id: string; type: string; title: string } }).document
+    expect(doc.type).toBe('markdown')
+    expect(doc.title).toBe('Test Markdown')
+
+    // Save content
+    const md = '# Hello World\n\nThis is a **markdown** document.'
+    const contentResult = await apiCall(page, 'PATCH', `/api/documents/${doc.id}/content`, { content: md })
+    expect(contentResult.status).toBe(200)
+    expect((contentResult.data as { content_version: number }).content_version).toBe(1)
+
+    // Navigate to it
+    await page.goto(`/#/d/${doc.id}`)
+
+    // Should see the markdown viewer (no canvas, no iframe)
+    await expect(page.locator('[data-testid="canvas"]')).toHaveCount(0, { timeout: 10_000 })
+    await expect(page.locator('iframe[title="HTML Artifact"]')).toHaveCount(0)
+    // Should render the markdown content
+    await expect(page.locator('[data-testid="markdown-content"]')).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('[data-testid="markdown-content"] h1')).toHaveText('Hello World', { timeout: 10_000 })
+  })
+
+  test('markdown document content: save, retrieve, version bumps', async ({ page }) => {
+    await page.goto('/')
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    await page.waitForTimeout(1500)
+
+    // Create markdown document
+    const createResult = await apiCall(page, 'POST', '/api/documents', {
+      title: 'MD Content Test',
+      type: 'markdown',
+    })
+    const doc = (createResult.data as { document: { id: string } }).document
+
+    // Initially no content
+    const get1 = await apiCall(page, 'GET', `/api/documents/${doc.id}/content`)
+    expect(get1.status).toBe(200)
+    expect((get1.data as { content: string | null }).content).toBeFalsy()
+    expect((get1.data as { content_version: number }).content_version).toBe(0)
+
+    // Save content v1
+    const patch1 = await apiCall(page, 'PATCH', `/api/documents/${doc.id}/content`, {
+      content: '# Version 1',
+    })
+    expect((patch1.data as { content_version: number }).content_version).toBe(1)
+
+    // Save content v2
+    const patch2 = await apiCall(page, 'PATCH', `/api/documents/${doc.id}/content`, {
+      content: '# Version 2\n\nUpdated content.',
+    })
+    expect((patch2.data as { content_version: number }).content_version).toBe(2)
+
+    // Retrieve — should be v2
+    const get2 = await apiCall(page, 'GET', `/api/documents/${doc.id}/content`)
+    expect((get2.data as { content: string }).content).toBe('# Version 2\n\nUpdated content.')
+    expect((get2.data as { content_version: number }).content_version).toBe(2)
+  })
+
+  test('markdown viewer renders headings, bold, and lists', async ({ page }) => {
+    await page.goto('/')
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    await page.waitForTimeout(1500)
+
+    const createResult = await apiCall(page, 'POST', '/api/documents', {
+      title: 'Rich Markdown',
+      type: 'markdown',
+    })
+    const doc = (createResult.data as { document: { id: string } }).document
+
+    const md = `# Main Heading
+
+## Sub Heading
+
+This has **bold** and *italic* text.
+
+- Item one
+- Item two
+- Item three
+
+\`\`\`js
+const x = 42
+\`\`\`
+`
+    await apiCall(page, 'PATCH', `/api/documents/${doc.id}/content`, { content: md })
+
+    await page.goto(`/#/d/${doc.id}`)
+    const viewer = page.locator('[data-testid="markdown-content"]')
+    await expect(viewer).toBeVisible({ timeout: 10_000 })
+
+    await expect(viewer.locator('h1')).toHaveText('Main Heading')
+    await expect(viewer.locator('h2')).toHaveText('Sub Heading')
+    await expect(viewer.locator('strong')).toHaveText('bold')
+    await expect(viewer.locator('em')).toHaveText('italic')
+    await expect(viewer.locator('li')).toHaveCount(3)
+    await expect(viewer.locator('pre code')).toContainText('const x = 42')
+  })
+
+  test('type filter returns markdown documents', async ({ page }) => {
+    await page.goto('/')
+    await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })
+    await page.waitForTimeout(1500)
+
+    await apiCall(page, 'POST', '/api/documents', { title: 'A Markdown Doc', type: 'markdown' })
+
+    const result = await apiCall(page, 'GET', '/api/documents?type=markdown')
+    const docs = (result.data as { documents: Array<{ type: string }> }).documents
+    expect(docs.length).toBeGreaterThanOrEqual(1)
+    expect(docs.every(d => d.type === 'markdown')).toBe(true)
+  })
+
   test('document content API: save, retrieve, version bumps', async ({ page }) => {
     await page.goto('/')
     await page.locator('[data-testid="canvas"]').waitFor({ state: 'visible', timeout: 15_000 })

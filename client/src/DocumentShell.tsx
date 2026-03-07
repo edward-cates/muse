@@ -5,6 +5,7 @@ import { useDocumentRegistration } from './hooks/useDocumentRegistration'
 import { CollabProvider } from './collab/CollabContext'
 import { App } from './App'
 import { HtmlArtifactViewer } from './components/HtmlArtifactViewer'
+import { MarkdownViewer } from './components/MarkdownViewer'
 import type { DocumentType } from './types/document'
 
 export function DocumentShell() {
@@ -46,6 +47,8 @@ export function DocumentShell() {
   switch (docType) {
     case 'html_artifact':
       return <HtmlArtifactViewer documentId={documentId} />
+    case 'markdown':
+      return <MarkdownViewer documentId={documentId} />
     case 'research':
     case 'canvas':
     default:

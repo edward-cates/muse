@@ -39,6 +39,14 @@ const typeIcons: Record<string, React.ReactNode> = {
       <polyline points="8 6 2 12 8 18" />
     </svg>
   ),
+  markdown: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M6 8v8l2-2.5L10 16V8" />
+      <path d="M18 12l-2.5-3v6" />
+      <path d="M13 12l2.5 3" />
+    </svg>
+  ),
 }
 
 export function DocumentsList({ currentDocumentId }: Props) {
@@ -47,6 +55,7 @@ export function DocumentsList({ currentDocumentId }: Props) {
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
   const fetchDocuments = useCallback(async () => {
@@ -98,6 +107,46 @@ export function DocumentsList({ currentDocumentId }: Props) {
     setExpanded(false)
   }
 
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+
+    // First click: ask for confirmation
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id)
+      return
+    }
+
+    // Second click: actually delete
+    if (!session?.access_token) return
+    try {
+      const res = await fetch(`/api/documents/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (res.ok) {
+        setDocuments(prev => prev.filter(d => d.id !== id))
+        setConfirmDeleteId(null)
+        // If we deleted the current document, navigate to a new one
+        if (id === currentDocumentId) {
+          const remaining = documents.filter(d => d.id !== id)
+          if (remaining.length > 0) {
+            window.location.hash = `/d/${remaining[0].id}`
+          } else {
+            window.location.hash = `/d/${crypto.randomUUID()}`
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // Clear confirmation when hover leaves
+  const handleItemMouseLeave = (id: string) => {
+    setHoveredId(null)
+    if (confirmDeleteId === id) setConfirmDeleteId(null)
+  }
+
   return (
     <div ref={panelRef} style={s.container}>
       {/* Expandable panel */}
@@ -146,12 +195,13 @@ export function DocumentsList({ currentDocumentId }: Props) {
           {documents.map((d) => {
             const isActive = d.id === currentDocumentId
             const isHovered = hoveredId === d.id
+            const isConfirming = confirmDeleteId === d.id
             return (
               <button
                 key={d.id}
                 onClick={() => handleNavigate(d.id)}
                 onMouseEnter={() => setHoveredId(d.id)}
-                onMouseLeave={() => setHoveredId(null)}
+                onMouseLeave={() => handleItemMouseLeave(d.id)}
                 style={{
                   ...s.item,
                   ...(isActive ? s.itemActive : {}),
@@ -174,6 +224,25 @@ export function DocumentsList({ currentDocumentId }: Props) {
                   </span>
                   <span style={s.itemTime}>{timeAgo(d.updated_at)}</span>
                 </div>
+                {isHovered && (
+                  <div
+                    onClick={(e) => handleDelete(d.id, e)}
+                    style={{
+                      ...s.deleteBtn,
+                      ...(isConfirming ? s.deleteBtnConfirm : {}),
+                    }}
+                    title={isConfirming ? 'Click again to confirm' : 'Delete document'}
+                  >
+                    {isConfirming ? (
+                      <span style={s.deleteBtnText}>Delete?</span>
+                    ) : (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    )}
+                  </div>
+                )}
               </button>
             )
           })}
@@ -350,6 +419,28 @@ const s: Record<string, React.CSSProperties> = {
   itemTime: {
     fontSize: 11,
     color: 'var(--text-muted)',
+  },
+
+  // Delete button
+  deleteBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    padding: '4px 6px',
+    borderRadius: 6,
+    color: 'var(--text-muted)',
+    cursor: 'pointer',
+    transition: 'color 0.12s, background 0.12s',
+  },
+  deleteBtnConfirm: {
+    background: '#fee2e2',
+    color: '#dc2626',
+  },
+  deleteBtnText: {
+    fontSize: 11,
+    fontWeight: 600,
+    whiteSpace: 'nowrap' as const,
   },
 
   // Trigger

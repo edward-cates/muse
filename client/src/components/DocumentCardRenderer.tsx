@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState, useEffect, type MouseEvent } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../auth/AuthContext'
 import type { DocumentCardElement, Tool } from '../types'
 
@@ -25,6 +26,7 @@ const HANDLES: { dir: string; x: number; y: number; cursor: string }[] = [
 const typeLabels: Record<string, string> = {
   canvas: 'Canvas',
   html_artifact: 'HTML Wireframe',
+  markdown: 'Markdown',
   research: 'Research',
 }
 
@@ -39,6 +41,14 @@ const typeIcons: Record<string, React.ReactNode> = {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <polyline points="16 18 22 12 16 6" />
       <polyline points="8 6 2 12 8 18" />
+    </svg>
+  ),
+  markdown: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M6 8v8l2-2.5L10 16V8" />
+      <path d="M18 12l-2.5-3v6" />
+      <path d="M13 12l2.5 3" />
     </svg>
   ),
   research: (
@@ -57,6 +67,7 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
   const dragStart = useRef({ x: 0, y: 0 })
   const elStart = useRef({ x: 0, y: 0 })
   const [htmlContent, setHtmlContent] = useState<string | null>(null)
+  const [markdownContent, setMarkdownContent] = useState<string | null>(null)
 
   // Sync title from server (handles renames done on the child canvas)
   useEffect(() => {
@@ -79,9 +90,9 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
     return () => { cancelled = true }
   }, [element.documentId, element.id, element.title, session?.access_token, onUpdate])
 
-  // Fetch HTML content for thumbnail preview (html_artifact only)
+  // Fetch content for thumbnail preview (html_artifact and markdown)
   useEffect(() => {
-    if (element.documentType !== 'html_artifact') return
+    if (element.documentType !== 'html_artifact' && element.documentType !== 'markdown') return
     if (!session?.access_token || !element.documentId) return
 
     let cancelled = false
@@ -91,7 +102,11 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!cancelled && data?.content) {
-          setHtmlContent(data.content)
+          if (element.documentType === 'html_artifact') {
+            setHtmlContent(data.content)
+          } else {
+            setMarkdownContent(data.content)
+          }
         }
       })
       .catch(() => {})
@@ -172,7 +187,9 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
 
   const showHandles = isSelected && activeTool === 'select'
   const isHtml = element.documentType === 'html_artifact'
+  const isMd = element.documentType === 'markdown'
   const hasPreview = isHtml && htmlContent
+  const hasMdPreview = isMd && markdownContent
 
   // Chrome bar height for html_artifact
   const chromeH = isHtml ? 24 : 0
@@ -185,7 +202,7 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
     <div
       data-testid="document-card"
       data-shape-id={element.id}
-      className={`shape document-card ${isSelected ? 'shape--selected' : ''} ${element.documentType === 'research' ? 'document-card--research' : ''} ${isHtml ? 'document-card--html' : ''}`}
+      className={`shape document-card ${isSelected ? 'shape--selected' : ''} ${element.documentType === 'research' ? 'document-card--research' : ''} ${isHtml ? 'document-card--html' : ''} ${isMd ? 'document-card--markdown' : ''}`}
       style={{
         left: element.x,
         top: element.y,
@@ -245,6 +262,10 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
               pointerEvents: 'none',
             }}
           />
+        </div>
+      ) : hasMdPreview ? (
+        <div className="document-card__md-preview">
+          <ReactMarkdown>{markdownContent}</ReactMarkdown>
         </div>
       ) : (
         <div className={`document-card__inner ${element.documentType === 'research' ? 'document-card__inner--research' : ''}`}>

@@ -1,4 +1,4 @@
-export type DocumentType = 'canvas' | 'html_artifact' | 'research'
+export type DocumentType = 'canvas' | 'html_artifact' | 'markdown' | 'research'
 
 export interface DocumentMeta {
   id: string
