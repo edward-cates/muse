@@ -16,12 +16,21 @@ async function boot() {
     const { AuthProvider, useAuth } = await import('./auth/AuthContext')
     const { LoginPage } = await import('./auth/LoginPage')
     const { DocumentShell } = await import('./DocumentShell')
+    const { ActiveCanvasProvider } = await import('./ai/ActiveCanvasContext')
+    const { AiPanel } = await import('./components/AiPanel')
 
     function Root() {
       const { session, loading } = useAuth()
       if (loading) return null
       if (!session) return <LoginPage />
-      return <DocumentShell />
+      return (
+        <ActiveCanvasProvider>
+          <div className="app-shell">
+            <DocumentShell />
+            <AiPanel />
+          </div>
+        </ActiveCanvasProvider>
+      )
     }
 
     root.render(

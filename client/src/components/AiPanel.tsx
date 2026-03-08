@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../auth/AuthContext'
-import { useConnection } from '../hooks/useConnection'
-import { executeToolCall, type ToolCall, type ElementActions, type DecomposeTextFn, type GenerateImageFn } from '../ai/executeToolCall'
+import { executeToolCall, type ToolCall, type DecomposeTextFn, type GenerateImageFn } from '../ai/executeToolCall'
 import { captureCanvas, computeBounds } from '../ai/canvasCapture'
 import { classifyIntent, type AgentIntent } from '../ai/router'
 import { buildCanvasEditorConfig } from '../ai/agents/canvasEditor'
@@ -11,6 +10,7 @@ import { buildComposerConfig } from '../ai/agents/composer'
 import type { AgentConfig } from '../ai/agents/types'
 import type { CanvasElement } from '../types'
 import { useJobStatus, createJob } from '../hooks/useJobStatus'
+import { useActiveCanvas } from '../ai/ActiveCanvasContext'
 
 // ── AI interaction logger ──
 
@@ -78,14 +78,6 @@ type SseEvent = SseTextDelta | SseToolUseStart | SseInputJsonDelta | SseContentB
 
 // ── Component ──
 
-interface Props {
-  elements: CanvasElement[]
-  elementActions: ElementActions
-  onSettingsClick: () => void
-  onToggleMinimap: () => void
-  onToggleDarkMode: () => void
-}
-
 // Module-level persistent state — survives component remounts during navigation
 let _persistedChat: ChatMessage[] = []
 let _persistedApi: ApiMessage[] = []
@@ -98,9 +90,10 @@ interface ChatListItem {
   updated_at: string
 }
 
-export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMinimap, onToggleDarkMode }: Props) {
+export function AiPanel() {
+  const { elements, elementActions, documentId, connectionStatus: ctxConnectionStatus, onSettingsClick, onToggleMinimap, onToggleDarkMode } = useActiveCanvas()
+  const connectionStatus = ctxConnectionStatus || 'disconnected'
   const { session } = useAuth()
-  const connectionStatus = useConnection()
   const [chatMessages, _setChatMessages] = useState<ChatMessage[]>(_persistedChat)
   const [apiMessages, _setApiMessages] = useState<ApiMessage[]>(_persistedApi)
   const [chatId, _setChatId] = useState<string | null>(_persistedChatId)
@@ -112,8 +105,23 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [activeJobCardId, setActiveJobCardId] = useState<string | null>(null)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const prevDocumentIdRef = useRef<string | null>(documentId)
+  const hasCanvas = !!elementActions
+
+  // Track canvas navigation — inject a status message when the user switches canvases
+  useEffect(() => {
+    const prev = prevDocumentIdRef.current
+    prevDocumentIdRef.current = documentId
+    if (prev && documentId && prev !== documentId && chatMessages.length > 0) {
+      setChatMessages(msgs => [...msgs, {
+        role: 'status' as const,
+        content: 'You navigated to a different canvas.',
+      }])
+    }
+  }, [documentId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll job status when a server-side job is active
   const jobStatus = useJobStatus(activeJobId, session?.access_token || null)
@@ -155,7 +163,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         return [...filtered, { role: 'assistant', content: resultText }]
       })
       if (activeJobCardId) {
-        elementActions.updateElement(activeJobCardId, { jobStatus: 'completed', description: '' })
+        elementActions?.updateElement(activeJobCardId, { jobStatus: 'completed', description: '' })
       }
       setStreaming(false)
       setStatus(null)
@@ -168,7 +176,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         return [...filtered, { role: 'assistant', content: `Error: ${errMsg}` }]
       })
       if (activeJobCardId) {
-        elementActions.updateElement(activeJobCardId, { jobStatus: 'failed', description: errMsg })
+        elementActions?.updateElement(activeJobCardId, { jobStatus: 'failed', description: errMsg })
       }
       setStreaming(false)
       setStatus(null)
@@ -177,7 +185,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
     } else if (jobStatus.status === 'cancelled') {
       setChatMessages(prev => [...prev, { role: 'assistant', content: 'Research cancelled.' }])
       if (activeJobCardId) {
-        elementActions.updateElement(activeJobCardId, { jobStatus: 'cancelled', description: '' })
+        elementActions?.updateElement(activeJobCardId, { jobStatus: 'cancelled', description: '' })
       }
       setStreaming(false)
       setStatus(null)
@@ -205,7 +213,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         .then((job: { status: string } | null) => {
           if (!job) return
           if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled' || job.status === 'stalled') {
-            elementActions.updateElement(card.id, { jobStatus: job.status, description: '' })
+            elementActions?.updateElement(card.id, { jobStatus: job.status, description: '' })
           }
         })
         .catch(() => {})
@@ -522,6 +530,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
     initialMessages: ApiMessage[],
     abort: AbortController,
     screenshotBase64: string | null,
+    actions: NonNullable<typeof elementActions>,
   ): Promise<ApiMessage[]> {
     let currentApiMessages = initialMessages
     let turns = 0
@@ -585,7 +594,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         res, abort.signal,
         async (tc) => {
           setStatus(describeToolAction(tc))
-          const result = await executeToolCall(tc, elementActions, fetchUrlViaServer, decomposeTextViaServer, generateImageViaServer)
+          const result = await executeToolCall(tc, actions, fetchUrlViaServer, decomposeTextViaServer, generateImageViaServer)
 
           const parsed = (() => { try { return JSON.parse(result.content) } catch { return {} } })()
 
@@ -598,8 +607,8 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
           }
 
           // Auto-fit viewport after canvas-mutating tools
-          if (CANVAS_MUTATING_TOOLS.has(tc.name) && elementActions.fitToContent) {
-            elementActions.fitToContent()
+          if (CANVAS_MUTATING_TOOLS.has(tc.name) && actions.fitToContent) {
+            actions.fitToContent()
           }
 
           return result
@@ -630,7 +639,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         log(turns, 'tool-results.json', {
           results: toolResults.map(r => ({ tool_use_id: r.tool_use_id, ...(() => { try { return JSON.parse(r.content) } catch { return { raw: r.content } } })() })),
           failCount,
-          storeSnapshot: snapshotElements(elementActions.getElements()),
+          storeSnapshot: snapshotElements(actions.getElements()),
         })
 
         // Track failure rate — >50% failures counts as a bad turn
@@ -661,9 +670,9 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
           if (canvasEl) {
             try {
               // Fit viewport before screenshot so the capture shows all content
-              if (elementActions.fitToContent) elementActions.fitToContent()
+              if (actions.fitToContent) actions.fitToContent()
 
-              const currentElements = elementActions.getElements()
+              const currentElements = actions.getElements()
               const bounds = computeBounds(currentElements)
               const vqaScreenshot = await captureCanvas(canvasEl)
 
@@ -725,7 +734,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
     // Log final state
     log(turns, 'final-state.json', {
       totalTurns: turns,
-      elements: snapshotElements(elementActions.getElements()),
+      elements: snapshotElements(actions.getElements()),
     })
 
     return currentApiMessages
@@ -744,7 +753,8 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     const text = input.trim()
-    if (!text || streaming || !session?.access_token) return
+    if (!text || streaming || !session?.access_token || !elementActions) return
+    const actions = elementActions // capture non-null ref for async closure
 
     // Immediate UX feedback before async classification
     setInput('')
@@ -791,17 +801,17 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
     // Route research and compose to server-side job system
     if (agentConfig.name === 'researcher' || agentConfig.name === 'composer') {
       try {
-        if (!elementActions.createDocument || !elementActions.addDocumentCard) {
+        if (!actions.createDocument || !actions.addDocumentCard) {
           throw new Error('Document actions not available')
         }
 
         const jobType = agentConfig.name === 'researcher' ? 'research' : 'compose'
 
         // 1. Create a workspace document so it appears on the board immediately
-        const workspaceDoc = await elementActions.createDocument({ title: text.slice(0, 60), type: 'canvas' })
+        const workspaceDoc = await actions.createDocument({ title: text.slice(0, 60), type: 'canvas' })
 
         // 2. Place a document card on the current canvas
-        const cardId = elementActions.addDocumentCard(100, 100, 280, 200, workspaceDoc.id, 'canvas', text.slice(0, 60))
+        const cardId = actions.addDocumentCard(100, 100, 280, 200, workspaceDoc.id, 'canvas', text.slice(0, 60))
 
         // 3. Create the job, passing the workspace ID and parent info
         const hashMatch = window.location.hash.match(/#\/d\/(.+)/)
@@ -813,7 +823,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         }, workspaceDoc.id)
 
         // 4. Stamp the jobId and running status on the card so it shows progress
-        elementActions.updateElement(cardId, { jobId, jobStatus: 'running' })
+        actions.updateElement(cardId, { jobId, jobStatus: 'running' })
 
         setActiveJobId(jobId)
         setActiveJobCardId(cardId)
@@ -847,7 +857,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
     ]
 
     try {
-      const finalMessages = await runAgentLoop(agentConfig, currentApiMessages, abort, screenshotBase64)
+      const finalMessages = await runAgentLoop(agentConfig, currentApiMessages, abort, screenshotBase64, actions)
 
       // Clean up empty trailing assistant messages
       setChatMessages((prev) => prev.filter(
@@ -973,7 +983,8 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
                   <img
                     src={`data:image/png;base64,${msg.imageBase64}`}
                     alt="Canvas screenshot"
-                    style={styles.toolScreenshotThumb}
+                    style={{ ...styles.toolScreenshotThumb, cursor: 'pointer' }}
+                    onClick={() => setLightboxSrc(`data:image/png;base64,${msg.imageBase64}`)}
                   />
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1016,7 +1027,8 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
                 <img
                   src={`data:image/png;base64,${msg.imageBase64}`}
                   alt="Canvas screenshot"
-                  style={styles.screenshotThumb}
+                  style={{ ...styles.screenshotThumb, cursor: 'pointer' }}
+                  onClick={() => setLightboxSrc(`data:image/png;base64,${msg.imageBase64}`)}
                 />
               )}
               {msg.role === 'assistant' ? (
@@ -1046,7 +1058,7 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
           placeholder="Draw a flowchart, research a topic, or ask a question..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={streaming}
+          disabled={streaming || !hasCanvas}
           style={styles.input}
         />
         {streaming ? (
@@ -1069,6 +1081,19 @@ export function AiPanel({ elements, elementActions, onSettingsClick, onToggleMin
         )}
       </form>
       </>)}
+      {lightboxSrc && (
+        <div
+          style={styles.lightboxOverlay}
+          onClick={() => setLightboxSrc(null)}
+        >
+          <img
+            src={lightboxSrc}
+            alt="Canvas screenshot (full size)"
+            style={styles.lightboxImage}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -1148,6 +1173,26 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(79, 70, 229, 0.15)',
     marginBottom: 4,
     display: 'block',
+  },
+  lightboxOverlay: {
+    position: 'fixed' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.8)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
+    cursor: 'pointer',
+  },
+  lightboxImage: {
+    maxWidth: '90vw',
+    maxHeight: '90vh',
+    borderRadius: 8,
+    boxShadow: '0 4px 40px rgba(0,0,0,0.5)',
+    cursor: 'default',
   },
   messageText: {
     fontSize: 14,

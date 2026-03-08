@@ -1,6 +1,7 @@
 import type { ShapeType, CanvasElement, LineType } from '../types'
 import { isShape } from '../types'
 import { validateHexColor, clampDimensions, checkOverlaps } from './validation'
+import { describeElement, describeConnections } from './systemPrompt'
 
 export interface ToolCall {
   id: string
@@ -76,6 +77,14 @@ export async function executeToolCall(
     const elements = actions.getElements()
 
     switch (call.name) {
+      case 'list_elements': {
+        const listing = elements.length > 0
+          ? elements.map(describeElement).join('\n')
+          : '(empty canvas)'
+        const connections = describeConnections(elements)
+        return { tool_use_id: call.id, content: listing + connections }
+      }
+
       case 'add_shape': {
         const { shape_type, x, y, width, height, text, fill, stroke, strokeWidth, target_document_id } = call.input as {
           shape_type: string; x: number; y: number; width: number; height: number

@@ -1,7 +1,7 @@
 import type { CanvasElement } from '../types'
 import { isShape, isLine, isText, isImage, isFrame, isWebCard, isDocumentCard, isDecompositionCard } from '../types'
 
-function describeElement(el: CanvasElement): string {
+export function describeElement(el: CanvasElement): string {
   if (isShape(el)) {
     const label = el.text ? ` "${el.text}"` : ''
     return `Shape<${el.id.slice(0, 8)}> ${el.type} at (${el.x},${el.y}) ${el.width}×${el.height} fill=${el.fill} stroke=${el.stroke}${label}`
@@ -38,7 +38,7 @@ function describeElement(el: CanvasElement): string {
   return `Unknown<${el.id.slice(0, 8)}>`
 }
 
-function describeConnections(elements: CanvasElement[]): string {
+export function describeConnections(elements: CanvasElement[]): string {
   const lines = elements.filter(isLine)
   if (lines.length === 0) return ''
 
@@ -57,17 +57,47 @@ function describeConnections(elements: CanvasElement[]): string {
   return `\nConnections:\n${connections.join('\n')}`
 }
 
-export function buildSystemPrompt(elements: CanvasElement[]): string {
-  const elementLines = elements.length > 0
-    ? elements.map(describeElement).join('\n')
-    : '(empty canvas)'
+/** Compact ID→label map for the system prompt (keeps token count low) */
+function buildElementMap(elements: CanvasElement[]): string {
+  if (elements.length === 0) return '(empty canvas)'
+  const entries: string[] = []
+  for (const el of elements) {
+    const short = el.id.slice(0, 8)
+    if (isShape(el)) {
+      const label = el.text ? `"${el.text}"` : el.type
+      entries.push(`${short}=${label}`)
+    } else if (isLine(el)) {
+      const from = el.startShapeId ? el.startShapeId.slice(0, 8) : '?'
+      const to = el.endShapeId ? el.endShapeId.slice(0, 8) : '?'
+      const arrow = el.arrowEnd ? '→' : '—'
+      entries.push(`${short}=(${from}${arrow}${to})`)
+    } else if (isText(el)) {
+      const preview = el.text.length > 20 ? el.text.slice(0, 20) + '…' : el.text
+      entries.push(`${short}="${preview}"`)
+    } else if (isWebCard(el)) {
+      entries.push(`${short}=WebCard:"${el.title}"`)
+    } else if (isDocumentCard(el)) {
+      entries.push(`${short}=Doc:"${el.title}"`)
+    } else if (isDecompositionCard(el)) {
+      entries.push(`${short}=Decomp:"${el.topic}"`)
+    } else if (isImage(el)) {
+      entries.push(`${short}=Image`)
+    } else if (isFrame(el)) {
+      entries.push(`${short}=Frame:"${el.label}"`)
+    }
+  }
+  return entries.join(', ')
+}
 
-  const connections = describeConnections(elements)
+export function buildSystemPrompt(elements: CanvasElement[]): string {
+  const elementMap = buildElementMap(elements)
 
   return `You are a spatial thinking assistant for Muse, a collaborative canvas. You can create and modify diagrams, flowcharts, mind maps, and visual layouts.
 
-## Canvas state (${elements.length} element${elements.length !== 1 ? 's' : ''})
-${elementLines}${connections}
+## Canvas elements (${elements.length})
+${elementMap}
+
+Use the list_elements tool to get detailed positions, sizes, and properties when needed. You also receive a screenshot each turn showing the current layout.
 
 ## Coordinate system
 - Origin (0,0) is top-left. X increases right, Y increases down.

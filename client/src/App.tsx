@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Canvas, type CanvasHandle } from './components/Canvas'
 import { Toolbar } from './components/Toolbar'
 import { SettingsPanel } from './components/SettingsPanel'
-import { AiPanel } from './components/AiPanel'
 import { SourceTextPanel } from './components/SourceTextPanel'
 import { DocumentsList } from './components/DocumentsList'
 import { DocumentTitle } from './components/DocumentTitle'
@@ -11,6 +10,8 @@ import { BacklinksPanel } from './components/BacklinksPanel'
 import { useElements, readElement } from './hooks/useElements'
 import { useDocumentApi } from './hooks/useDocument'
 import { useAuth } from './auth/AuthContext'
+import { useActiveCanvas } from './ai/ActiveCanvasContext'
+import { useConnection } from './hooks/useConnection'
 import type { Tool, LineType, CanvasElement } from './types'
 import { isShape, isLine, isText } from './types'
 import { computeLayout } from './lib/layout'
@@ -486,6 +487,50 @@ export function App({ drawingId }: { drawingId: string }) {
     return () => window.removeEventListener('keydown', handler)
   }, [elements, selectedIds, undo, redo, deleteElement, reorderElement, groupElements, ungroupElements, updateElement, addShape, addArrow, addText, doc, stopCapturing, handleDrillIn])
 
+  // Register this canvas as active for AiPanel
+  const { register: registerCanvas, unregister: unregisterCanvas } = useActiveCanvas()
+  const connectionStatus = useConnection()
+  useEffect(() => {
+    registerCanvas({
+      documentId: drawingId,
+      elements,
+      connectionStatus,
+      elementActions: {
+        addShape, addLine, addArrow, addText, addImage, addWebCard, addDocumentCard, addDecompositionCard,
+        updateElement, deleteElement,
+        getElements: () => yElements.toArray().map(readElement),
+        fitToContent: () => canvasRef.current?.fitToContent(),
+        fitToElements: (ids: string[]) => canvasRef.current?.fitToElements(ids),
+        createDocument: async (opts) => {
+          const doc = await createDocument(opts)
+          return { id: doc.id, type: doc.type, content_version: doc.content_version }
+        },
+        updateDocumentContent,
+        addRemoteElements: async (documentId, elems) => {
+          const res = await fetch(`/api/documents/${documentId}/elements`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
+            body: JSON.stringify({ elements: elems }),
+          })
+          if (!res.ok) throw new Error('Failed to add remote elements')
+          return res.json()
+        },
+        updateRemoteElement: async (documentId, elementId, updates) => {
+          const res = await fetch(`/api/documents/${documentId}/elements`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
+            body: JSON.stringify({ elementId, updates }),
+          })
+          if (!res.ok) throw new Error('Failed to update remote element')
+        },
+      },
+      onSettingsClick: () => setSettingsOpen(true),
+      onToggleMinimap: () => setMinimapVisible(prev => !prev),
+      onToggleDarkMode: () => setDarkMode(prev => !prev),
+    })
+    return () => unregisterCanvas(drawingId)
+  })
+
   return (
     <div className="app">
       <div className="app__canvas-area">
@@ -568,41 +613,6 @@ export function App({ drawingId }: { drawingId: string }) {
         <DocumentsList currentDocumentId={drawingId} />
       </div>
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <AiPanel
-        elements={elements}
-        onSettingsClick={() => setSettingsOpen(true)}
-        onToggleMinimap={() => setMinimapVisible(prev => !prev)}
-        onToggleDarkMode={() => setDarkMode(prev => !prev)}
-        elementActions={{
-          addShape, addLine, addArrow, addText, addImage, addWebCard, addDocumentCard, addDecompositionCard,
-          updateElement, deleteElement,
-          getElements: () => yElements.toArray().map(readElement),
-          fitToContent: () => canvasRef.current?.fitToContent(),
-          fitToElements: (ids: string[]) => canvasRef.current?.fitToElements(ids),
-          createDocument: async (opts) => {
-            const doc = await createDocument(opts)
-            return { id: doc.id, type: doc.type, content_version: doc.content_version }
-          },
-          updateDocumentContent,
-          addRemoteElements: async (documentId, elements) => {
-            const res = await fetch(`/api/documents/${documentId}/elements`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
-              body: JSON.stringify({ elements }),
-            })
-            if (!res.ok) throw new Error('Failed to add remote elements')
-            return res.json()
-          },
-          updateRemoteElement: async (documentId, elementId, updates) => {
-            const res = await fetch(`/api/documents/${documentId}/elements`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
-              body: JSON.stringify({ elementId, updates }),
-            })
-            if (!res.ok) throw new Error('Failed to update remote element')
-          },
-        }}
-      />
       {sourcePanel && (
         <SourceTextPanel
           sourceText={sourcePanel.text}

@@ -51,6 +51,31 @@ export async function executeServerToolCall(
 ): Promise<{ tool_use_id: string; content: string }> {
   try {
     switch (call.name) {
+      case 'list_elements': {
+        const elements = await readElementsFromDoc(ctx.documentId)
+        if (elements.length === 0) {
+          return { tool_use_id: call.id, content: '(empty canvas)' }
+        }
+        const lines = elements.map(el => {
+          const type = el.type as string
+          const id = (el.id as string).slice(0, 8)
+          if (isShapeType(type)) {
+            const label = el.text ? ` "${el.text}"` : ''
+            return `Shape<${id}> ${type} at (${el.x},${el.y}) ${el.width}×${el.height} fill=${el.fill || '#ffffff'} stroke=${el.stroke || '#4f46e5'}${label}`
+          }
+          if (type === 'line') {
+            const from = el.startShapeId ? `Shape<${(el.startShapeId as string).slice(0, 8)}>` : `(${el.startX},${el.startY})`
+            const to = el.endShapeId ? `Shape<${(el.endShapeId as string).slice(0, 8)}>` : `(${el.endX},${el.endY})`
+            const arrow = el.arrowEnd ? '→' : '—'
+            return `Line<${id}> ${from} ${arrow} ${to} ${el.lineType || 'straight'} stroke=${el.stroke || '#4f46e5'}`
+          }
+          if (type === 'webcard') return `WebCard<${id}> "${el.title}" at (${el.x},${el.y}) ${el.width}×${el.height} url=${el.url}`
+          if (type === 'document_card') return `DocCard<${id}> "${el.title}" at (${el.x},${el.y}) ${el.width}×${el.height} docId=${el.documentId}`
+          return `${type}<${id}> at (${el.x},${el.y})`
+        })
+        return { tool_use_id: call.id, content: lines.join('\n') }
+      }
+
       case 'add_shape': {
         const { shape_type, x, y, width, height, text, fill, stroke, strokeWidth, target_document_id } = call.input as {
           shape_type: string; x: number; y: number; width: number; height: number

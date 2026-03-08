@@ -258,7 +258,9 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100vh',
+    flex: 1,
+    minWidth: 0,
+    height: '100%',
     background: 'var(--bg, #f5f5f5)',
   },
   header: {

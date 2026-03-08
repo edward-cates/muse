@@ -10,6 +10,15 @@ export interface ToolDefinition {
 
 export const CANVAS_TOOLS: ToolDefinition[] = [
   {
+    name: 'list_elements',
+    description: 'List all elements on the canvas with their full details (positions, sizes, colors, text, connections). Use this when you need exact coordinates or properties.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
     name: 'add_shape',
     description: 'Add a shape to the canvas. Returns the new shape ID. Use target_document_id to add to a child canvas.',
     input_schema: {

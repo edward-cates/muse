@@ -99,6 +99,11 @@ export async function captureCanvas(element: HTMLElement): Promise<string> {
     windowWidth: ww,
     windowHeight: wh,
     onclone: (_doc, clonedEl) => {
+      // Copy textarea values (html2canvas ignores .value)
+      for (const ta of clonedEl.querySelectorAll<HTMLTextAreaElement>('textarea')) {
+        ta.textContent = ta.value
+      }
+
       // Replace cross-origin images with labeled placeholders
       // (html2canvas can't load cross-origin images; data URLs are fine)
       for (const img of clonedEl.querySelectorAll<HTMLImageElement>('.image-element img')) {

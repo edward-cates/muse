@@ -32,26 +32,30 @@ interface ApiMessage {
   content: string | ContentBlock[]
 }
 
-/** Describe elements for the system prompt (same format as client-side) */
+/** Compact ID→label map for system prompt (keeps token count low) */
 function describeElements(elements: Array<Record<string, YMapVal>>): string {
   if (elements.length === 0) return '(empty canvas)'
-  return elements.map(el => {
+  const entries: string[] = []
+  for (const el of elements) {
     const type = el.type as string
-    const id = (el.id as string).slice(0, 8)
+    const short = (el.id as string).slice(0, 8)
     if (['rectangle', 'ellipse', 'diamond'].includes(type)) {
-      const label = el.text ? ` "${el.text}"` : ''
-      return `Shape<${id}> ${type} at (${el.x},${el.y}) ${el.width}x${el.height}${label}`
+      const label = el.text ? `"${el.text}"` : type
+      entries.push(`${short}=${label}`)
+    } else if (type === 'line') {
+      const from = el.startShapeId ? (el.startShapeId as string).slice(0, 8) : '?'
+      const to = el.endShapeId ? (el.endShapeId as string).slice(0, 8) : '?'
+      const arrow = el.arrowEnd ? '→' : '—'
+      entries.push(`${short}=(${from}${arrow}${to})`)
+    } else if (type === 'webcard') {
+      entries.push(`${short}=WebCard:"${el.title}"`)
+    } else if (type === 'document_card') {
+      entries.push(`${short}=Doc:"${el.title}"`)
+    } else {
+      entries.push(`${short}=${type}`)
     }
-    if (type === 'line') {
-      const from = el.startShapeId ? `Shape<${(el.startShapeId as string).slice(0, 8)}>` : `(${el.startX},${el.startY})`
-      const to = el.endShapeId ? `Shape<${(el.endShapeId as string).slice(0, 8)}>` : `(${el.endX},${el.endY})`
-      const arrow = el.arrowEnd ? '->' : '--'
-      return `Line<${id}> ${from} ${arrow} ${to}`
-    }
-    if (type === 'webcard') return `WebCard<${id}> "${el.title}" url=${el.url}`
-    if (type === 'document_card') return `DocCard<${id}> "${el.title}" docId=${el.documentId}`
-    return `${type}<${id}>`
-  }).join('\n')
+  }
+  return entries.join(', ')
 }
 
 export async function runAgentLoop(

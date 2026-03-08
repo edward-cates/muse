@@ -28,10 +28,18 @@ body {
   background: var(--bg);
 }
 
-/* ── App ── */
-.app {
+/* ── App shell (outer flex: content + AI panel) ── */
+.app-shell {
   width: 100vw;
   height: 100vh;
+  display: flex;
+}
+
+/* ── App (canvas view) ── */
+.app {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
   position: relative;
   display: flex;
 }

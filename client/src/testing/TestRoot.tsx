@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import * as Y from 'yjs'
 import { App } from '../App'
+import { AiPanel } from '../components/AiPanel'
+import { ActiveCanvasProvider } from '../ai/ActiveCanvasContext'
 import { CollabContext } from '../collab/CollabContext'
 import { AuthContext } from '../auth/AuthContext'
 import type { CollabInstance } from '../collab/provider'
@@ -85,9 +87,14 @@ export function TestRoot() {
 
   return (
     <AuthContext.Provider value={mockAuth}>
-      <CollabContext.Provider value={instance}>
-        <App drawingId={drawingId} key={drawingId} />
-      </CollabContext.Provider>
+      <ActiveCanvasProvider>
+        <div className="app-shell">
+          <CollabContext.Provider value={instance}>
+            <App drawingId={drawingId} key={drawingId} />
+          </CollabContext.Provider>
+          <AiPanel />
+        </div>
+      </ActiveCanvasProvider>
     </AuthContext.Provider>
   )
 }
