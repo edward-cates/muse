@@ -109,6 +109,7 @@ export function AiPanel() {
   const abortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const prevDocumentIdRef = useRef<string | null>(documentId)
+  const lastIntentRef = useRef<AgentIntent | null>(null)
   const hasCanvas = !!elementActions
 
   // Track canvas navigation — inject a status message when the user switches canvases
@@ -468,7 +469,8 @@ export function AiPanel() {
     token: string,
     signal?: AbortSignal,
   ): Promise<AgentConfig> {
-    const intent = await classifyIntent(text, token, signal)
+    const intent = await classifyIntent(text, token, signal, lastIntentRef.current ?? undefined)
+    lastIntentRef.current = intent
     return buildAgentConfigFromIntent(intent)
   }
 

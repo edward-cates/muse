@@ -53,7 +53,7 @@ const VALID_INTENTS = ['canvas_edit', 'research', 'compose', 'chat'] as const
 
 router.post('/classify', async (req, res) => {
   const userId = req.userId!
-  const { message } = req.body
+  const { message, previousIntent } = req.body
 
   if (!message || typeof message !== 'string') {
     res.status(400).json({ error: 'message string is required' })
@@ -73,10 +73,14 @@ router.post('/classify', async (req, res) => {
 
   try {
     const client = new Anthropic({ apiKey })
+    let system = CLASSIFY_SYSTEM
+    if (previousIntent && VALID_INTENTS.includes(previousIntent)) {
+      system += `\n\nThe previous message in this conversation was classified as: ${previousIntent}. Short follow-ups like "keep going", "continue", "yes", "more", "do it", "ok now..." should usually continue with the same category unless the user clearly changes topic.`
+    }
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 20,
-      system: CLASSIFY_SYSTEM,
+      system,
       messages: [{ role: 'user', content: message }],
     })
 

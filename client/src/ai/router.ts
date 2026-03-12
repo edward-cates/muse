@@ -24,7 +24,7 @@ const URL_RE = /https?:\/\/[^\s]+/i
 const VALID_INTENTS: readonly AgentIntent[] = ['canvas_edit', 'research', 'compose', 'chat']
 
 /** Keyword-based intent heuristic (synchronous fallback) */
-export function classifyIntentLocal(message: string): AgentIntent {
+export function classifyIntentLocal(message: string, previousIntent?: AgentIntent): AgentIntent {
   const lower = message.toLowerCase().trim()
 
   // URL-only or URL + short instruction → research
@@ -47,6 +47,9 @@ export function classifyIntentLocal(message: string): AgentIntent {
   if (researchScore > 0 && canvasScore > 0) return 'compose'
   if (researchScore > canvasScore) return 'research'
   if (canvasScore > 0) return 'canvas_edit'
+
+  // No keywords matched — continue previous intent if available
+  if (previousIntent && previousIntent !== 'chat') return previousIntent
   return 'chat'
 }
 
@@ -55,6 +58,7 @@ export async function classifyIntent(
   message: string,
   token: string,
   signal?: AbortSignal,
+  previousIntent?: AgentIntent,
 ): Promise<AgentIntent> {
   try {
     const res = await fetch('/api/ai/classify', {
@@ -63,18 +67,18 @@ export async function classifyIntent(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, previousIntent }),
       signal,
     })
 
-    if (!res.ok) return classifyIntentLocal(message)
+    if (!res.ok) return classifyIntentLocal(message, previousIntent)
 
     const data = await res.json() as { intent?: string }
     if (data.intent && VALID_INTENTS.includes(data.intent as AgentIntent)) {
       return data.intent as AgentIntent
     }
-    return classifyIntentLocal(message)
+    return classifyIntentLocal(message, previousIntent)
   } catch {
-    return classifyIntentLocal(message)
+    return classifyIntentLocal(message, previousIntent)
   }
 }

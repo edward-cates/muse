@@ -47,6 +47,27 @@ describe('classifyIntentLocal', () => {
     assert.equal(classifyIntentLocal('delete the Auth box'), 'canvas_edit')
   })
 
+  // Continuation: short/ambiguous messages inherit previous intent
+  it('continues canvas_edit for "keep going"', () => {
+    assert.equal(classifyIntentLocal('keep going', 'canvas_edit'), 'canvas_edit')
+  })
+
+  it('continues canvas_edit for "yes"', () => {
+    assert.equal(classifyIntentLocal('yes', 'canvas_edit'), 'canvas_edit')
+  })
+
+  it('continues research for "more"', () => {
+    assert.equal(classifyIntentLocal('more', 'research'), 'research')
+  })
+
+  it('does not continue chat (no previous intent)', () => {
+    assert.equal(classifyIntentLocal('keep going'), 'chat')
+  })
+
+  it('still classifies explicit keywords even with previous intent', () => {
+    assert.equal(classifyIntentLocal('research React hooks', 'canvas_edit'), 'research')
+  })
+
   it('classifies "what is a CRDT?" as research', () => {
     assert.equal(classifyIntentLocal('what is a CRDT?'), 'research')
   })
@@ -139,5 +160,25 @@ describe('classifyIntent (async, LLM-based)', () => {
     assert.equal(headers['Authorization'], 'Bearer my-jwt-token')
     const body = JSON.parse(capturedInit?.body as string)
     assert.equal(body.message, 'hello')
+  })
+
+  it('sends previousIntent in request body', async () => {
+    let capturedBody: Record<string, unknown> = {}
+    globalThis.fetch = async (_input: string | URL | Request, init?: RequestInit) => {
+      capturedBody = JSON.parse(init?.body as string)
+      return new Response(
+        JSON.stringify({ intent: 'canvas_edit' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
+    await classifyIntent('keep going', 'my-jwt-token', undefined, 'canvas_edit')
+    assert.equal(capturedBody.previousIntent, 'canvas_edit')
+  })
+
+  it('falls back with previousIntent on fetch failure', async () => {
+    globalThis.fetch = async () => { throw new Error('Network error') }
+    const result = await classifyIntent('keep going', 'fake-token', undefined, 'canvas_edit')
+    assert.equal(result, 'canvas_edit')
   })
 })
