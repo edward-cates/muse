@@ -8,7 +8,7 @@ export function buildCanvasEditorConfig(elements: CanvasElement[]): AgentConfig 
     name: 'canvas_editor',
     systemPrompt: buildSystemPrompt(elements),
     tools: [...CANVAS_TOOLS, ...DOCUMENT_TOOLS, ...IMAGE_TOOLS],
-    maxTurns: 5,
+    maxTurns: 6,
     vqa: true,
   }
 }
