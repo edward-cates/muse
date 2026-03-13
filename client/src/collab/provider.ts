@@ -20,7 +20,8 @@ export function createCollabProvider(
   token: string,
 ): CollabInstance {
   const doc = new Y.Doc()
-  const wsProvider = new WebsocketProvider('ws://localhost:4444', roomName, doc, {
+  const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:4444'
+  const wsProvider = new WebsocketProvider(wsUrl, roomName, doc, {
     params: { token },
   })
   const awareness = wsProvider.awareness
