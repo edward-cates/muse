@@ -257,7 +257,7 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
         >
           <iframe
             srcDoc={htmlContent}
-            sandbox=""
+            sandbox="allow-scripts"
             tabIndex={-1}
             style={{
               width: THUMBNAIL_RENDER_WIDTH,

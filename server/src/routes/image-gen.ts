@@ -38,6 +38,23 @@ router.post('/', async (req, res) => {
     return
   }
 
+  if (prompt.length > 4000) {
+    res.status(400).json({ error: 'Prompt must be under 4000 characters' })
+    return
+  }
+
+  const ALLOWED_SIZES = ['1024x1024', '1792x1024', '1024x1792']
+  if (!ALLOWED_SIZES.includes(size)) {
+    res.status(400).json({ error: `Invalid size. Allowed: ${ALLOWED_SIZES.join(', ')}` })
+    return
+  }
+
+  const ALLOWED_QUALITIES = ['standard', 'hd']
+  if (!ALLOWED_QUALITIES.includes(quality)) {
+    res.status(400).json({ error: `Invalid quality. Allowed: ${ALLOWED_QUALITIES.join(', ')}` })
+    return
+  }
+
   let apiKey: string
   try {
     apiKey = await decryptOpenAIKey(userId)

@@ -27,13 +27,13 @@ async function decryptUserApiKey(userId: string): Promise<string> {
     .maybeSingle()
 
   if (!secret) {
-    throw new ApiKeyError('No API key configured. Add one in Settings.', 400)
+    throw new ApiKeyError('API key not available. Check Settings.', 400)
   }
 
   try {
     return decrypt(secret.encrypted_key)
   } catch {
-    throw new ApiKeyError('Failed to decrypt API key', 500)
+    throw new ApiKeyError('API key not available. Check Settings.', 400)
   }
 }
 

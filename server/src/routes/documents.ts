@@ -1,22 +1,64 @@
 import { Router } from 'express'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createRequire } from 'node:module'
+import sharesRouter from './shares.js'
 
 const _require = createRequire(import.meta.url)
 const Y = _require('yjs') as typeof import('yjs')
 
 const router = Router()
 
+const SAFE_ID_RE = /^[a-zA-Z0-9_-]{1,128}$/
+
+router.param('id', (_req, res, next, id) => {
+  if (!SAFE_ID_RE.test(id)) {
+    res.status(400).json({ error: 'Invalid document ID format' })
+    return
+  }
+  next()
+})
+
 function getSupabase() {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
-// List user's documents
+// ── Access control ──
+
+export async function assertDocumentAccess(
+  supabase: SupabaseClient,
+  docId: string,
+  userId: string
+): Promise<'owner' | 'editor'> {
+  const { data: doc } = await supabase
+    .from('documents')
+    .select('owner_id')
+    .eq('id', docId)
+    .maybeSingle()
+
+  if (!doc) return Promise.reject({ status: 404, message: 'Document not found' })
+  if (doc.owner_id === userId) return 'owner'
+
+  const { data: share } = await supabase
+    .from('document_shares')
+    .select('role')
+    .eq('document_id', docId)
+    .eq('shared_with_id', userId)
+    .maybeSingle()
+
+  if (!share) return Promise.reject({ status: 404, message: 'Document not found' })
+  return share.role as 'owner' | 'editor'
+}
+
+// Mount shares sub-router
+router.use('/:id/shares', sharesRouter)
+
+// List user's documents (owned + shared)
 router.get('/', async (req, res) => {
   const userId = req.userId!
   const supabase = getSupabase()
   const type = req.query.type as string | undefined
 
+  // 1. Fetch own documents
   let query = supabase
     .from('documents')
     .select('id, title, type, content_version, created_at, updated_at')
@@ -27,14 +69,63 @@ router.get('/', async (req, res) => {
     query = query.eq('type', type)
   }
 
-  const { data, error } = await query
+  const { data: ownDocs, error } = await query
 
   if (error) {
     res.status(500).json({ error: 'Failed to list documents' })
     return
   }
 
-  res.json({ documents: data })
+  // 2. Look up the caller's email and backfill any pending shares
+  let sharedDocs: Array<Record<string, unknown>> = []
+  try {
+    const { data: userData } = await supabase.auth.admin.getUserById(userId)
+    const userEmail = userData?.user?.email
+
+    if (userEmail) {
+      // Backfill: claim any pending shares addressed to this email
+      await supabase
+        .from('document_shares')
+        .update({ shared_with_id: userId })
+        .eq('shared_with_email', userEmail.toLowerCase())
+        .is('shared_with_id', null)
+
+      // Fetch shared document IDs
+      const { data: shares } = await supabase
+        .from('document_shares')
+        .select('document_id')
+        .eq('shared_with_id', userId)
+
+      if (shares && shares.length > 0) {
+        const sharedIds = shares.map((s) => s.document_id)
+        let sharedQuery = supabase
+          .from('documents')
+          .select('id, title, type, content_version, created_at, updated_at')
+          .in('id', sharedIds)
+          .order('updated_at', { ascending: false })
+
+        if (type) {
+          sharedQuery = sharedQuery.eq('type', type)
+        }
+
+        const { data: sharedData } = await sharedQuery
+        if (sharedData) {
+          sharedDocs = sharedData.map((d) => ({ ...d, shared: true }))
+        }
+      }
+    }
+  } catch {
+    // If shared lookup fails, still return own docs
+  }
+
+  // 3. Merge: own docs first, then shared docs (dedup by id)
+  const ownIds = new Set((ownDocs || []).map((d) => d.id))
+  const merged = [
+    ...(ownDocs || []),
+    ...sharedDocs.filter((d) => !ownIds.has(d.id as string)),
+  ]
+
+  res.json({ documents: merged })
 })
 
 // Create or register a document
@@ -100,6 +191,15 @@ router.get('/:id/backlinks', async (req, res) => {
   const { id } = req.params
   const supabase = getSupabase()
 
+  try {
+    await assertDocumentAccess(supabase, id, userId)
+  } catch (err: unknown) {
+    const e = err as { status?: number; message?: string }
+    res.status(e.status || 500).json({ error: e.message || 'Access denied' })
+    return
+  }
+
+  // Still only search the caller's own canvases for backlinks
   const { data, error } = await supabase
     .from('documents')
     .select('id, title, content')
@@ -141,17 +241,24 @@ router.get('/:id/backlinks', async (req, res) => {
   res.json({ backlinks })
 })
 
-// Get a single document (metadata + source_text)
+// Get a single document (metadata + source_text) — owner or shared editor
 router.get('/:id', async (req, res) => {
   const userId = req.userId!
   const { id } = req.params
   const supabase = getSupabase()
 
+  try {
+    await assertDocumentAccess(supabase, id, userId)
+  } catch (err: unknown) {
+    const e = err as { status?: number; message?: string }
+    res.status(e.status || 500).json({ error: e.message || 'Access denied' })
+    return
+  }
+
   const { data, error } = await supabase
     .from('documents')
     .select('id, title, type, content_version, source_text, created_at, updated_at')
     .eq('id', id)
-    .eq('owner_id', userId)
     .maybeSingle()
 
   if (error) {
@@ -188,11 +295,27 @@ router.patch('/:id', async (req, res) => {
   res.json({ ok: true })
 })
 
-// Delete a document
+// Delete a document (owner only)
 router.delete('/:id', async (req, res) => {
   const userId = req.userId!
   const { id } = req.params
   const supabase = getSupabase()
+
+  // Verify ownership — shared users cannot delete
+  const { data: doc } = await supabase
+    .from('documents')
+    .select('owner_id')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (!doc) {
+    res.status(404).json({ error: 'Document not found' })
+    return
+  }
+  if (doc.owner_id !== userId) {
+    res.status(403).json({ error: 'Only the document owner can delete it' })
+    return
+  }
 
   const { error } = await supabase
     .from('documents')
@@ -208,17 +331,24 @@ router.delete('/:id', async (req, res) => {
   res.json({ ok: true })
 })
 
-// Get document content
+// Get document content — owner or shared editor
 router.get('/:id/content', async (req, res) => {
   const userId = req.userId!
   const { id } = req.params
   const supabase = getSupabase()
 
+  try {
+    await assertDocumentAccess(supabase, id, userId)
+  } catch (err: unknown) {
+    const e = err as { status?: number; message?: string }
+    res.status(e.status || 500).json({ error: e.message || 'Access denied' })
+    return
+  }
+
   const { data, error } = await supabase
     .from('documents')
     .select('content, content_version')
     .eq('id', id)
-    .eq('owner_id', userId)
     .maybeSingle()
 
   if (error) {
@@ -234,19 +364,26 @@ router.get('/:id/content', async (req, res) => {
   res.json({ content: data.content, content_version: data.content_version })
 })
 
-// Update document content (and bump content_version)
+// Update document content (and bump content_version) — owner or shared editor
 router.patch('/:id/content', async (req, res) => {
   const userId = req.userId!
   const { id } = req.params
   const { content } = req.body
   const supabase = getSupabase()
 
-  // First get current version
+  try {
+    await assertDocumentAccess(supabase, id, userId)
+  } catch (err: unknown) {
+    const e = err as { status?: number; message?: string }
+    res.status(e.status || 500).json({ error: e.message || 'Access denied' })
+    return
+  }
+
+  // Get current version
   const { data: current, error: fetchError } = await supabase
     .from('documents')
     .select('content_version')
     .eq('id', id)
-    .eq('owner_id', userId)
     .maybeSingle()
 
   if (fetchError) {
@@ -269,7 +406,6 @@ router.patch('/:id/content', async (req, res) => {
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
-    .eq('owner_id', userId)
 
   if (error) {
     res.status(500).json({ error: 'Failed to update document content' })
@@ -279,7 +415,7 @@ router.patch('/:id/content', async (req, res) => {
   res.json({ content_version: newVersion })
 })
 
-// Add elements to a canvas document's Yjs state (used by AI to write to child canvases)
+// Add elements to a canvas document's Yjs state (used by AI to write to child canvases) — owner or shared editor
 router.post('/:id/elements', async (req, res) => {
   const userId = req.userId!
   const { id } = req.params
@@ -292,12 +428,19 @@ router.post('/:id/elements', async (req, res) => {
 
   const supabase = getSupabase()
 
-  // Verify ownership and type
+  try {
+    await assertDocumentAccess(supabase, id, userId)
+  } catch (err: unknown) {
+    const e = err as { status?: number; message?: string }
+    res.status(e.status || 500).json({ error: e.message || 'Access denied' })
+    return
+  }
+
+  // Get document content and type
   const { data: doc, error: fetchError } = await supabase
     .from('documents')
     .select('content, type')
     .eq('id', id)
-    .eq('owner_id', userId)
     .maybeSingle()
 
   if (fetchError) {
@@ -343,13 +486,12 @@ router.post('/:id/elements', async (req, res) => {
     yElements.push([yEl])
   }
 
-  // Persist back to DB
+  // Persist back to DB (access already verified above)
   const state = Y.encodeStateAsUpdate(ydoc)
   const { error: updateError } = await supabase
     .from('documents')
     .update({ content: Buffer.from(state).toString('base64'), updated_at: new Date().toISOString() })
     .eq('id', id)
-    .eq('owner_id', userId)
 
   ydoc.destroy()
 
@@ -361,7 +503,7 @@ router.post('/:id/elements', async (req, res) => {
   res.json({ ids, count: elements.length })
 })
 
-// Update an element in a canvas document's Yjs state (used by AI to update elements in any canvas)
+// Update an element in a canvas document's Yjs state (used by AI to update elements in any canvas) — owner or shared editor
 router.patch('/:id/elements', async (req, res) => {
   const userId = req.userId!
   const { id } = req.params
@@ -378,12 +520,19 @@ router.patch('/:id/elements', async (req, res) => {
 
   const supabase = getSupabase()
 
-  // Verify ownership and type
+  try {
+    await assertDocumentAccess(supabase, id, userId)
+  } catch (err: unknown) {
+    const e = err as { status?: number; message?: string }
+    res.status(e.status || 500).json({ error: e.message || 'Access denied' })
+    return
+  }
+
+  // Get document content and type
   const { data: doc, error: fetchError } = await supabase
     .from('documents')
     .select('content, type')
     .eq('id', id)
-    .eq('owner_id', userId)
     .maybeSingle()
 
   if (fetchError) {
@@ -430,13 +579,12 @@ router.patch('/:id/elements', async (req, res) => {
     return
   }
 
-  // Persist back to DB
+  // Persist back to DB (access already verified above)
   const state = Y.encodeStateAsUpdate(ydoc)
   const { error: updateError } = await supabase
     .from('documents')
     .update({ content: Buffer.from(state).toString('base64'), updated_at: new Date().toISOString() })
     .eq('id', id)
-    .eq('owner_id', userId)
 
   ydoc.destroy()
 

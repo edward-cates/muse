@@ -64,6 +64,7 @@ describe('Fetch URL route', () => {
     process.env.SUPABASE_JWT_SECRET = TEST_JWT_SECRET
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
     process.env.ENCRYPTION_KEY = 'a'.repeat(64)
+    process.env.ALLOW_PRIVATE_FETCH = '1'
 
     const { createApp } = await import('../src/app.js')
     const app = await createApp()

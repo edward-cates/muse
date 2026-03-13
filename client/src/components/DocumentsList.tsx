@@ -7,6 +7,8 @@ interface Document {
   type: string
   created_at: string
   updated_at: string
+  shared?: boolean
+  owner_email?: string
 }
 
 interface Props {
@@ -79,6 +81,9 @@ export function DocumentsList({ currentDocumentId }: Props) {
   useEffect(() => {
     if (expanded) fetchDocuments()
   }, [expanded, fetchDocuments])
+
+  const myDocuments = documents.filter(d => !d.shared)
+  const sharedDocuments = documents.filter(d => d.shared)
 
   // Close on click outside
   useEffect(() => {
@@ -192,60 +197,116 @@ export function DocumentsList({ currentDocumentId }: Props) {
               <span style={{ marginTop: 8 }}>No documents yet</span>
             </div>
           )}
-          {documents.map((d) => {
-            const isActive = d.id === currentDocumentId
-            const isHovered = hoveredId === d.id
-            const isConfirming = confirmDeleteId === d.id
-            return (
-              <button
-                key={d.id}
-                onClick={() => handleNavigate(d.id)}
-                onMouseEnter={() => setHoveredId(d.id)}
-                onMouseLeave={() => handleItemMouseLeave(d.id)}
-                style={{
-                  ...s.item,
-                  ...(isActive ? s.itemActive : {}),
-                  ...(isHovered && !isActive ? s.itemHover : {}),
-                }}
-              >
-                <div style={s.itemIcon}>
-                  {isActive ? (
-                    <div style={s.activeDot} />
-                  ) : (
-                    typeIcons[d.type] || typeIcons.canvas
-                  )}
-                </div>
-                <div style={s.itemContent}>
-                  <span style={{
-                    ...s.itemTitle,
-                    ...(isActive ? { color: 'var(--accent)', fontWeight: 600 } : {}),
-                  }}>
-                    {d.title}
-                  </span>
-                  <span style={s.itemTime}>{timeAgo(d.updated_at)}</span>
-                </div>
-                {isHovered && (
-                  <div
-                    onClick={(e) => handleDelete(d.id, e)}
+          {/* My Documents */}
+          {myDocuments.length > 0 && (
+            <>
+              {sharedDocuments.length > 0 && (
+                <div style={s.sectionLabel}>My Documents</div>
+              )}
+              {myDocuments.map((d) => {
+                const isActive = d.id === currentDocumentId
+                const isHovered = hoveredId === d.id
+                const isConfirming = confirmDeleteId === d.id
+                return (
+                  <button
+                    key={d.id}
+                    onClick={() => handleNavigate(d.id)}
+                    onMouseEnter={() => setHoveredId(d.id)}
+                    onMouseLeave={() => handleItemMouseLeave(d.id)}
                     style={{
-                      ...s.deleteBtn,
-                      ...(isConfirming ? s.deleteBtnConfirm : {}),
+                      ...s.item,
+                      ...(isActive ? s.itemActive : {}),
+                      ...(isHovered && !isActive ? s.itemHover : {}),
                     }}
-                    title={isConfirming ? 'Click again to confirm' : 'Delete document'}
                   >
-                    {isConfirming ? (
-                      <span style={s.deleteBtnText}>Delete?</span>
-                    ) : (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
+                    <div style={s.itemIcon}>
+                      {isActive ? (
+                        <div style={s.activeDot} />
+                      ) : (
+                        typeIcons[d.type] || typeIcons.canvas
+                      )}
+                    </div>
+                    <div style={s.itemContent}>
+                      <span style={{
+                        ...s.itemTitle,
+                        ...(isActive ? { color: 'var(--accent)', fontWeight: 600 } : {}),
+                      }}>
+                        {d.title}
+                      </span>
+                      <span style={s.itemTime}>{timeAgo(d.updated_at)}</span>
+                    </div>
+                    {isHovered && (
+                      <div
+                        onClick={(e) => handleDelete(d.id, e)}
+                        style={{
+                          ...s.deleteBtn,
+                          ...(isConfirming ? s.deleteBtnConfirm : {}),
+                        }}
+                        title={isConfirming ? 'Click again to confirm' : 'Delete document'}
+                      >
+                        {isConfirming ? (
+                          <span style={s.deleteBtnText}>Delete?</span>
+                        ) : (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          </svg>
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
-              </button>
-            )
-          })}
+                  </button>
+                )
+              })}
+            </>
+          )}
+          {/* Shared with me */}
+          {sharedDocuments.length > 0 && (
+            <>
+              <div style={s.sectionLabel}>Shared with me</div>
+              {sharedDocuments.map((d) => {
+                const isActive = d.id === currentDocumentId
+                const isHovered = hoveredId === d.id
+                return (
+                  <button
+                    key={d.id}
+                    onClick={() => handleNavigate(d.id)}
+                    onMouseEnter={() => setHoveredId(d.id)}
+                    onMouseLeave={() => { setHoveredId(null) }}
+                    style={{
+                      ...s.item,
+                      ...(isActive ? s.itemActive : {}),
+                      ...(isHovered && !isActive ? s.itemHover : {}),
+                    }}
+                  >
+                    <div style={s.itemIcon}>
+                      {isActive ? (
+                        <div style={s.activeDot} />
+                      ) : (
+                        typeIcons[d.type] || typeIcons.canvas
+                      )}
+                    </div>
+                    <div style={s.itemContent}>
+                      <span style={{
+                        ...s.itemTitle,
+                        ...(isActive ? { color: 'var(--accent)', fontWeight: 600 } : {}),
+                      }}>
+                        {d.title}
+                      </span>
+                      <span style={s.itemTime}>{d.owner_email || 'shared'}</span>
+                    </div>
+                    <div style={s.sharedBadge}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                    </div>
+                  </button>
+                )
+              })}
+            </>
+          )}
         </div>
       </div>
 
@@ -419,6 +480,24 @@ const s: Record<string, React.CSSProperties> = {
   itemTime: {
     fontSize: 11,
     color: 'var(--text-muted)',
+  },
+
+  // Section label
+  sectionLabel: {
+    padding: '10px 10px 4px',
+    fontSize: 11,
+    fontWeight: 600,
+    color: 'var(--text-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+  },
+  sharedBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    color: 'var(--text-muted)',
+    opacity: 0.6,
   },
 
   // Delete button

@@ -273,7 +273,7 @@ describe('AI message route', () => {
     })
     assert.equal(res.status, 400)
     const body = await res.json() as { error: string }
-    assert.ok(body.error.includes('No API key'))
+    assert.ok(body.error.includes('API key not available'))
   })
 
   it('streams text-only response', async () => {
@@ -543,7 +543,7 @@ describe('AI message route', () => {
     })
     assert.equal(res.status, 400)
     const body = await res.json() as { error: string }
-    assert.ok(body.error.includes('No API key'))
+    assert.ok(body.error.includes('API key not available'))
   })
 
   it('POST /classify returns correct intent for canvas_edit', async () => {

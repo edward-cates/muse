@@ -2,7 +2,10 @@ import { createServer as createHttpServer, type IncomingMessage, type Server } f
 import { WebSocketServer, type WebSocket } from 'ws'
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import * as jose from 'jose'
+import { createClient } from '@supabase/supabase-js'
 import keysRouter from './routes/keys.js'
 import aiRouter from './routes/ai.js'
 import documentsRouter from './routes/documents.js'
@@ -79,8 +82,25 @@ export async function createApp(): Promise<AppInstance> {
 
   // ── Express ──
   const app = express()
-  app.use(cors({ origin: true }))
+
+  // Security headers
+  app.use(helmet())
+
+  // CORS: lock to specific origins in production via ALLOWED_ORIGINS env var
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim())
+  app.use(cors({ origin: allowedOrigins || true }))
+
   app.use(express.json({ limit: '10mb' }))
+
+  // Rate limit for AI routes (applied after auth so we can key by userId)
+  const aiRateLimit = rateLimit({
+    windowMs: 60_000,
+    max: 20,
+    keyGenerator: (req) => req.userId || 'anonymous',
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests. Please try again later.' },
+  })
 
   app.get('/', (_req, res) => {
     res.json({ status: 'ok', service: 'muse-server' })
@@ -103,11 +123,11 @@ export async function createApp(): Promise<AppInstance> {
   }
 
   app.use('/api/keys', authMiddleware, keysRouter)
-  app.use('/api/ai', authMiddleware, aiRouter)
+  app.use('/api/ai', authMiddleware, aiRateLimit, aiRouter)
   app.use('/api/documents', authMiddleware, documentsRouter)
   app.use('/api/drawings', authMiddleware, documentsRouter) // backward compat alias
   app.use('/api/fetch', authMiddleware, fetchRouter)
-  app.use('/api/image-gen', authMiddleware, imageGenRouter)
+  app.use('/api/image-gen', authMiddleware, aiRateLimit, imageGenRouter)
   app.use('/api/ailog', authMiddleware, ailogRouter)
   app.use('/api/decompose', authMiddleware, decomposeRouter)
   app.use('/api/ai/chats', authMiddleware, chatsRouter)
@@ -141,6 +161,40 @@ export async function createApp(): Promise<AppInstance> {
     // Pre-create the Yjs doc and wait for DB content to load before
     // completing the upgrade, so the sync starts with the full state
     const docName = (req.url || '').slice(1).split('?')[0]
+
+    // Check document access for shared documents
+    const documentId = docName.replace(/^muse-/, '')
+    if (documentId && documentId !== docName) {
+      try {
+        const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+        const { data: doc } = await supabase
+          .from('documents')
+          .select('owner_id')
+          .eq('id', documentId)
+          .maybeSingle()
+
+        if (doc && doc.owner_id !== userId) {
+          const { data: share } = await supabase
+            .from('document_shares')
+            .select('id')
+            .eq('document_id', documentId)
+            .eq('shared_with_id', userId)
+            .maybeSingle()
+
+          if (!share) {
+            socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+            socket.destroy()
+            return
+          }
+        }
+      } catch (err) {
+        console.error('WS access check error:', err)
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+        socket.destroy()
+        return
+      }
+    }
+
     getYDoc(docName, true)
     await persistence.waitForBind(docName)
 

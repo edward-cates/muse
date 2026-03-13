@@ -77,6 +77,25 @@ export default async function globalSetup() {
     }, { onConflict: 'user_id,provider' })
   }
 
+  // Create second test user for sharing tests
+  const { error: createError2 } = await admin.auth.admin.createUser({
+    email: 'test2@integration.local',
+    password: 'test-password-456',
+    email_confirm: true,
+  })
+  if (createError2 && !createError2.message.includes('already been registered')) {
+    throw new Error(`Failed to create test user 2: ${createError2.message}`)
+  }
+
+  const client2 = createClient(supabaseUrl, anonKey)
+  const { data: data2, error: error2 } = await client2.auth.signInWithPassword({
+    email: 'test2@integration.local',
+    password: 'test-password-456',
+  })
+  if (error2 || !data2.session) {
+    throw new Error(`Auth setup for user 2 failed: ${error2?.message}`)
+  }
+
   // Build Playwright storage state with Supabase session in localStorage.
   // Supabase JS stores session under: sb-{hostname-first-segment}-auth-token
   const storageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`
@@ -92,5 +111,17 @@ export default async function globalSetup() {
     }],
   }
 
+  const storageState2 = {
+    cookies: [],
+    origins: [{
+      origin: 'http://localhost:5175',
+      localStorage: [{
+        name: storageKey,
+        value: JSON.stringify(data2.session),
+      }],
+    }],
+  }
+
   writeFileSync(resolve(INTEGRATION_DIR, '.auth-state.json'), JSON.stringify(storageState, null, 2))
+  writeFileSync(resolve(INTEGRATION_DIR, '.auth-state-user2.json'), JSON.stringify(storageState2, null, 2))
 }

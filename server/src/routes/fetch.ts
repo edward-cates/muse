@@ -1,10 +1,35 @@
 import { Router } from 'express'
+import { lookup } from 'node:dns/promises'
+import { isIP } from 'node:net'
 
 const router = Router()
 
 const MAX_TEXT_LENGTH = 5000
 const FETCH_TIMEOUT_MS = 10_000
 const MAX_BODY_BYTES = 1_024_000 // 1MB
+
+// SSRF protection: block requests to private/internal IP ranges
+function ipToInt(ip: string): number {
+  const parts = ip.split('.').map(Number)
+  return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
+}
+
+const PRIVATE_RANGES: Array<{ start: number; end: number }> = [
+  { start: 0x00000000, end: 0x00FFFFFF }, // 0.0.0.0/8
+  { start: 0x0A000000, end: 0x0AFFFFFF }, // 10.0.0.0/8
+  { start: 0x7F000000, end: 0x7FFFFFFF }, // 127.0.0.0/8
+  { start: 0xA9FE0000, end: 0xA9FEFFFF }, // 169.254.0.0/16
+  { start: 0xAC100000, end: 0xAC1FFFFF }, // 172.16.0.0/12
+  { start: 0xC0A80000, end: 0xC0A8FFFF }, // 192.168.0.0/16
+]
+
+function isPrivateIP(ip: string): boolean {
+  const version = isIP(ip)
+  if (version === 6) return true // block all IPv6 (could be link-local, mapped, etc.)
+  if (version === 0) return true // not a valid IP
+  const num = ipToInt(ip)
+  return PRIVATE_RANGES.some(r => num >= r.start && num <= r.end)
+}
 
 router.post('/', async (req, res) => {
   const { url } = req.body as { url?: string }
@@ -26,6 +51,21 @@ router.post('/', async (req, res) => {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     res.status(400).json({ error: 'Only http and https URLs are allowed' })
     return
+  }
+
+  // SSRF protection: resolve hostname and block private/internal IPs
+  // Skipped when ALLOW_PRIVATE_FETCH=1 (local dev / tests with localhost mock servers)
+  if (!process.env.ALLOW_PRIVATE_FETCH) {
+    try {
+      const { address } = await lookup(parsed.hostname)
+      if (isPrivateIP(address)) {
+        res.status(400).json({ error: 'URLs resolving to private/internal addresses are not allowed' })
+        return
+      }
+    } catch {
+      res.status(400).json({ error: 'Could not resolve hostname' })
+      return
+    }
   }
 
   try {

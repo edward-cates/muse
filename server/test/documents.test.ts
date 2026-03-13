@@ -385,16 +385,23 @@ describe('Documents API', () => {
   // ── DELETE /api/documents/:id ──
 
   it('DELETE /api/documents/:id deletes a document', async () => {
-    let capturedUrl = ''
+    let capturedDeleteUrl = ''
 
-    setMockRoutes([{
-      method: 'DELETE',
-      table: 'documents',
-      handler: (req) => {
-        capturedUrl = req.url || ''
-        return { status: 200, data: [] }
+    setMockRoutes([
+      {
+        method: 'GET',
+        table: 'documents',
+        handler: () => ({ status: 200, data: { owner_id: TEST_USER_ID } }),
       },
-    }])
+      {
+        method: 'DELETE',
+        table: 'documents',
+        handler: (req) => {
+          capturedDeleteUrl = req.url || ''
+          return { status: 200, data: [] }
+        },
+      },
+    ])
 
     const res = await fetch(url('/api/documents/abc-123'), {
       method: 'DELETE',
@@ -404,17 +411,24 @@ describe('Documents API', () => {
     const body = await res.json() as { ok: boolean }
     assert.equal(body.ok, true)
 
-    // Verify filters
-    assert.ok(capturedUrl.includes('id=eq.abc-123'))
-    assert.ok(capturedUrl.includes(`owner_id=eq.${TEST_USER_ID}`))
+    // Verify filters on the delete query
+    assert.ok(capturedDeleteUrl.includes('id=eq.abc-123'))
+    assert.ok(capturedDeleteUrl.includes(`owner_id=eq.${TEST_USER_ID}`))
   })
 
   it('DELETE /api/documents/:id returns 500 on DB error', async () => {
-    setMockRoutes([{
-      method: 'DELETE',
-      table: 'documents',
-      handler: () => ({ status: 400, data: { message: 'error', code: 'PGRST000' } }),
-    }])
+    setMockRoutes([
+      {
+        method: 'GET',
+        table: 'documents',
+        handler: () => ({ status: 200, data: { owner_id: TEST_USER_ID } }),
+      },
+      {
+        method: 'DELETE',
+        table: 'documents',
+        handler: () => ({ status: 400, data: { message: 'error', code: 'PGRST000' } }),
+      },
+    ])
 
     const res = await fetch(url('/api/documents/abc-123'), {
       method: 'DELETE',
@@ -429,10 +443,15 @@ describe('Documents API', () => {
     setMockRoutes([{
       method: 'GET',
       table: 'documents',
-      handler: () => ({
-        status: 200,
-        data: { content: '<h1>Hello</h1>', content_version: 3 },
-      }),
+      handler: (req) => {
+        const reqUrl = new URL(req.url || '/', 'http://localhost')
+        const select = reqUrl.searchParams.get('select') || ''
+        // assertDocumentAccess queries owner_id; the route queries content
+        if (select.includes('owner_id')) {
+          return { status: 200, data: { owner_id: TEST_USER_ID } }
+        }
+        return { status: 200, data: { content: '<h1>Hello</h1>', content_version: 3 } }
+      },
     }])
 
     const res = await fetch(url('/api/documents/abc-123/content'), { headers: authHeaders() })
@@ -461,10 +480,15 @@ describe('Documents API', () => {
     setMockRoutes([{
       method: 'GET',
       table: 'documents',
-      handler: () => ({
-        status: 200,
-        data: { content_version: 2 },
-      }),
+      handler: (req) => {
+        const reqUrl = new URL(req.url || '/', 'http://localhost')
+        const select = reqUrl.searchParams.get('select') || ''
+        // assertDocumentAccess queries owner_id; the route queries content_version
+        if (select.includes('owner_id')) {
+          return { status: 200, data: { owner_id: TEST_USER_ID } }
+        }
+        return { status: 200, data: { content_version: 2 } }
+      },
     }, {
       method: 'PATCH',
       table: 'documents',
@@ -511,10 +535,14 @@ describe('Documents API', () => {
     setMockRoutes([{
       method: 'GET',
       table: 'documents',
-      handler: () => ({
-        status: 200,
-        data: { content: null, type: 'canvas' },
-      }),
+      handler: (req) => {
+        const reqUrl = new URL(req.url || '/', 'http://localhost')
+        const select = reqUrl.searchParams.get('select') || ''
+        if (select.includes('owner_id')) {
+          return { status: 200, data: { owner_id: TEST_USER_ID } }
+        }
+        return { status: 200, data: { content: null, type: 'canvas' } }
+      },
     }, {
       method: 'PATCH',
       table: 'documents',
@@ -558,10 +586,14 @@ describe('Documents API', () => {
     setMockRoutes([{
       method: 'GET',
       table: 'documents',
-      handler: () => ({
-        status: 200,
-        data: { content: null, type: 'html_artifact' },
-      }),
+      handler: (req) => {
+        const reqUrl = new URL(req.url || '/', 'http://localhost')
+        const select = reqUrl.searchParams.get('select') || ''
+        if (select.includes('owner_id')) {
+          return { status: 200, data: { owner_id: TEST_USER_ID } }
+        }
+        return { status: 200, data: { content: null, type: 'html_artifact' } }
+      },
     }])
 
     const res = await fetch(url('/api/documents/abc-123/elements'), {
@@ -598,10 +630,14 @@ describe('Documents API', () => {
     setMockRoutes([{
       method: 'GET',
       table: 'documents',
-      handler: () => ({
-        status: 200,
-        data: { content: null, type: 'canvas' },
-      }),
+      handler: (req) => {
+        const reqUrl = new URL(req.url || '/', 'http://localhost')
+        const select = reqUrl.searchParams.get('select') || ''
+        if (select.includes('owner_id')) {
+          return { status: 200, data: { owner_id: TEST_USER_ID } }
+        }
+        return { status: 200, data: { content: null, type: 'canvas' } }
+      },
     }, {
       method: 'PATCH',
       table: 'documents',
@@ -627,10 +663,14 @@ describe('Documents API', () => {
     setMockRoutes([{
       method: 'GET',
       table: 'documents',
-      handler: () => ({
-        status: 200,
-        data: { content: savedContent, type: 'canvas' },
-      }),
+      handler: (req) => {
+        const reqUrl = new URL(req.url || '/', 'http://localhost')
+        const select = reqUrl.searchParams.get('select') || ''
+        if (select.includes('owner_id')) {
+          return { status: 200, data: { owner_id: TEST_USER_ID } }
+        }
+        return { status: 200, data: { content: savedContent, type: 'canvas' } }
+      },
     }, {
       method: 'PATCH',
       table: 'documents',
@@ -655,10 +695,14 @@ describe('Documents API', () => {
     setMockRoutes([{
       method: 'GET',
       table: 'documents',
-      handler: () => ({
-        status: 200,
-        data: { content: null, type: 'canvas' },
-      }),
+      handler: (req) => {
+        const reqUrl = new URL(req.url || '/', 'http://localhost')
+        const select = reqUrl.searchParams.get('select') || ''
+        if (select.includes('owner_id')) {
+          return { status: 200, data: { owner_id: TEST_USER_ID } }
+        }
+        return { status: 200, data: { content: null, type: 'canvas' } }
+      },
     }])
 
     const res = await fetch(url('/api/documents/abc-123/elements'), {

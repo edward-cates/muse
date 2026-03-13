@@ -55,11 +55,21 @@ function makePlaceholder(doc: Document, opts: {
     font-family:system-ui,sans-serif; color:#555; font-size:14px;
     border:1px solid #ddd; border-radius:4px; overflow:hidden;
   `
-  div.innerHTML = `
-    ${opts.icon}
-    <div style="font-weight:500;margin-top:4px">${opts.label}</div>
-    <div style="font-size:11px;color:#999;margin-top:2px">${opts.sublabel}</div>
-  `
+  // Icon is a hardcoded SVG constant — safe for innerHTML
+  const iconWrap = doc.createElement('div')
+  iconWrap.innerHTML = opts.icon
+  div.appendChild(iconWrap)
+
+  const labelDiv = doc.createElement('div')
+  labelDiv.style.cssText = 'font-weight:500;margin-top:4px'
+  labelDiv.textContent = opts.label
+  div.appendChild(labelDiv)
+
+  const sublabelDiv = doc.createElement('div')
+  sublabelDiv.style.cssText = 'font-size:11px;color:#999;margin-top:2px'
+  sublabelDiv.textContent = opts.sublabel
+  div.appendChild(sublabelDiv)
+
   if (opts.transform) {
     div.style.transform = opts.transform
     div.style.transformOrigin = opts.transformOrigin || 'top left'

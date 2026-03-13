@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { ShareDialog } from './ShareDialog'
 
 interface Props {
   documentId: string
@@ -10,6 +11,7 @@ export function DocumentTitle({ documentId }: Props) {
   const [title, setTitle] = useState('Untitled')
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  const [shareOpen, setShareOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Fetch current title when documentId changes
@@ -91,10 +93,47 @@ export function DocumentTitle({ documentId }: Props) {
   }
 
   return (
-    <div className="drawing-title">
+    <div className="drawing-title" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       <button className="drawing-title__display" onClick={startEditing}>
         {title}
       </button>
+      <button
+        onClick={() => setShareOpen(true)}
+        style={shareButtonStyle}
+        title="Share document"
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = 'var(--text, #333)'
+          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'var(--text-muted, #666)'
+          e.currentTarget.style.background = 'transparent'
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+          <polyline points="16 6 12 2 8 6" />
+          <line x1="12" y1="2" x2="12" y2="15" />
+        </svg>
+      </button>
+      {shareOpen && (
+        <ShareDialog documentId={documentId} onClose={() => setShareOpen(false)} />
+      )}
     </div>
   )
+}
+
+const shareButtonStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 5,
+  background: 'transparent',
+  border: 'none',
+  borderRadius: 6,
+  cursor: 'pointer',
+  color: 'var(--text-muted, #666)',
+  fontFamily: 'inherit',
+  transition: 'color 0.12s, background 0.12s',
+  flexShrink: 0,
 }
