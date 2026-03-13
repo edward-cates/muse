@@ -13,6 +13,7 @@ export function DocumentShell() {
   const { session } = useAuth()
   const [docType, setDocType] = useState<DocumentType | null>(null)
   const [loading, setLoading] = useState(true)
+  const [accessDenied, setAccessDenied] = useState(false)
 
   useDocumentRegistration(documentId)
 
@@ -20,6 +21,7 @@ export function DocumentShell() {
   useEffect(() => {
     if (!session?.access_token || !documentId) return
     setLoading(true)
+    setAccessDenied(false)
 
     // Use POST to register/get doc metadata (idempotent)
     fetch('/api/documents', {
@@ -30,8 +32,16 @@ export function DocumentShell() {
       },
       body: JSON.stringify({ id: documentId }),
     })
-      .then(r => r.ok ? r.json() : null)
+      .then(r => {
+        if (r.status === 403 || r.status === 404) {
+          setAccessDenied(true)
+          setLoading(false)
+          return null
+        }
+        return r.ok ? r.json() : null
+      })
       .then(data => {
+        if (!data) return
         const type = data?.document?.type as DocumentType
         setDocType(type || 'canvas')
         setLoading(false)
@@ -42,7 +52,23 @@ export function DocumentShell() {
       })
   }, [documentId, session?.access_token])
 
-  if (loading || !docType) return null
+  if (loading) return <div className="app" />
+
+  if (accessDenied) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, background: 'var(--bg, #fff)' }}>
+        <p style={{ fontSize: 16, color: 'var(--text-muted, #666)', margin: 0 }}>You don't have access to this document.</p>
+        <button
+          onClick={() => { window.location.hash = `/d/${crypto.randomUUID()}` }}
+          style={{ padding: '8px 20px', fontSize: 14, fontFamily: 'inherit', fontWeight: 600, background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+        >
+          Go to my canvas
+        </button>
+      </div>
+    )
+  }
+
+  if (!docType) return null
 
   switch (docType) {
     case 'html_artifact':

@@ -99,6 +99,7 @@ export function DocumentTitle({ documentId }: Props) {
         {title}
       </button>
       <button
+        className="drawing-title__share"
         onClick={(e) => { e.stopPropagation(); setShareOpen(true) }}
         onMouseDown={(e) => e.stopPropagation()}
         style={shareButtonStyle}

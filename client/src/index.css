@@ -313,7 +313,8 @@ body {
 }
 
 .drawing-title__display,
-.drawing-title__input {
+.drawing-title__input,
+.drawing-title__share {
   pointer-events: auto;
 }
 

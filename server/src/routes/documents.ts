@@ -144,6 +144,13 @@ router.post('/', async (req, res) => {
       .maybeSingle()
 
     if (existing) {
+      // Verify the caller has access (owner or shared)
+      try {
+        await assertDocumentAccess(supabase, id, userId)
+      } catch {
+        res.status(403).json({ error: 'Access denied' })
+        return
+      }
       res.json({ document: existing })
       return
     }

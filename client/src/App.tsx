@@ -490,22 +490,41 @@ export function App({ drawingId }: { drawingId: string }) {
   // Register this canvas as active for AiPanel
   const { register: registerCanvas, unregister: unregisterCanvas } = useActiveCanvas()
   const connectionStatus = useConnection()
+
+  // Stable refs for callbacks that don't need to trigger re-registration
+  const actionsRef = useRef({
+    addShape, addLine, addArrow, addText, addImage, addWebCard, addDocumentCard, addDecompositionCard,
+    updateElement, deleteElement, createDocument, updateDocumentContent,
+  })
+  actionsRef.current = {
+    addShape, addLine, addArrow, addText, addImage, addWebCard, addDocumentCard, addDecompositionCard,
+    updateElement, deleteElement, createDocument, updateDocumentContent,
+  }
+
   useEffect(() => {
     registerCanvas({
       documentId: drawingId,
       elements,
       connectionStatus,
       elementActions: {
-        addShape, addLine, addArrow, addText, addImage, addWebCard, addDocumentCard, addDecompositionCard,
-        updateElement, deleteElement,
+        addShape: (...a: Parameters<typeof addShape>) => actionsRef.current.addShape(...a),
+        addLine: (...a: Parameters<typeof addLine>) => actionsRef.current.addLine(...a),
+        addArrow: (...a: Parameters<typeof addArrow>) => actionsRef.current.addArrow(...a),
+        addText: (...a: Parameters<typeof addText>) => actionsRef.current.addText(...a),
+        addImage: (...a: Parameters<typeof addImage>) => actionsRef.current.addImage(...a),
+        addWebCard: (...a: Parameters<typeof addWebCard>) => actionsRef.current.addWebCard(...a),
+        addDocumentCard: (...a: Parameters<typeof addDocumentCard>) => actionsRef.current.addDocumentCard(...a),
+        addDecompositionCard: (...a: Parameters<typeof addDecompositionCard>) => actionsRef.current.addDecompositionCard(...a),
+        updateElement: (...a: Parameters<typeof updateElement>) => actionsRef.current.updateElement(...a),
+        deleteElement: (...a: Parameters<typeof deleteElement>) => actionsRef.current.deleteElement(...a),
         getElements: () => yElements.toArray().map(readElement),
         fitToContent: () => canvasRef.current?.fitToContent(),
         fitToElements: (ids: string[]) => canvasRef.current?.fitToElements(ids),
         createDocument: async (opts) => {
-          const doc = await createDocument(opts)
+          const doc = await actionsRef.current.createDocument(opts)
           return { id: doc.id, type: doc.type, content_version: doc.content_version }
         },
-        updateDocumentContent,
+        updateDocumentContent: (...a: Parameters<typeof updateDocumentContent>) => actionsRef.current.updateDocumentContent(...a),
         addRemoteElements: async (documentId, elems) => {
           const res = await fetch(`/api/documents/${documentId}/elements`, {
             method: 'POST',
@@ -529,7 +548,7 @@ export function App({ drawingId }: { drawingId: string }) {
       onToggleDarkMode: () => setDarkMode(prev => !prev),
     })
     return () => unregisterCanvas(drawingId)
-  })
+  }, [drawingId, elements, connectionStatus, registerCanvas, unregisterCanvas, yElements, session?.access_token])
 
   return (
     <div className="app">

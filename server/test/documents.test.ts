@@ -222,7 +222,7 @@ describe('Documents API', () => {
         table: 'documents',
         handler: () => ({
           status: 200,
-          data: { id: documentId, title: 'My Renamed Drawing', type: 'canvas', content_version: 0, created_at: '2025-01-01', updated_at: '2025-06-01' },
+          data: { id: documentId, title: 'My Renamed Drawing', type: 'canvas', content_version: 0, created_at: '2025-01-01', updated_at: '2025-06-01', owner_id: TEST_USER_ID },
         }),
       },
       {

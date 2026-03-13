@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthContext'
 
 interface Share {
   id: string
-  email: string
+  shared_with_email: string
   created_at: string
 }
 
@@ -121,12 +121,13 @@ export function ShareDialog({ documentId, onClose }: ShareDialogProps) {
   }
 
   return (
-    <div style={styles.overlay} onClick={handleBackdropClick} onKeyDown={handleKeyDown}>
-      <div ref={dialogRef} style={styles.dialog}>
+    <div className="share-dialog-overlay" style={styles.overlay} onClick={handleBackdropClick} onKeyDown={handleKeyDown}>
+      <div ref={dialogRef} className="share-dialog" style={styles.dialog}>
         {/* Header */}
         <div style={styles.header}>
           <span style={styles.title}>Share document</span>
           <button
+            className="share-dialog__close"
             onClick={onClose}
             style={styles.closeBtn}
             onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text, #333)' }}
@@ -191,9 +192,9 @@ export function ShareDialog({ documentId, onClose }: ShareDialogProps) {
                 onMouseLeave={() => setHoveredShareId(null)}
               >
                 <div style={styles.shareAvatar}>
-                  {share.email[0].toUpperCase()}
+                  {share.shared_with_email[0].toUpperCase()}
                 </div>
-                <span style={styles.shareEmail}>{share.email}</span>
+                <span style={styles.shareEmail}>{share.shared_with_email}</span>
                 <button
                   onClick={() => handleRemove(share.id)}
                   style={{
@@ -242,7 +243,7 @@ const styles: Record<string, React.CSSProperties> = {
     maxHeight: '80vh',
     display: 'flex',
     flexDirection: 'column',
-    background: 'var(--surface, #fff)',
+    background: 'var(--bg, #fff)',
     borderRadius: 16,
     boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08)',
     overflow: 'hidden',
