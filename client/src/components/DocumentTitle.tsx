@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../auth/AuthContext'
 import { ShareDialog } from './ShareDialog'
 
@@ -98,7 +99,8 @@ export function DocumentTitle({ documentId }: Props) {
         {title}
       </button>
       <button
-        onClick={() => setShareOpen(true)}
+        onClick={(e) => { e.stopPropagation(); setShareOpen(true) }}
+        onMouseDown={(e) => e.stopPropagation()}
         style={shareButtonStyle}
         title="Share document"
         onMouseEnter={(e) => {
@@ -116,8 +118,9 @@ export function DocumentTitle({ documentId }: Props) {
           <line x1="12" y1="2" x2="12" y2="15" />
         </svg>
       </button>
-      {shareOpen && (
-        <ShareDialog documentId={documentId} onClose={() => setShareOpen(false)} />
+      {shareOpen && createPortal(
+        <ShareDialog documentId={documentId} onClose={() => setShareOpen(false)} />,
+        document.body,
       )}
     </div>
   )
