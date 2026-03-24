@@ -79,6 +79,15 @@ export function setupPersistence() {
       if (existing) clearTimeout(existing)
       writeTimers.delete(docName)
 
+      // Only persist Yjs state for canvas documents. HTML artifacts store
+      // raw HTML in content, not Yjs binary — overwriting would destroy them.
+      const { data } = await getSupabase()
+        .from('documents')
+        .select('type')
+        .eq('id', drawingId(docName))
+        .maybeSingle()
+      if (data && data.type !== 'canvas') return
+
       const state = Y.encodeStateAsUpdate(ydoc)
       if (state.length <= EMPTY_STATE_SIZE) return
       await getSupabase()
