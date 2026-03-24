@@ -4,6 +4,7 @@ import { layoutCanvas } from './layout.js'
 import { runAgentLoop, type AgentConfig, type StreamCallback } from './agent-runner.js'
 import { type ToolContext } from './agent-tools.js'
 import { updateLiveElement } from './live-docs.js'
+import { updateElementInDoc } from './yjs-utils.js'
 import { decrypt } from './crypto.js'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -381,7 +382,10 @@ async function processNextJob(): Promise<boolean> {
 
     // Clear the description and mark completed on the parent card
     if (parentDocId && parentCardId) {
-      updateLiveElement(parentDocId, parentCardId, { jobStatus: 'completed', description: '' })
+      const liveUpdated = updateLiveElement(parentDocId, parentCardId, { jobStatus: 'completed', description: '' })
+      if (!liveUpdated) {
+        await updateElementInDoc(parentDocId, parentCardId, { jobStatus: 'completed', description: '' })
+      }
     }
 
     console.log(`[worker] Completed job ${job.id} in ${result.turns} turns`)
@@ -391,7 +395,10 @@ async function processNextJob(): Promise<boolean> {
     await failJob(job.id, errMsg)
     // Update document card jobStatus on the parent canvas
     if (parentDocId && parentCardId) {
-      updateLiveElement(parentDocId, parentCardId, { jobStatus: 'failed', description: errMsg })
+      const liveUpdated = updateLiveElement(parentDocId, parentCardId, { jobStatus: 'failed', description: errMsg })
+      if (!liveUpdated) {
+        await updateElementInDoc(parentDocId, parentCardId, { jobStatus: 'failed', description: errMsg })
+      }
     }
   }
 
