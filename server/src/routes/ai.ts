@@ -41,7 +41,7 @@ async function decryptUserApiKey(userId: string): Promise<string> {
 
 const CLASSIFY_SYSTEM = `Classify the user's message into exactly one category. Reply with ONLY the category name, nothing else.
 
-canvas_edit — The user wants to create, modify, or arrange visual elements on a drawing canvas, OR generate AI images. Examples: "draw a flowchart", "wireframe a dashboard", "connect the two shapes", "make a mind map of React concepts", "generate an image of a cat", "make me a picture".
+canvas_edit — The user wants to create, modify, or arrange visual elements on a drawing canvas, OR generate AI images, OR create documents (markdown, wireframes, HTML artifacts) on the canvas. Examples: "draw a flowchart", "wireframe a dashboard", "connect the two shapes", "make a mind map of React concepts", "generate an image of a cat", "make me a picture", "create a markdown document", "make a hello world wireframe".
 
 research — The user wants to find information, look something up, or learn about a topic. Includes bare URLs. Examples: "what is a CRDT?", "search for React hooks best practices", "https://example.com summarize this".
 

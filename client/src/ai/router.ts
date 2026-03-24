@@ -17,6 +17,7 @@ const CANVAS_KEYWORDS = [
   'table', 'hierarchy', 'architecture',
   'generate image', 'generated image', 'image of', 'picture of',
   'generate a', 'make an image', 'make a picture', 'dall-e', 'dalle',
+  'markdown', 'wireframe', 'html artifact', 'document',
 ]
 
 const URL_RE = /https?:\/\/[^\s]+/i
