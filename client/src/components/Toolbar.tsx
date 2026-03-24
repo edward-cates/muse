@@ -10,11 +10,12 @@ interface Props {
   onInsertNode?: () => void
   onAutoLayout?: () => void
   onFitToContent?: () => void
+  onExportPng?: () => void
 }
 
 const LINE_TOOLS: Tool[] = ['line', 'arrow']
 
-export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeChange, onInsertImage, onInsertNode, onAutoLayout, onFitToContent }: Props) {
+export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeChange, onInsertImage, onInsertNode, onAutoLayout, onFitToContent, onExportPng }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleInsertImage = () => {
@@ -251,6 +252,22 @@ export function Toolbar({ activeTool, activeLineType, onToolChange, onLineTypeCh
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+          </svg>
+        </button>
+      )}
+
+      {/* Export as PNG */}
+      {onExportPng && (
+        <button
+          data-testid="export-png"
+          className="toolbar__btn"
+          onClick={onExportPng}
+          title="Export as PNG"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
         </button>
       )}

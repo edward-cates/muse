@@ -232,6 +232,8 @@ body {
 /* ── Lines (SVG layer) ── */
 .canvas__lines {
   pointer-events: none;
+  position: relative;
+  z-index: 1;
 }
 
 .canvas__lines path {

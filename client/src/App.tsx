@@ -15,6 +15,7 @@ import { useConnection } from './hooks/useConnection'
 import type { Tool, LineType, CanvasElement } from './types'
 import { isShape, isLine, isText } from './types'
 import { computeLayout } from './lib/layout'
+import { exportCanvasAsPng } from './ai/canvasCapture'
 
 export function App({ drawingId }: { drawingId: string }) {
   const [activeTool, setActiveTool] = useState<Tool>('select')
@@ -597,6 +598,10 @@ export function App({ drawingId }: { drawingId: string }) {
             for (const [id, pos] of positions) {
               updateElement(id, { x: pos.x, y: pos.y })
             }
+          }}
+          onExportPng={() => {
+            const el = document.querySelector('.canvas') as HTMLElement | null
+            if (el) exportCanvasAsPng(el)
           }}
         />
         {nodePickerOpen && (

@@ -87,6 +87,68 @@ const IMAGE_ICON = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" 
   <polyline points="21 15 16 10 5 21"></polyline>
 </svg>`
 
+/** Export the current viewport as a PNG and trigger a download. */
+export async function exportCanvasAsPng(element: HTMLElement, filename = 'canvas.png'): Promise<void> {
+  await waitForPaint()
+
+  const world = element.querySelector('.canvas__world') as HTMLElement | null
+  const ww = Math.max(element.clientWidth, world?.scrollWidth ?? 0)
+  const wh = Math.max(element.clientHeight, world?.scrollHeight ?? 0)
+
+  const canvas = await html2canvas(element, {
+    scale: 2, // retina quality
+    useCORS: true,
+    logging: false,
+    width: element.clientWidth,
+    height: element.clientHeight,
+    windowWidth: ww,
+    windowHeight: wh,
+    onclone: (_doc, clonedEl) => {
+      // Copy textarea values (html2canvas ignores .value)
+      for (const ta of clonedEl.querySelectorAll<HTMLTextAreaElement>('textarea')) {
+        ta.textContent = ta.value
+      }
+      // Hide selection UI in export
+      for (const handle of clonedEl.querySelectorAll<HTMLElement>('.resize-handle')) {
+        handle.style.display = 'none'
+      }
+      // Replace cross-origin images with placeholders
+      for (const img of clonedEl.querySelectorAll<HTMLImageElement>('.image-element img')) {
+        if (img.src.startsWith('data:')) continue
+        const parent = img.closest('.image-element') as HTMLElement | null
+        const w = parent?.style.width || `${img.width}px`
+        const h = parent?.style.height || `${img.height}px`
+        const alt = img.alt || 'Image'
+        img.replaceWith(makePlaceholder(_doc, {
+          width: w, height: h, label: alt, sublabel: 'Image', icon: IMAGE_ICON,
+        }))
+      }
+      // Replace iframes with placeholders
+      for (const iframe of clonedEl.querySelectorAll<HTMLIFrameElement>('iframe')) {
+        const card = iframe.closest('.document-card')
+        const label = card?.querySelector('.document-card__title')?.textContent || 'Untitled'
+        iframe.replaceWith(makePlaceholder(_doc, {
+          width: iframe.style.width || '100%',
+          height: iframe.parentElement?.style.height || '100%',
+          label, sublabel: 'HTML Wireframe', icon: CODE_ICON,
+          transform: iframe.style.transform,
+          transformOrigin: iframe.style.transformOrigin,
+        }))
+      }
+    },
+  })
+
+  canvas.toBlob(blob => {
+    if (!blob) return
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }, 'image/png')
+}
+
 export async function captureCanvas(element: HTMLElement): Promise<string> {
   // Wait for React to paint Yjs mutations into the DOM
   await waitForPaint()
