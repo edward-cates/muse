@@ -17,42 +17,71 @@ export function DocumentShell() {
 
   useDocumentRegistration(documentId)
 
-  // Fetch document type after registration
+  const [fetchError, setFetchError] = useState(false)
+
+  // Fetch document type after registration, with retry for cold starts
   useEffect(() => {
     if (!session?.access_token || !documentId) return
     setLoading(true)
     setAccessDenied(false)
+    setFetchError(false)
 
-    // Use POST to register/get doc metadata (idempotent)
-    fetch('/api/documents', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ id: documentId }),
-    })
-      .then(r => {
-        if (r.status === 403 || r.status === 404) {
-          setAccessDenied(true)
+    let attempt = 0
+    const maxRetries = 3
+
+    const fetchType = () => {
+      attempt++
+      fetch('/api/documents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ id: documentId }),
+      })
+        .then(r => {
+          if (r.status === 403 || r.status === 404) {
+            setAccessDenied(true)
+            setLoading(false)
+            return null
+          }
+          if (!r.ok) throw new Error(`HTTP ${r.status}`)
+          return r.json()
+        })
+        .then(data => {
+          if (!data) return
+          const type = data?.document?.type as DocumentType
+          setDocType(type || 'canvas')
           setLoading(false)
-          return null
-        }
-        return r.ok ? r.json() : null
-      })
-      .then(data => {
-        if (!data) return
-        const type = data?.document?.type as DocumentType
-        setDocType(type || 'canvas')
-        setLoading(false)
-      })
-      .catch(() => {
-        setDocType('canvas') // fallback
-        setLoading(false)
-      })
+        })
+        .catch(() => {
+          if (attempt < maxRetries) {
+            setTimeout(fetchType, 1000 * attempt)
+          } else {
+            setFetchError(true)
+            setLoading(false)
+          }
+        })
+    }
+
+    fetchType()
   }, [documentId, session?.access_token])
 
   if (loading) return <div className="app" />
+
+  if (fetchError) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, background: 'var(--bg, #fff)' }}>
+        <p style={{ fontSize: 16, color: 'var(--text-muted, #666)', margin: 0 }}>Unable to reach the server.</p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{ padding: '8px 20px', fontSize: 14, fontFamily: 'inherit', fontWeight: 600, background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   if (accessDenied) {
     return (
