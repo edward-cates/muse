@@ -274,4 +274,22 @@ test.describe('Click-to-select in non-select tool modes', () => {
     // In line mode, clicking a shape starts a connector, not selection
     await expect(page.locator('.shape--selected')).toHaveCount(0)
   })
+
+  test('backspace while editing text does not delete the shape', async ({ page }) => {
+    // Double-click shape to start editing text
+    const shape = canvas.shapes.first()
+    await shape.dblclick()
+
+    // Type some text then press Backspace
+    const textarea = shape.locator('textarea')
+    await expect(textarea).toBeFocused()
+    await textarea.fill('Hello')
+    await page.keyboard.press('Backspace')
+
+    // Shape should still exist
+    await expect(canvas.shapes).toHaveCount(1)
+
+    // Text should have last character deleted, not the whole shape
+    await expect(textarea).toHaveValue('Hell')
+  })
 })

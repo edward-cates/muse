@@ -376,6 +376,9 @@ export function ShapeRenderer({ shape, isSelected, onSelect, onUpdate, onStartEd
           onMouseDown={(e) => {
             if (isEditing) e.stopPropagation()
           }}
+          onKeyDown={(e) => {
+            if (isEditing && !e.metaKey && !e.ctrlKey && e.key !== 'Escape') e.stopPropagation()
+          }}
         />
       </div>
       {shape.locked && (

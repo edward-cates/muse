@@ -229,7 +229,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).matches('textarea, input')) return
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0 && !editingId) {
         // Check if any selected elements are locked
         for (const id of selectedIds) {
           const el = elements.find(el => el.id === id)
@@ -244,7 +244,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selectedIds, deleteElement, onSelectedIdsChange, elements])
+  }, [selectedIds, deleteElement, onSelectedIdsChange, elements, editingId])
 
   // Zoom keyboard shortcuts — handled directly to ensure synchronous state updates
   useEffect(() => {
