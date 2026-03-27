@@ -160,7 +160,7 @@ export function readElement(m: Y.Map<YMapVal>): CanvasElement {
     verticalAlign: ((m.get('verticalAlign') as string) || 'middle') as 'top' | 'middle' | 'bottom',
     strokeStyle: ((m.get('strokeStyle') as string) || 'solid') as 'solid' | 'dashed' | 'dotted',
     opacity: (m.get('opacity') as number) ?? 100,
-    cornerRadius: (m.get('cornerRadius') as number) || 8,
+    cornerRadius: (m.get('cornerRadius') as number) ?? 8,
     shadow: (m.get('shadow') as unknown as boolean) ?? true,
     rotation: (m.get('rotation') as number) || 0,
     flipH: (m.get('flipH') as unknown as boolean) ?? false,

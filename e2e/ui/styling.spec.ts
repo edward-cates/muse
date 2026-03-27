@@ -277,6 +277,27 @@ test.describe('Style workflow', () => {
     await expect(rect).toHaveAttribute('rx', '12')
   })
 
+  test('corner radius can be set to zero for sharp corners', async ({ page }) => {
+    await canvas.selectTool('rectangle')
+    await canvas.drawShape(200, 200, 120, 80)
+    await canvas.selectTool('select')
+    await canvas.shapes.first().click()
+
+    // Default should be 8
+    const rect = canvas.shapes.first().locator('rect')
+    await page.mouse.click(600, 50)
+    await expect(rect).toHaveAttribute('rx', '8')
+
+    // Set to 0
+    await canvas.shapes.first().click()
+    const radiusInput = page.locator('.property-panel input[data-testid="corner-radius"]')
+    await radiusInput.fill('0')
+    await radiusInput.press('Enter')
+
+    await page.mouse.click(600, 50)
+    await expect(rect).toHaveAttribute('rx', '0')
+  })
+
   test('shadow toggle removes drop shadow from shape (default is on)', async ({ page }) => {
     await canvas.selectTool('rectangle')
     await canvas.drawShape(200, 200, 120, 80)
