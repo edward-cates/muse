@@ -78,6 +78,7 @@ export function setupPersistence() {
       const existing = writeTimers.get(docName)
       if (existing) clearTimeout(existing)
       writeTimers.delete(docName)
+      bindPromises.delete(docName)
 
       // Only persist Yjs state for canvas documents. HTML artifacts store
       // raw HTML in content, not Yjs binary — overwriting would destroy them.

@@ -139,7 +139,16 @@ router.post('/message', async (req, res) => {
       ...(tools && tools.length > 0 ? { tools } : {}),
     })
 
+    // Abort the Anthropic stream if the client disconnects mid-response
+    // to avoid buffering data for a dead connection
+    let clientDisconnected = false
+    res.on('close', () => {
+      clientDisconnected = true
+      stream.abort()
+    })
+
     for await (const event of stream) {
+      if (clientDisconnected) break
       // Text content deltas
       if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
         res.write(`data: ${JSON.stringify({ type: 'text_delta', text: event.delta.text })}\n\n`)

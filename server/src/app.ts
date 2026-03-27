@@ -16,7 +16,7 @@ import decomposeRouter from './routes/decompose.js'
 import chatsRouter from './routes/chats.js'
 import jobsRouter from './routes/jobs.js'
 import { setupPersistence } from './persistence.js'
-import { setGetYDoc } from './live-docs.js'
+import { setGetYDoc, setDocsMap } from './live-docs.js'
 
 // ── Express types augmentation ──
 declare global {
@@ -75,10 +75,12 @@ export async function createApp(): Promise<AppInstance> {
 
   const utils = await import('y-websocket/bin/utils')
   const { setupWSConnection, setPersistence, getYDoc } = utils
+  const docs = (utils as unknown as { docs: Map<string, import('yjs').Doc> }).docs
 
   const persistence = setupPersistence()
   setPersistence(persistence)
   setGetYDoc(getYDoc)
+  setDocsMap(docs)
 
   // ── Express ──
   const app = express()
