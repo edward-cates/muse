@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import type { DocumentMeta } from '../types/document'
+import { apiUrl } from '../lib/api'
 
-const API_BASE = '/api/documents'
+const API_BASE = apiUrl('/api/documents')
 
 export function useDocumentMeta(documentId: string) {
   const { session } = useAuth()
