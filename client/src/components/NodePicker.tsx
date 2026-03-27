@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { apiUrl } from '../lib/api'
 
 interface Document {
   id: string
@@ -24,7 +25,7 @@ export function NodePicker({ currentDocumentId, onCreateNew, onLinkExisting, onC
     if (!session?.access_token) return
     let cancelled = false
 
-    fetch('/api/documents', {
+    fetch(apiUrl('/api/documents'), {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then(r => r.ok ? r.json() : null)

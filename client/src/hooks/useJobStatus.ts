@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { apiUrl } from '../lib/api'
 
 export interface JobStatus {
   id: string
@@ -24,7 +25,7 @@ export function useJobStatus(jobId: string | null, token: string | null): JobSta
   const fetchStatus = useCallback(async () => {
     if (!jobId || !token) return
     try {
-      const res = await fetch(`/api/jobs/${jobId}`, {
+      const res = await fetch(apiUrl(`/api/jobs/${jobId}`), {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
@@ -71,7 +72,7 @@ export async function createJob(
   input: Record<string, unknown>,
   documentId?: string,
 ): Promise<string> {
-  const res = await fetch('/api/jobs', {
+  const res = await fetch(apiUrl('/api/jobs'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -89,7 +90,7 @@ export async function createJob(
 
 /** Cancel a running job */
 export async function cancelJobRequest(token: string, jobId: string): Promise<void> {
-  const res = await fetch(`/api/jobs/${jobId}/cancel`, {
+  const res = await fetch(apiUrl(`/api/jobs/${jobId}/cancel`), {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   })

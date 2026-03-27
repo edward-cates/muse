@@ -1,3 +1,5 @@
+import { apiUrl } from '../lib/api'
+
 export type AgentIntent = 'canvas_edit' | 'research' | 'compose' | 'chat'
 
 const RESEARCH_KEYWORDS = [
@@ -62,7 +64,7 @@ export async function classifyIntent(
   previousIntent?: AgentIntent,
 ): Promise<AgentIntent> {
   try {
-    const res = await fetch('/api/ai/classify', {
+    const res = await fetch(apiUrl('/api/ai/classify'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

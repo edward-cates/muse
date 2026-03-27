@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { apiUrl } from '../lib/api'
 
 export function useDocumentRegistration(documentId: string, type: string = 'canvas') {
   const { session } = useAuth()
@@ -10,7 +11,7 @@ export function useDocumentRegistration(documentId: string, type: string = 'canv
 
     registered.current.add(documentId)
 
-    fetch('/api/documents', {
+    fetch(apiUrl('/api/documents'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

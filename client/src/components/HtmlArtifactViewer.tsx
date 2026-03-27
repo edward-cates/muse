@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useDocumentContent, useDocumentApi } from '../hooks/useDocument'
 import { useAuth } from '../auth/AuthContext'
+import { apiUrl } from '../lib/api'
 import { DocumentTitle } from './DocumentTitle'
 import { buildHtmlEditorConfig, HTML_EDITOR_TOOLS } from '../ai/agents/htmlEditor'
 
@@ -58,7 +59,7 @@ export function HtmlArtifactViewer({ documentId }: Props) {
         { role: 'user', content: userMsg },
       ]
 
-      const res = await fetch('/api/ai/message', {
+      const res = await fetch(apiUrl('/api/ai/message'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

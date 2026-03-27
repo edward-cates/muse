@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { apiUrl } from '../lib/api'
 
 interface Backlink {
   id: string
@@ -18,7 +19,7 @@ export function BacklinksPanel({ documentId }: Props) {
     if (!session?.access_token || !documentId) return
     let cancelled = false
 
-    fetch(`/api/documents/${documentId}/backlinks`, {
+    fetch(apiUrl(`/api/documents/${documentId}/backlinks`), {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then(r => r.ok ? r.json() : null)

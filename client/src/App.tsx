@@ -15,6 +15,7 @@ import { useConnection } from './hooks/useConnection'
 import type { Tool, LineType, CanvasElement } from './types'
 import { isShape, isLine, isText } from './types'
 import { computeLayout } from './lib/layout'
+import { apiUrl } from './lib/api'
 import { exportCanvasAsPng } from './ai/canvasCapture'
 
 export function App({ drawingId }: { drawingId: string }) {
@@ -71,7 +72,7 @@ export function App({ drawingId }: { drawingId: string }) {
     }
 
     try {
-      const res = await fetch(`/api/documents/${documentId}`, {
+      const res = await fetch(apiUrl(`/api/documents/${documentId}`), {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       if (!res.ok) return
@@ -111,7 +112,7 @@ export function App({ drawingId }: { drawingId: string }) {
       : 'Untitled'
 
     try {
-      const res = await fetch('/api/documents', {
+      const res = await fetch(apiUrl('/api/documents'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -527,7 +528,7 @@ export function App({ drawingId }: { drawingId: string }) {
         },
         updateDocumentContent: (...a: Parameters<typeof updateDocumentContent>) => actionsRef.current.updateDocumentContent(...a),
         addRemoteElements: async (documentId, elems) => {
-          const res = await fetch(`/api/documents/${documentId}/elements`, {
+          const res = await fetch(apiUrl(`/api/documents/${documentId}/elements`), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
             body: JSON.stringify({ elements: elems }),
@@ -536,7 +537,7 @@ export function App({ drawingId }: { drawingId: string }) {
           return res.json()
         },
         updateRemoteElement: async (documentId, elementId, updates) => {
-          const res = await fetch(`/api/documents/${documentId}/elements`, {
+          const res = await fetch(apiUrl(`/api/documents/${documentId}/elements`), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
             body: JSON.stringify({ elementId, updates }),
@@ -610,7 +611,7 @@ export function App({ drawingId }: { drawingId: string }) {
             onCreateNew={async () => {
               if (!session?.access_token) return
               try {
-                const res = await fetch('/api/documents', {
+                const res = await fetch(apiUrl('/api/documents'), {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',

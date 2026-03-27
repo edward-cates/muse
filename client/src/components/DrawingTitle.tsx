@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { apiUrl } from '../lib/api'
 
 interface Props {
   drawingId: string
@@ -18,7 +19,7 @@ export function DrawingTitle({ drawingId }: Props) {
     if (!session?.access_token) return
     let cancelled = false
 
-    fetch('/api/drawings', {
+    fetch(apiUrl('/api/drawings'), {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then((res) => (res.ok ? res.json() : null))
@@ -44,7 +45,7 @@ export function DrawingTitle({ drawingId }: Props) {
     setTitle(trimmed)
 
     if (!session?.access_token) return
-    fetch(`/api/drawings/${drawingId}`, {
+    fetch(apiUrl(`/api/drawings/${drawingId}`), {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${session.access_token}`,

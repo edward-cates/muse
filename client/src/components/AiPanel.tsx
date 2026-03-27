@@ -11,6 +11,7 @@ import type { AgentConfig } from '../ai/agents/types'
 import type { CanvasElement } from '../types'
 import { useJobStatus, createJob } from '../hooks/useJobStatus'
 import { useActiveCanvas } from '../ai/ActiveCanvasContext'
+import { apiUrl } from '../lib/api'
 
 // ── AI interaction logger ──
 
@@ -26,7 +27,7 @@ async function logToFile(
   data: unknown,
 ) {
   try {
-    await fetch('/api/ailog/write', {
+    await fetch(apiUrl('/api/ailog/write'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ conversation: conversationId, turn, filename, data }),
@@ -207,7 +208,7 @@ export function AiPanel() {
     if (staleCards.length === 0) return
 
     for (const card of staleCards) {
-      fetch(`/api/jobs/${card.jobId}`, {
+      fetch(apiUrl(`/api/jobs/${card.jobId}`), {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
         .then(r => r.ok ? r.json() : null)
@@ -228,7 +229,7 @@ export function AiPanel() {
     const token = session?.access_token
     if (!token || _persistedChat.length === 0) return
     try {
-      const res = await fetch('/api/ai/chats', {
+      const res = await fetch(apiUrl('/api/ai/chats'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -255,7 +256,7 @@ export function AiPanel() {
     if (!session?.access_token) return
     setLoadingHistory(true)
     try {
-      const res = await fetch('/api/ai/chats', {
+      const res = await fetch(apiUrl('/api/ai/chats'), {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       if (res.ok) {
@@ -270,7 +271,7 @@ export function AiPanel() {
   async function loadChat(id: string) {
     if (!session?.access_token) return
     try {
-      const res = await fetch(`/api/ai/chats/${id}`, {
+      const res = await fetch(apiUrl(`/api/ai/chats/${id}`), {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       if (res.ok) {
@@ -476,7 +477,7 @@ export function AiPanel() {
 
   /** Decompose text via server endpoint */
   const decomposeTextViaServer: DecomposeTextFn = async (text, title) => {
-    const res = await fetch('/api/decompose', {
+    const res = await fetch(apiUrl('/api/decompose'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -495,7 +496,7 @@ export function AiPanel() {
 
   /** Fetch URL via server proxy */
   async function fetchUrlViaServer(url: string): Promise<{ title: string; text: string; url: string }> {
-    const res = await fetch('/api/fetch', {
+    const res = await fetch(apiUrl('/api/fetch'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -512,7 +513,7 @@ export function AiPanel() {
 
   /** Generate an image via server proxy to OpenAI DALL-E */
   async function generateImageViaServer(prompt: string, size?: string): Promise<{ url: string; revised_prompt?: string }> {
-    const res = await fetch('/api/image-gen', {
+    const res = await fetch(apiUrl('/api/image-gen'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -571,7 +572,7 @@ export function AiPanel() {
       })
       log(turns, 'request.json', { messages: redactedMessages })
 
-      const res = await fetch('/api/ai/message', {
+      const res = await fetch(apiUrl('/api/ai/message'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

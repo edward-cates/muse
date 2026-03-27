@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { apiUrl } from '../lib/api'
 
 interface Document {
   id: string
@@ -64,7 +65,7 @@ export function DocumentsList({ currentDocumentId }: Props) {
     if (!session?.access_token) return
     setLoading(true)
     try {
-      const res = await fetch('/api/documents', {
+      const res = await fetch(apiUrl('/api/documents'), {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       if (res.ok) {
@@ -124,7 +125,7 @@ export function DocumentsList({ currentDocumentId }: Props) {
     // Second click: actually delete
     if (!session?.access_token) return
     try {
-      const res = await fetch(`/api/documents/${id}`, {
+      const res = await fetch(apiUrl(`/api/documents/${id}`), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${session.access_token}` },
       })

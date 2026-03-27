@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { apiUrl } from '../lib/api'
 
 interface Share {
   id: string
@@ -28,7 +29,7 @@ export function ShareDialog({ documentId, onClose }: ShareDialogProps) {
     if (!session?.access_token) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/documents/${documentId}/shares`, {
+      const res = await fetch(apiUrl(`/api/documents/${documentId}/shares`), {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       if (res.ok) {
@@ -69,7 +70,7 @@ export function ShareDialog({ documentId, onClose }: ShareDialogProps) {
     setSuccess(null)
 
     try {
-      const res = await fetch(`/api/documents/${documentId}/shares`, {
+      const res = await fetch(apiUrl(`/api/documents/${documentId}/shares`), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -99,7 +100,7 @@ export function ShareDialog({ documentId, onClose }: ShareDialogProps) {
     if (!session?.access_token) return
 
     try {
-      const res = await fetch(`/api/documents/${documentId}/shares/${shareId}`, {
+      const res = await fetch(apiUrl(`/api/documents/${documentId}/shares/${shareId}`), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${session.access_token}` },
       })

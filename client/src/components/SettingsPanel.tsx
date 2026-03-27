@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { apiUrl } from '../lib/api'
 
 interface Props {
   open: boolean
@@ -23,7 +24,7 @@ function KeySection({ token, provider, label, placeholder, hint, open }: KeySect
 
   useEffect(() => {
     if (!open || !token) return
-    fetch(`/api/keys/status?provider=${provider}`, {
+    fetch(apiUrl(`/api/keys/status?provider=${provider}`), {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -38,7 +39,7 @@ function KeySection({ token, provider, label, placeholder, hint, open }: KeySect
     setError(null)
 
     try {
-      const res = await fetch('/api/keys', {
+      const res = await fetch(apiUrl('/api/keys'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -64,7 +65,7 @@ function KeySection({ token, provider, label, placeholder, hint, open }: KeySect
   const handleDelete = async () => {
     if (!token) return
     try {
-      await fetch(`/api/keys?provider=${provider}`, {
+      await fetch(apiUrl(`/api/keys?provider=${provider}`), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })

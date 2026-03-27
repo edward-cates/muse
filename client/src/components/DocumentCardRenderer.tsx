@@ -1,6 +1,7 @@
 import { useRef, useCallback, useState, useEffect, type MouseEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../auth/AuthContext'
+import { apiUrl } from '../lib/api'
 import type { DocumentCardElement, Tool } from '../types'
 
 interface Props {
@@ -76,7 +77,7 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
     if (!session?.access_token || !element.documentId) return
     let cancelled = false
 
-    fetch(`/api/documents/${element.documentId}`, {
+    fetch(apiUrl(`/api/documents/${element.documentId}`), {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then(r => r.ok ? r.json() : null)
@@ -98,7 +99,7 @@ export function DocumentCardRenderer({ element, isSelected, onSelect, onUpdate, 
     if (!session?.access_token || !element.documentId) return
 
     let cancelled = false
-    fetch(`/api/documents/${element.documentId}/content`, {
+    fetch(apiUrl(`/api/documents/${element.documentId}/content`), {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then(r => r.ok ? r.json() : null)

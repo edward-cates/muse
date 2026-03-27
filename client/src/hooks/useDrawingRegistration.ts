@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { apiUrl } from '../lib/api'
 
 export function useDrawingRegistration(drawingId: string) {
   const { session } = useAuth()
@@ -10,7 +11,7 @@ export function useDrawingRegistration(drawingId: string) {
 
     registered.current.add(drawingId)
 
-    fetch('/api/drawings', {
+    fetch(apiUrl('/api/drawings'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

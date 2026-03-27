@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { apiUrl } from '../lib/api'
 
 interface Drawing {
   id: string
@@ -37,7 +38,7 @@ export function DrawingsList({ currentDrawingId }: Props) {
     if (!session?.access_token) return
     setLoading(true)
     try {
-      const res = await fetch('/api/drawings', {
+      const res = await fetch(apiUrl('/api/drawings'), {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       if (res.ok) {

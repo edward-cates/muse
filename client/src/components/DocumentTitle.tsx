@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../auth/AuthContext'
+import { apiUrl } from '../lib/api'
 import { ShareDialog } from './ShareDialog'
 
 interface Props {
@@ -21,7 +22,7 @@ export function DocumentTitle({ documentId }: Props) {
     if (!session?.access_token) return
     let cancelled = false
 
-    fetch('/api/documents', {
+    fetch(apiUrl('/api/documents'), {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
       .then((res) => (res.ok ? res.json() : null))
@@ -46,7 +47,7 @@ export function DocumentTitle({ documentId }: Props) {
     if (trimmed === title) return
     setTitle(trimmed)
     if (!session?.access_token) return
-    fetch(`/api/documents/${documentId}`, {
+    fetch(apiUrl(`/api/documents/${documentId}`), {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${session.access_token}`,

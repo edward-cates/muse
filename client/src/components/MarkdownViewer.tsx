@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useDocumentContent, useDocumentApi } from '../hooks/useDocument'
 import { useAuth } from '../auth/AuthContext'
+import { apiUrl } from '../lib/api'
 import { DocumentTitle } from './DocumentTitle'
 import { buildMarkdownEditorConfig, MARKDOWN_EDITOR_TOOLS } from '../ai/agents/markdownEditor'
 
@@ -58,7 +59,7 @@ export function MarkdownViewer({ documentId }: Props) {
         { role: 'user', content: userMsg },
       ]
 
-      const res = await fetch('/api/ai/message', {
+      const res = await fetch(apiUrl('/api/ai/message'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
