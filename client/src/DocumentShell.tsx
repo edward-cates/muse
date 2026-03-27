@@ -7,6 +7,7 @@ import { App } from './App'
 import { HtmlArtifactViewer } from './components/HtmlArtifactViewer'
 import { MarkdownViewer } from './components/MarkdownViewer'
 import type { DocumentType } from './types/document'
+import { apiUrl } from './lib/api'
 
 export function DocumentShell() {
   const documentId = useDrawingId()
@@ -31,7 +32,7 @@ export function DocumentShell() {
 
     const fetchType = () => {
       attempt++
-      fetch('/api/documents', {
+      fetch(apiUrl('/api/documents'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
