@@ -12,6 +12,7 @@ import type { CanvasElement } from '../types'
 import { useJobStatus, createJob } from '../hooks/useJobStatus'
 import { useActiveCanvas } from '../ai/ActiveCanvasContext'
 import { apiUrl } from '../lib/api'
+import { stripBase64FromMessages } from '../ai/stripBase64'
 
 // ── AI interaction logger ──
 
@@ -578,6 +579,12 @@ export function AiPanel() {
     try {
     while (looping && turns < config.maxTurns) {
       turns++
+
+      // Strip base64 image data from previous tool results to avoid
+      // bloating the context — images are already stored on the canvas
+      if (turns > 1) {
+        currentApiMessages = stripBase64FromMessages(currentApiMessages)
+      }
 
       // Add placeholder assistant message for streaming
       if (turns === 1) {
