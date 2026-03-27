@@ -8,6 +8,7 @@ import { HtmlArtifactViewer } from './components/HtmlArtifactViewer'
 import { MarkdownViewer } from './components/MarkdownViewer'
 import type { DocumentType } from './types/document'
 import { apiUrl } from './lib/api'
+import { AiPanel } from './components/AiPanel'
 
 export function DocumentShell() {
   const documentId = useDrawingId()
@@ -109,9 +110,12 @@ export function DocumentShell() {
     case 'canvas':
     default:
       return (
-        <CollabProvider roomName={`muse-${documentId}`}>
-          <App drawingId={documentId} />
-        </CollabProvider>
+        <>
+          <CollabProvider roomName={`muse-${documentId}`}>
+            <App drawingId={documentId} />
+          </CollabProvider>
+          <AiPanel />
+        </>
       )
   }
 }

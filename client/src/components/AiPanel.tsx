@@ -71,11 +71,12 @@ interface SseTextDelta { type: 'text_delta'; text: string }
 interface SseToolUseStart { type: 'tool_use_start'; id: string; name: string }
 interface SseInputJsonDelta { type: 'input_json_delta'; partial_json: string }
 interface SseContentBlockStop { type: 'content_block_stop' }
-interface SseMessageDelta { type: 'message_delta'; stop_reason: string }
+interface SseMessageDelta { type: 'message_delta'; stop_reason: string; usage?: { output_tokens: number } }
+interface SseUsage { type: 'usage'; input_tokens: number; output_tokens: number }
 interface SseServerToolUseStart { type: 'server_tool_use_start'; name: string; input: Record<string, unknown> }
 interface SseError { error: string }
 
-type SseEvent = SseTextDelta | SseToolUseStart | SseInputJsonDelta | SseContentBlockStop | SseMessageDelta | SseServerToolUseStart | SseError
+type SseEvent = SseTextDelta | SseToolUseStart | SseInputJsonDelta | SseContentBlockStop | SseMessageDelta | SseUsage | SseServerToolUseStart | SseError
 
 // ── Component ──
 
@@ -83,6 +84,10 @@ type SseEvent = SseTextDelta | SseToolUseStart | SseInputJsonDelta | SseContentB
 let _persistedChat: ChatMessage[] = []
 let _persistedApi: ApiMessage[] = []
 let _persistedChatId: string | null = null
+let _persistedTokens = { input: 0, output: 0 }
+
+const TOKEN_LIMIT = 1_000_000
+const TOKEN_WARNING = 800_000
 
 interface ChatListItem {
   id: string
@@ -107,6 +112,7 @@ export function AiPanel() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [activeJobCardId, setActiveJobCardId] = useState<string | null>(null)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+  const [tokenUsage, _setTokenUsage] = useState(_persistedTokens)
   const abortRef = useRef<AbortController | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const prevDocumentIdRef = useRef<string | null>(documentId)
@@ -146,6 +152,11 @@ export function AiPanel() {
   const setChatId = useCallback((id: string | null) => {
     _persistedChatId = id
     _setChatId(id)
+  }, [])
+
+  const setTokenUsage = useCallback((usage: { input: number; output: number }) => {
+    _persistedTokens = usage
+    _setTokenUsage(usage)
   }, [])
 
   // Update chat UI and card status when job status changes
@@ -289,6 +300,7 @@ export function AiPanel() {
     setChatId(null)
     setChatMessages([])
     setApiMessages([])
+    setTokenUsage({ input: 0, output: 0 })
     setShowHistory(false)
   }
 
@@ -309,7 +321,7 @@ export function AiPanel() {
     signal: AbortSignal,
     onToolCall: (tc: ToolCall) => Promise<{ tool_use_id: string; content: string }>,
     onStatus?: (status: string) => void,
-  ): Promise<{ textContent: string; toolCalls: ToolCall[]; toolResults: { tool_use_id: string; content: string }[]; stopReason: string }> {
+  ): Promise<{ textContent: string; toolCalls: ToolCall[]; toolResults: { tool_use_id: string; content: string }[]; stopReason: string; usage: { input_tokens: number; output_tokens: number } }> {
     const reader = res.body!.getReader()
     const decoder = new TextDecoder()
     let textContent = ''
@@ -318,6 +330,7 @@ export function AiPanel() {
     let currentTool: { id: string; name: string; inputJson: string } | null = null
     let stopReason = 'end_turn'
     let buffer = ''
+    const usage = { input_tokens: 0, output_tokens: 0 }
 
     while (true) {
       const { done, value } = await reader.read()
@@ -397,6 +410,14 @@ export function AiPanel() {
 
           case 'message_delta':
             stopReason = event.stop_reason
+            if (event.usage?.output_tokens) {
+              usage.output_tokens = event.usage.output_tokens
+            }
+            break
+
+          case 'usage':
+            usage.input_tokens = event.input_tokens
+            usage.output_tokens = event.output_tokens
             break
 
           case 'server_tool_use_start':
@@ -408,7 +429,7 @@ export function AiPanel() {
       }
     }
 
-    return { textContent, toolCalls, toolResults, stopReason }
+    return { textContent, toolCalls, toolResults, stopReason, usage }
   }
 
   function describeToolAction(tc: ToolCall): string {
@@ -593,7 +614,7 @@ export function AiPanel() {
 
       // Stream-and-execute: tools are executed inline as they complete
       let failCount = 0
-      const { textContent, toolCalls, toolResults, stopReason } = await parseStreamAndExecute(
+      const { textContent, toolCalls, toolResults, stopReason, usage: turnUsage } = await parseStreamAndExecute(
         res, abort.signal,
         async (tc) => {
           setStatus(describeToolAction(tc))
@@ -625,6 +646,14 @@ export function AiPanel() {
         textContent: textContent || null,
         toolCalls: toolCalls.map(tc => ({ id: tc.id, name: tc.name, input: tc.input })),
       })
+
+      // Accumulate token usage
+      if (turnUsage.input_tokens || turnUsage.output_tokens) {
+        setTokenUsage({
+          input: _persistedTokens.input + turnUsage.input_tokens,
+          output: _persistedTokens.output + turnUsage.output_tokens,
+        })
+      }
 
       if (stopReason === 'tool_use' && toolCalls.length > 0) {
         // Build the assistant's API message with all content blocks
@@ -1055,13 +1084,32 @@ export function AiPanel() {
         <div ref={messagesEndRef} />
       </div>
 
+      {(() => {
+        const total = tokenUsage.input + tokenUsage.output
+        if (total === 0) return null
+        const atLimit = total >= TOKEN_LIMIT * 0.95
+        const nearLimit = total >= TOKEN_WARNING
+        const fmt = total >= 1000 ? `${(total / 1000).toFixed(1)}k` : String(total)
+        return (
+          <div style={{ padding: '4px 16px', fontSize: 12, color: atLimit ? '#dc2626' : nearLimit ? '#d97706' : '#9ca3af', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Context: {fmt} / 1M tokens</span>
+            {atLimit && (
+              <button onClick={startNewChat} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit' }}>
+                Start new chat
+              </button>
+            )}
+            {!atLimit && nearLimit && <span>Consider starting a new chat soon</span>}
+          </div>
+        )
+      })()}
+
       <form onSubmit={handleSubmit} style={styles.inputArea}>
         <input
           type="text"
-          placeholder="Draw a flowchart, research a topic, or ask a question..."
+          placeholder={tokenUsage.input + tokenUsage.output >= TOKEN_LIMIT * 0.95 ? 'Context limit reached — start a new chat' : 'Draw a flowchart, research a topic, or ask a question...'}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={streaming || !hasCanvas}
+          disabled={streaming || !hasCanvas || tokenUsage.input + tokenUsage.output >= TOKEN_LIMIT * 0.95}
           style={styles.input}
         />
         {streaming ? (

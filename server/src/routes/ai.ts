@@ -176,11 +176,25 @@ router.post('/message', async (req, res) => {
         res.write(`data: ${JSON.stringify({ type: 'content_block_stop' })}\n\n`)
       }
 
-      // Message delta (contains stop_reason)
+      // Message start (contains input token usage)
+      if (event.type === 'message_start') {
+        const u = (event as unknown as { message: { usage?: { input_tokens?: number; output_tokens?: number } } }).message.usage
+        if (u) {
+          res.write(`data: ${JSON.stringify({
+            type: 'usage',
+            input_tokens: u.input_tokens ?? 0,
+            output_tokens: u.output_tokens ?? 0,
+          })}\n\n`)
+        }
+      }
+
+      // Message delta (contains stop_reason + output token usage)
       if (event.type === 'message_delta') {
+        const u = (event as unknown as { usage?: { output_tokens?: number } }).usage
         res.write(`data: ${JSON.stringify({
           type: 'message_delta',
           stop_reason: event.delta.stop_reason,
+          ...(u ? { usage: { output_tokens: u.output_tokens ?? 0 } } : {}),
         })}\n\n`)
       }
     }
