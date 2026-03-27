@@ -59,9 +59,11 @@ export function LoginPage() {
           </button>
         </form>
 
+        {/* TODO: re-enable once Google OAuth is configured in prod Supabase
         <button onClick={handleGoogle} style={styles.oauthButton}>
           Continue with Google
         </button>
+        */}
 
         <p style={styles.toggle}>
           {isSignUp ? 'Have an account?' : "Don't have an account?"}{' '}
